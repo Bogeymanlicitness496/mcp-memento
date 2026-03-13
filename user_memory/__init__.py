@@ -1,37 +1,37 @@
 """
-Claude Code Memory Server
+MemoryGraph MCP Server for Zed Editor
 
-A graph-based MCP server that provides intelligent memory capabilities for Claude Code,
+A graph-based MCP server that provides intelligent memory capabilities for Zed editor,
 enabling persistent knowledge tracking, relationship mapping, and contextual development assistance.
 
-Supports multiple backends: SQLite (default), Neo4j, and Memgraph.
+Supports SQLite backend only for simplified deployment with Zed editor.
 """
 
-__version__ = "0.12.4"
+__version__ = "0.1.4"
 __author__ = "Gregory Dickson"
 __email__ = "gregory.d.dickson@gmail.com"
 
-from .server import ClaudeMemoryServer
 from .models import (
-    Memory,
-    MemoryType,
-    Relationship,
-    RelationshipType,
-    MemoryNode,
-    MemoryContext,
-    MemoryError,
-    MemoryNotFoundError,
-    RelationshipError,
-    ValidationError,
-    DatabaseConnectionError,
-    SchemaError,
-    NotFoundError,
     BackendError,
     ConfigurationError,
+    DatabaseConnectionError,
+    Memory,
+    MemoryContext,
+    MemoryError,
+    MemoryNode,
+    MemoryNotFoundError,
+    MemoryType,
+    NotFoundError,
+    Relationship,
+    RelationshipError,
+    RelationshipType,
+    SchemaError,
+    ValidationError,
 )
+from .server import MemoryGraphServer
 
 __all__ = [
-    "ClaudeMemoryServer",
+    "MemoryGraphServer",
     "Memory",
     "MemoryType",
     "Relationship",

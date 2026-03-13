@@ -5,19 +5,18 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from ..models import Memory, MemoryType, MemoryContext
+from ..models import Memory, MemoryContext, MemoryType
 
 logger = logging.getLogger(__name__)
 
 
 def parse_memory_from_properties(
-    node_data: Dict[str, Any],
-    source: str = "unknown"
+    node_data: Dict[str, Any], source: str = "unknown"
 ) -> Optional[Memory]:
     """
     Convert database node properties to Memory object.
 
-    Works with Neo4j, FalkorDB, SQLite, and other backends.
+    Works with SQLite backend.
 
     Args:
         node_data: Dictionary of node properties
@@ -79,7 +78,7 @@ def _extract_context(node_data: Dict[str, Any]) -> Dict[str, Any]:
                     context_data[context_key] = json.loads(value)
                 except json.JSONDecodeError:
                     context_data[context_key] = value
-            elif isinstance(value, str) and value.startswith(('[', '{')):
+            elif isinstance(value, str) and value.startswith(("[", "{")):
                 try:
                     context_data[context_key] = json.loads(value)
                 except json.JSONDecodeError:

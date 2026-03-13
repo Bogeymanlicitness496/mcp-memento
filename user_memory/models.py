@@ -277,6 +277,46 @@ class MemoryNode(BaseModel):
     node_id: Optional[int] = None  # Internal node ID for graph databases
     labels: List[str] = Field(default_factory=list)
 
+    def to_database_properties(self) -> Dict[str, Any]:
+        """Convert memory to database properties dictionary."""
+        # Convert memory to dict
+        memory_dict = self.memory.model_dump()
+
+        # Handle context separately if present
+        if "context" in memory_dict and memory_dict["context"] is not None:
+            context = memory_dict.pop("context")
+            if hasattr(context, "model_dump"):
+                context_dict = context.model_dump()
+            else:
+                context_dict = context
+
+            # Add context fields with prefix
+            for key, value in context_dict.items():
+                if value is not None:
+                    memory_dict[f"context_{key}"] = value
+
+        # Convert datetime objects to ISO format strings
+        for key in ["created_at", "updated_at", "last_accessed"]:
+            if key in memory_dict and memory_dict[key] is not None:
+                if hasattr(memory_dict[key], "isoformat"):
+                    memory_dict[key] = memory_dict[key].isoformat()
+
+        # Ensure all fields are JSON serializable
+        for key, value in list(memory_dict.items()):
+            if isinstance(value, (list, dict)):
+                # These are already JSON serializable
+                continue
+            elif hasattr(value, "value"):  # Handle Enum values
+                memory_dict[key] = value.value
+            elif value is None:
+                # Keep None values
+                continue
+            elif not isinstance(value, (str, int, float, bool)):
+                # Convert other types to string
+                memory_dict[key] = str(value)
+
+        return memory_dict
+
 
 class SearchQuery(BaseModel):
     """Search query parameters for memory retrieval."""

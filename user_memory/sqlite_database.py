@@ -2,25 +2,36 @@
 SQLite-specific database implementation for MemoryGraph.
 
 This module provides a SQLiteMemoryDatabase class that uses SQL queries
-instead of Cypher. It works with the SQLiteFallbackBackend to provide
-memory storage without requiring Neo4j.
+for memory storage. It works with the SQLiteFallbackBackend to provide
+local storage without requiring external database servers.
 """
 
 import asyncio
-import logging
 import json
+import logging
 import uuid
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
-from .models import (
-    Memory, MemoryType, MemoryNode, Relationship, RelationshipType,
-    RelationshipProperties, SearchQuery, MemoryContext,
-    MemoryError, MemoryNotFoundError, RelationshipError,
-    ValidationError, DatabaseConnectionError, SchemaError, PaginatedResult
-)
 from .backends.sqlite_fallback import SQLiteFallbackBackend
 from .config import Config
+from .models import (
+    DatabaseConnectionError,
+    Memory,
+    MemoryContext,
+    MemoryError,
+    MemoryNode,
+    MemoryNotFoundError,
+    MemoryType,
+    PaginatedResult,
+    Relationship,
+    RelationshipError,
+    RelationshipProperties,
+    RelationshipType,
+    SchemaError,
+    SearchQuery,
+    ValidationError,
+)
 from .utils.graph_algorithms import has_cycle
 
 logger = logging.getLogger(__name__)
@@ -45,30 +56,30 @@ def _simple_stem(word: str) -> str:
         return word
 
     # Handle 'ied' suffix specially (retried -> retry, not retri)
-    if word.endswith('ied') and len(word) > 4:
+    if word.endswith("ied") and len(word) > 4:
         # Remove 'ied' and add 'y' back
-        stem = word[:-3] + 'y'
+        stem = word[:-3] + "y"
         if len(stem) >= 3:
             return stem
 
     # Handle 'ies' suffix specially (retries -> retry, not retr)
-    if word.endswith('ies') and len(word) > 4:
+    if word.endswith("ies") and len(word) > 4:
         # Remove 'ies' and add 'y' back
-        stem = word[:-3] + 'y'
+        stem = word[:-3] + "y"
         if len(stem) >= 3:
             return stem
 
     # Remove common suffixes (ordered by specificity)
     suffixes = [
-        'es',     # boxes -> box
-        'ing',    # retrying -> retry
-        'ed',     # timed -> tim
-        's',      # errors -> error
+        "es",  # boxes -> box
+        "ing",  # retrying -> retry
+        "ed",  # timed -> tim
+        "s",  # errors -> error
     ]
 
     for suffix in suffixes:
         if word.endswith(suffix):
-            stem = word[:-len(suffix)]
+            stem = word[: -len(suffix)]
             # Don't stem too aggressively (keep at least 3 chars)
             if len(stem) >= 3:
                 return stem
@@ -115,19 +126,23 @@ def _generate_fuzzy_patterns(query: str) -> list:
             variations = []
 
             # Handle words ending in 'y' specially (retry -> retries, not retrys)
-            if word.endswith('y'):
-                variations.extend([
-                    word[:-1] + "ies",  # retry -> retries
-                    word + "ing",        # retry -> retrying
-                    word[:-1] + "ied",  # retry -> retried
-                ])
+            if word.endswith("y"):
+                variations.extend(
+                    [
+                        word[:-1] + "ies",  # retry -> retries
+                        word + "ing",  # retry -> retrying
+                        word[:-1] + "ied",  # retry -> retried
+                    ]
+                )
             else:
-                variations.extend([
-                    word + "s",     # cache -> caches
-                    word + "es",    # box -> boxes
-                    word + "ing",   # cache -> caching
-                    word + "ed",    # cache -> cached
-                ])
+                variations.extend(
+                    [
+                        word + "s",  # cache -> caches
+                        word + "es",  # box -> boxes
+                        word + "ing",  # cache -> caching
+                        word + "ed",  # cache -> cached
+                    ]
+                )
 
             for var in variations:
                 var_stem = _simple_stem(var)
@@ -179,7 +194,7 @@ class SQLiteMemoryDatabase:
             try:
                 await asyncio.to_thread(
                     self.backend.execute_sync,
-                    "CREATE INDEX IF NOT EXISTS idx_nodes_memory ON nodes(label) WHERE label = 'Memory'"
+                    "CREATE INDEX IF NOT EXISTS idx_nodes_memory ON nodes(label) WHERE label = 'Memory'",
                 )
             except Exception as e:
                 logger.debug(f"Index creation skipped (may already exist): {e}")
@@ -212,7 +227,7 @@ class SQLiteMemoryDatabase:
 
             # Convert memory to properties dict
             memory_node = MemoryNode(memory=memory)
-            properties = memory_node.to_neo4j_properties()
+            properties = memory_node.to_database_properties()
 
             # Serialize properties as JSON
             properties_json = json.dumps(properties)
@@ -221,7 +236,7 @@ class SQLiteMemoryDatabase:
             existing = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM nodes WHERE id = ? AND label = 'Memory'",
-                (memory.id,)
+                (memory.id,),
             )
 
             if existing:
@@ -233,7 +248,7 @@ class SQLiteMemoryDatabase:
                     SET properties = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND label = 'Memory'
                     """,
-                    (properties_json, memory.id)
+                    (properties_json, memory.id),
                 )
             else:
                 # Insert new
@@ -243,7 +258,7 @@ class SQLiteMemoryDatabase:
                     INSERT INTO nodes (id, label, properties, created_at, updated_at)
                     VALUES (?, 'Memory', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """,
-                    (memory.id, properties_json)
+                    (memory.id, properties_json),
                 )
 
             self.backend.commit()
@@ -257,7 +272,9 @@ class SQLiteMemoryDatabase:
             logger.error(f"Failed to store memory: {e}")
             raise DatabaseConnectionError(f"Failed to store memory: {e}")
 
-    async def get_memory(self, memory_id: str, include_relationships: bool = True) -> Optional[Memory]:
+    async def get_memory(
+        self, memory_id: str, include_relationships: bool = True
+    ) -> Optional[Memory]:
         """
         Retrieve a memory by ID.
 
@@ -275,13 +292,13 @@ class SQLiteMemoryDatabase:
             result = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT properties FROM nodes WHERE id = ? AND label = 'Memory'",
-                (memory_id,)
+                (memory_id,),
             )
 
             if not result:
                 return None
 
-            properties_json = result[0]['properties']
+            properties_json = result[0]["properties"]
             properties = json.loads(properties_json)
 
             return self._properties_to_memory(properties)
@@ -338,7 +355,9 @@ class SQLiteMemoryDatabase:
                             )
                             params.extend([pattern, pattern, pattern])
                         if pattern_conditions:
-                            term_conditions.append(f"({' OR '.join(pattern_conditions)})")
+                            term_conditions.append(
+                                f"({' OR '.join(pattern_conditions)})"
+                            )
 
                 # Combine term conditions based on match_mode
                 if term_conditions:
@@ -407,8 +426,10 @@ class SQLiteMemoryDatabase:
 
             # Memory type filter
             if search_query.memory_types:
-                type_placeholders = ','.join('?' * len(search_query.memory_types))
-                where_conditions.append(f"json_extract(properties, '$.type') IN ({type_placeholders})")
+                type_placeholders = ",".join("?" * len(search_query.memory_types))
+                where_conditions.append(
+                    f"json_extract(properties, '$.type') IN ({type_placeholders})"
+                )
                 params.extend([t.value for t in search_query.memory_types])
 
             # Tags filter (check if any tag matches)
@@ -422,17 +443,23 @@ class SQLiteMemoryDatabase:
 
             # Project path filter
             if search_query.project_path:
-                where_conditions.append("json_extract(properties, '$.context_project_path') = ?")
+                where_conditions.append(
+                    "json_extract(properties, '$.context_project_path') = ?"
+                )
                 params.append(search_query.project_path)
 
             # Importance filter
             if search_query.min_importance is not None:
-                where_conditions.append("CAST(json_extract(properties, '$.importance') AS REAL) >= ?")
+                where_conditions.append(
+                    "CAST(json_extract(properties, '$.importance') AS REAL) >= ?"
+                )
                 params.append(search_query.min_importance)
 
             # Confidence filter
             if search_query.min_confidence is not None:
-                where_conditions.append("CAST(json_extract(properties, '$.confidence') AS REAL) >= ?")
+                where_conditions.append(
+                    "CAST(json_extract(properties, '$.confidence') AS REAL) >= ?"
+                )
                 params.append(search_query.min_confidence)
 
             # Date filters
@@ -456,11 +483,13 @@ class SQLiteMemoryDatabase:
             """
             params.append(search_query.limit)
 
-            result = await asyncio.to_thread(self.backend.execute_sync, query, tuple(params))
+            result = await asyncio.to_thread(
+                self.backend.execute_sync, query, tuple(params)
+            )
 
             memories = []
             for row in result:
-                properties = json.loads(row['properties'])
+                properties = json.loads(row["properties"])
                 memory = self._properties_to_memory(properties)
                 if memory:
                     memories.append(memory)
@@ -468,19 +497,17 @@ class SQLiteMemoryDatabase:
             # Enrich results with relationships and match info if requested
             if search_query.include_relationships:
                 # Use terms for enrichment if provided, otherwise use query
-                search_text = (search_query.terms[0] if search_query.terms
-                              else search_query.query)
-                memories = await self._enrich_search_results(
-                    memories,
-                    search_text
+                search_text = (
+                    search_query.terms[0] if search_query.terms else search_query.query
                 )
+                memories = await self._enrich_search_results(memories, search_text)
 
             # Apply relationship filter if specified
             if search_query.relationship_filter:
                 filtered_memories = []
                 for memory in memories:
                     # Check if memory has any of the specified relationship types
-                    if hasattr(memory, 'relationships') and memory.relationships:
+                    if hasattr(memory, "relationships") and memory.relationships:
                         # relationships is a dict like {"SOLVES": ["title1", "title2"], ...}
                         has_matching_relationship = any(
                             rel_type in search_query.relationship_filter
@@ -498,10 +525,13 @@ class SQLiteMemoryDatabase:
                         rel_result = await asyncio.to_thread(
                             self.backend.execute_sync,
                             query_rels,
-                            (memory.id, memory.id)
+                            (memory.id, memory.id),
                         )
-                        rel_types = {row['type'] for row in rel_result}
-                        if any(rel_type in search_query.relationship_filter for rel_type in rel_types):
+                        rel_types = {row["type"] for row in rel_result}
+                        if any(
+                            rel_type in search_query.relationship_filter
+                            for rel_type in rel_types
+                        ):
                             filtered_memories.append(memory)
                 memories = filtered_memories
 
@@ -514,7 +544,9 @@ class SQLiteMemoryDatabase:
             logger.error(f"Failed to search memories: {e}")
             raise DatabaseConnectionError(f"Failed to search memories: {e}")
 
-    async def search_memories_paginated(self, search_query: SearchQuery) -> PaginatedResult:
+    async def search_memories_paginated(
+        self, search_query: SearchQuery
+    ) -> PaginatedResult:
         """
         Search for memories with pagination support.
 
@@ -558,7 +590,9 @@ class SQLiteMemoryDatabase:
                             )
                             params.extend([pattern, pattern, pattern])
                         if pattern_conditions:
-                            term_conditions.append(f"({' OR '.join(pattern_conditions)})")
+                            term_conditions.append(
+                                f"({' OR '.join(pattern_conditions)})"
+                            )
 
                 if term_conditions:
                     if match_mode == "all":
@@ -593,8 +627,10 @@ class SQLiteMemoryDatabase:
 
             # Memory type filter
             if search_query.memory_types:
-                type_placeholders = ','.join('?' * len(search_query.memory_types))
-                where_conditions.append(f"json_extract(properties, '$.type') IN ({type_placeholders})")
+                type_placeholders = ",".join("?" * len(search_query.memory_types))
+                where_conditions.append(
+                    f"json_extract(properties, '$.type') IN ({type_placeholders})"
+                )
                 params.extend([t.value for t in search_query.memory_types])
 
             # Tags filter
@@ -607,17 +643,23 @@ class SQLiteMemoryDatabase:
 
             # Project path filter
             if search_query.project_path:
-                where_conditions.append("json_extract(properties, '$.context_project_path') = ?")
+                where_conditions.append(
+                    "json_extract(properties, '$.context_project_path') = ?"
+                )
                 params.append(search_query.project_path)
 
             # Importance filter
             if search_query.min_importance is not None:
-                where_conditions.append("CAST(json_extract(properties, '$.importance') AS REAL) >= ?")
+                where_conditions.append(
+                    "CAST(json_extract(properties, '$.importance') AS REAL) >= ?"
+                )
                 params.append(search_query.min_importance)
 
             # Confidence filter
             if search_query.min_confidence is not None:
-                where_conditions.append("CAST(json_extract(properties, '$.confidence') AS REAL) >= ?")
+                where_conditions.append(
+                    "CAST(json_extract(properties, '$.confidence') AS REAL) >= ?"
+                )
                 params.append(search_query.min_confidence)
 
             # Date filters
@@ -634,8 +676,10 @@ class SQLiteMemoryDatabase:
 
             # First, get total count
             count_query = f"SELECT COUNT(*) as total FROM nodes WHERE {where_clause}"
-            count_result = await asyncio.to_thread(self.backend.execute_sync, count_query, tuple(params))
-            total_count = count_result[0]['total'] if count_result else 0
+            count_result = await asyncio.to_thread(
+                self.backend.execute_sync, count_query, tuple(params)
+            )
+            total_count = count_result[0]["total"] if count_result else 0
 
             # Then get paginated results
             results_query = f"""
@@ -648,20 +692,26 @@ class SQLiteMemoryDatabase:
             """
             results_params = params + [search_query.limit, search_query.offset]
 
-            result = await asyncio.to_thread(self.backend.execute_sync, results_query, tuple(results_params))
+            result = await asyncio.to_thread(
+                self.backend.execute_sync, results_query, tuple(results_params)
+            )
 
             memories = []
             for row in result:
-                properties = json.loads(row['properties'])
+                properties = json.loads(row["properties"])
                 memory = self._properties_to_memory(properties)
                 if memory:
                     memories.append(memory)
 
             # Calculate pagination metadata
             has_more = (search_query.offset + search_query.limit) < total_count
-            next_offset = (search_query.offset + search_query.limit) if has_more else None
+            next_offset = (
+                (search_query.offset + search_query.limit) if has_more else None
+            )
 
-            logger.info(f"Found {len(memories)} memories (page {search_query.offset}-{search_query.offset + len(memories)} of {total_count})")
+            logger.info(
+                f"Found {len(memories)} memories (page {search_query.offset}-{search_query.offset + len(memories)} of {total_count})"
+            )
 
             return PaginatedResult(
                 results=memories,
@@ -669,7 +719,7 @@ class SQLiteMemoryDatabase:
                 limit=search_query.limit,
                 offset=search_query.offset,
                 has_more=has_more,
-                next_offset=next_offset
+                next_offset=next_offset,
             )
 
         except Exception as e:
@@ -679,9 +729,7 @@ class SQLiteMemoryDatabase:
             raise DatabaseConnectionError(f"Failed to search memories (paginated): {e}")
 
     async def _enrich_search_results(
-        self,
-        memories: List[Memory],
-        query: Optional[str] = None
+        self, memories: List[Memory], query: Optional[str] = None
     ) -> List[Memory]:
         """
         Enrich search results with relationship context and match quality hints.
@@ -701,7 +749,7 @@ class SQLiteMemoryDatabase:
                 related = await self.get_related_memories(
                     memory.id,
                     relationship_types=None,  # Get all types
-                    max_depth=1  # Only immediate relationships
+                    max_depth=1,  # Only immediate relationships
                 )
 
                 # Group relationships by type
@@ -720,12 +768,13 @@ class SQLiteMemoryDatabase:
 
                 # Generate context summary
                 context_summary = self._generate_context_summary(
-                    memory,
-                    relationships_by_type
+                    memory, relationships_by_type
                 )
 
                 # Update memory with enriched data
-                memory.relationships = relationships_by_type if relationships_by_type else {}
+                memory.relationships = (
+                    relationships_by_type if relationships_by_type else {}
+                )
                 memory.match_info = match_info
                 memory.context_summary = context_summary
 
@@ -739,9 +788,7 @@ class SQLiteMemoryDatabase:
             return memories
 
     def _generate_match_info(
-        self,
-        memory: Memory,
-        query: Optional[str] = None
+        self, memory: Memory, query: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate match quality hints for a search result.
@@ -798,13 +845,11 @@ class SQLiteMemoryDatabase:
         return {
             "matched_fields": matched_fields,
             "matched_terms": matched_terms,
-            "match_quality": match_quality
+            "match_quality": match_quality,
         }
 
     def _generate_context_summary(
-        self,
-        memory: Memory,
-        relationships: Dict[str, List[str]]
+        self, memory: Memory, relationships: Dict[str, List[str]]
     ) -> str:
         """
         Generate a natural language context summary for a memory.
@@ -819,18 +864,18 @@ class SQLiteMemoryDatabase:
         summary_parts = []
 
         # Start with memory type
-        summary_parts.append(memory.type.value.replace('_', ' ').capitalize())
+        summary_parts.append(memory.type.value.replace("_", " ").capitalize())
 
         # Add key relationship information
-        if 'solves' in relationships and relationships['solves']:
-            problems = relationships['solves'][:2]  # Limit to 2
+        if "solves" in relationships and relationships["solves"]:
+            problems = relationships["solves"][:2]  # Limit to 2
             summary_parts.append(f"solves {', '.join(problems)}")
-        elif 'solved_by' in relationships and relationships['solved_by']:
-            solutions = relationships['solved_by'][:1]
+        elif "solved_by" in relationships and relationships["solved_by"]:
+            solutions = relationships["solved_by"][:1]
             summary_parts.append(f"solved by {solutions[0]}")
 
-        if 'used_in' in relationships and relationships['used_in']:
-            projects = relationships['used_in'][:1]
+        if "used_in" in relationships and relationships["used_in"]:
+            projects = relationships["used_in"][:1]
             summary_parts.append(f"in {projects[0]}")
 
         # Join parts with appropriate separators
@@ -863,7 +908,7 @@ class SQLiteMemoryDatabase:
 
             # Convert memory to properties dict
             memory_node = MemoryNode(memory=memory)
-            properties = memory_node.to_neo4j_properties()
+            properties = memory_node.to_database_properties()
             properties_json = json.dumps(properties)
 
             result = await asyncio.to_thread(
@@ -873,7 +918,7 @@ class SQLiteMemoryDatabase:
                 SET properties = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND label = 'Memory'
                 """,
-                (properties_json, memory.id)
+                (properties_json, memory.id),
             )
 
             self.backend.commit()
@@ -884,7 +929,7 @@ class SQLiteMemoryDatabase:
             check = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM nodes WHERE id = ? AND label = 'Memory'",
-                (memory.id,)
+                (memory.id,),
             )
 
             success = len(check) > 0
@@ -918,7 +963,7 @@ class SQLiteMemoryDatabase:
             existing = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM nodes WHERE id = ? AND label = 'Memory'",
-                (memory_id,)
+                (memory_id,),
             )
 
             if not existing:
@@ -928,14 +973,14 @@ class SQLiteMemoryDatabase:
             await asyncio.to_thread(
                 self.backend.execute_sync,
                 "DELETE FROM relationships WHERE from_id = ? OR to_id = ?",
-                (memory_id, memory_id)
+                (memory_id, memory_id),
             )
 
             # Delete the memory node
             await asyncio.to_thread(
                 self.backend.execute_sync,
                 "DELETE FROM nodes WHERE id = ? AND label = 'Memory'",
-                (memory_id,)
+                (memory_id,),
             )
 
             self.backend.commit()
@@ -955,7 +1000,7 @@ class SQLiteMemoryDatabase:
         to_memory_id: str,
         relationship_type: RelationshipType,
         properties: RelationshipProperties = None,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Create a relationship between two memories with bi-temporal tracking.
@@ -985,34 +1030,36 @@ class SQLiteMemoryDatabase:
                 properties = RelationshipProperties()
 
             # Override property fields from kwargs if provided
-            if 'strength' in kwargs:
-                properties.strength = kwargs['strength']
-            if 'confidence' in kwargs:
-                properties.confidence = kwargs['confidence']
-            if 'context' in kwargs:
-                properties.context = kwargs['context']
-            if 'valid_from' in kwargs:
-                valid_from_value = kwargs['valid_from']
+            if "strength" in kwargs:
+                properties.strength = kwargs["strength"]
+            if "confidence" in kwargs:
+                properties.confidence = kwargs["confidence"]
+            if "context" in kwargs:
+                properties.context = kwargs["context"]
+            if "valid_from" in kwargs:
+                valid_from_value = kwargs["valid_from"]
                 if not isinstance(valid_from_value, datetime):
                     raise ValidationError(
                         "valid_from must be a datetime object",
-                        {"provided": type(valid_from_value).__name__}
+                        {"provided": type(valid_from_value).__name__},
                     )
                 if valid_from_value > datetime.now(timezone.utc):
-                    logger.warning(f"valid_from is in the future: {valid_from_value.isoformat()}")
+                    logger.warning(
+                        f"valid_from is in the future: {valid_from_value.isoformat()}"
+                    )
                 properties.valid_from = valid_from_value
 
             # Convert properties to dict
             props_dict = properties.model_dump()
-            props_dict['id'] = relationship_id
-            props_dict['created_at'] = props_dict['created_at'].isoformat()
-            props_dict['last_validated'] = props_dict['last_validated'].isoformat()
+            props_dict["id"] = relationship_id
+            props_dict["created_at"] = props_dict["created_at"].isoformat()
+            props_dict["last_validated"] = props_dict["last_validated"].isoformat()
 
             # Handle temporal fields
-            props_dict['valid_from'] = props_dict['valid_from'].isoformat()
-            props_dict['recorded_at'] = props_dict['recorded_at'].isoformat()
-            if props_dict.get('valid_until'):
-                props_dict['valid_until'] = props_dict['valid_until'].isoformat()
+            props_dict["valid_from"] = props_dict["valid_from"].isoformat()
+            props_dict["recorded_at"] = props_dict["recorded_at"].isoformat()
+            if props_dict.get("valid_until"):
+                props_dict["valid_until"] = props_dict["valid_until"].isoformat()
 
             # Serialize properties as JSON
             properties_json = json.dumps(props_dict)
@@ -1021,27 +1068,24 @@ class SQLiteMemoryDatabase:
             from_exists = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM nodes WHERE id = ? AND label = 'Memory'",
-                (from_memory_id,)
+                (from_memory_id,),
             )
             to_exists = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM nodes WHERE id = ? AND label = 'Memory'",
-                (to_memory_id,)
+                (to_memory_id,),
             )
 
             if not from_exists or not to_exists:
                 raise RelationshipError(
                     f"One or both memories not found: {from_memory_id}, {to_memory_id}",
-                    {"from_id": from_memory_id, "to_id": to_memory_id}
+                    {"from_id": from_memory_id, "to_id": to_memory_id},
                 )
 
             # Check for cycles (unless explicitly allowed by configuration)
             if not Config.ALLOW_RELATIONSHIP_CYCLES:
                 cycle_detected = await has_cycle(
-                    self,
-                    from_memory_id,
-                    to_memory_id,
-                    relationship_type
+                    self, from_memory_id, to_memory_id, relationship_type
                 )
                 if cycle_detected:
                     raise ValidationError(
@@ -1051,8 +1095,8 @@ class SQLiteMemoryDatabase:
                             "from_id": from_memory_id,
                             "to_id": to_memory_id,
                             "relationship_type": relationship_type.value,
-                            "suggestion": "Check your relationship chain before creating, or enable cycles with MEMORY_ALLOW_CYCLES=true"
-                        }
+                            "suggestion": "Check your relationship chain before creating, or enable cycles with MEMORY_ALLOW_CYCLES=true",
+                        },
                     )
 
             # Insert relationship with temporal fields
@@ -1066,22 +1110,29 @@ class SQLiteMemoryDatabase:
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)
                 """,
                 (
-                    relationship_id, from_memory_id, to_memory_id,
-                    relationship_type.value, properties_json,
-                    props_dict['valid_from'],
-                    props_dict.get('valid_until'),
-                    props_dict['recorded_at'],
-                    props_dict.get('invalidated_by')
-                )
+                    relationship_id,
+                    from_memory_id,
+                    to_memory_id,
+                    relationship_type.value,
+                    properties_json,
+                    props_dict["valid_from"],
+                    props_dict.get("valid_until"),
+                    props_dict["recorded_at"],
+                    props_dict.get("invalidated_by"),
+                ),
             )
 
             self.backend.commit()
-            logger.info(f"Created relationship: {relationship_type.value} between {from_memory_id} and {to_memory_id}")
+            logger.info(
+                f"Created relationship: {relationship_type.value} between {from_memory_id} and {to_memory_id}"
+            )
             return relationship_id
 
         except Exception as e:
             self.backend.rollback()
-            if isinstance(e, (RelationshipError, DatabaseConnectionError, ValidationError)):
+            if isinstance(
+                e, (RelationshipError, DatabaseConnectionError, ValidationError)
+            ):
                 raise
             logger.error(f"Failed to create relationship: {e}")
             raise RelationshipError(f"Failed to create relationship: {e}")
@@ -1091,7 +1142,7 @@ class SQLiteMemoryDatabase:
         memory_id: str,
         relationship_types: List[RelationshipType] = None,
         max_depth: int = 2,
-        as_of: datetime = None
+        as_of: datetime = None,
     ) -> List[Tuple[Memory, Relationship]]:
         """
         Get memories related to a specific memory, with optional point-in-time query.
@@ -1130,7 +1181,7 @@ class SQLiteMemoryDatabase:
                 for rt in relationship_types:
                     if rt.value not in valid_types:
                         raise ValidationError(f"Invalid relationship type: {rt}")
-                type_placeholders = ','.join('?' * len(relationship_types))
+                type_placeholders = ",".join("?" * len(relationship_types))
                 where_conditions.append(f"r.rel_type IN ({type_placeholders})")
                 params.extend([rt.value for rt in relationship_types])
 
@@ -1166,18 +1217,20 @@ class SQLiteMemoryDatabase:
             # Add memory_id params for the JOIN conditions and final filter
             query_params = [memory_id, memory_id] + params + [memory_id]
 
-            result = await asyncio.to_thread(self.backend.execute_sync, query, tuple(query_params))
+            result = await asyncio.to_thread(
+                self.backend.execute_sync, query, tuple(query_params)
+            )
 
             related_memories = []
             for row in result:
                 # Parse related memory
-                related_props = json.loads(row['related_props'])
+                related_props = json.loads(row["related_props"])
                 memory = self._properties_to_memory(related_props)
 
                 if memory:
                     # Parse relationship properties
-                    rel_props = json.loads(row['rel_props'])
-                    rel_type_str = row['rel_type']
+                    rel_props = json.loads(row["rel_props"])
+                    rel_type_str = row["rel_type"]
 
                     try:
                         rel_type = RelationshipType(rel_type_str)
@@ -1185,20 +1238,22 @@ class SQLiteMemoryDatabase:
                         rel_type = RelationshipType.RELATED_TO
 
                     relationship = Relationship(
-                        id=row['rel_id'],
-                        from_memory_id=row['rel_from'],
-                        to_memory_id=row['rel_to'],
+                        id=row["rel_id"],
+                        from_memory_id=row["rel_from"],
+                        to_memory_id=row["rel_to"],
                         type=rel_type,
                         properties=RelationshipProperties(
                             strength=rel_props.get("strength", 0.5),
                             confidence=rel_props.get("confidence", 0.8),
                             context=rel_props.get("context"),
-                            evidence_count=rel_props.get("evidence_count", 1)
-                        )
+                            evidence_count=rel_props.get("evidence_count", 1),
+                        ),
                     )
                     related_memories.append((memory, relationship))
 
-            logger.info(f"Found {len(related_memories)} related memories for {memory_id}")
+            logger.info(
+                f"Found {len(related_memories)} related memories for {memory_id}"
+            )
             return related_memories
 
         except Exception as e:
@@ -1208,9 +1263,7 @@ class SQLiteMemoryDatabase:
             raise DatabaseConnectionError(f"Failed to get related memories: {e}")
 
     async def invalidate_relationship(
-        self,
-        relationship_id: str,
-        invalidated_by: str = None
+        self, relationship_id: str, invalidated_by: str = None
     ) -> None:
         """
         Invalidate a relationship by setting valid_until to now.
@@ -1228,13 +1281,13 @@ class SQLiteMemoryDatabase:
             result = await asyncio.to_thread(
                 self.backend.execute_sync,
                 "SELECT id FROM relationships WHERE id = ?",
-                (relationship_id,)
+                (relationship_id,),
             )
 
             if not result:
                 raise RelationshipError(
                     f"Relationship not found: {relationship_id}",
-                    {"relationship_id": relationship_id}
+                    {"relationship_id": relationship_id},
                 )
 
             # Set valid_until to now
@@ -1246,7 +1299,7 @@ class SQLiteMemoryDatabase:
                 SET valid_until = ?, invalidated_by = ?
                 WHERE id = ?
                 """,
-                (now, invalidated_by, relationship_id)
+                (now, invalidated_by, relationship_id),
             )
 
             self.backend.commit()
@@ -1264,7 +1317,7 @@ class SQLiteMemoryDatabase:
         memory_id: str,
         relationship_types: List[RelationshipType] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[Relationship]:
         """
         Get full history of relationships for a memory, including invalidated ones.
@@ -1287,7 +1340,7 @@ class SQLiteMemoryDatabase:
             params = [memory_id, memory_id]
 
             if relationship_types:
-                type_placeholders = ','.join('?' * len(relationship_types))
+                type_placeholders = ",".join("?" * len(relationship_types))
                 where_conditions.append(f"r.rel_type IN ({type_placeholders})")
                 params.extend([rt.value for rt in relationship_types])
 
@@ -1312,12 +1365,14 @@ class SQLiteMemoryDatabase:
             """
 
             params_query = [memory_id, memory_id] + params[2:] + [limit, offset]
-            result = await asyncio.to_thread(self.backend.execute_sync, query, tuple(params_query))
+            result = await asyncio.to_thread(
+                self.backend.execute_sync, query, tuple(params_query)
+            )
 
             relationships = []
             for row in result:
-                rel_props = json.loads(row['rel_props'])
-                rel_type_str = row['rel_type']
+                rel_props = json.loads(row["rel_props"])
+                rel_type_str = row["rel_type"]
 
                 try:
                     rel_type = RelationshipType(rel_type_str)
@@ -1325,14 +1380,26 @@ class SQLiteMemoryDatabase:
                     rel_type = RelationshipType.RELATED_TO
 
                 # Parse temporal fields
-                valid_from = datetime.fromisoformat(row['valid_from']) if row['valid_from'] else None
-                valid_until = datetime.fromisoformat(row['valid_until']) if row['valid_until'] else None
-                recorded_at = datetime.fromisoformat(row['recorded_at']) if row['recorded_at'] else None
+                valid_from = (
+                    datetime.fromisoformat(row["valid_from"])
+                    if row["valid_from"]
+                    else None
+                )
+                valid_until = (
+                    datetime.fromisoformat(row["valid_until"])
+                    if row["valid_until"]
+                    else None
+                )
+                recorded_at = (
+                    datetime.fromisoformat(row["recorded_at"])
+                    if row["recorded_at"]
+                    else None
+                )
 
                 relationship = Relationship(
-                    id=row['rel_id'],
-                    from_memory_id=row['rel_from'],
-                    to_memory_id=row['rel_to'],
+                    id=row["rel_id"],
+                    from_memory_id=row["rel_from"],
+                    to_memory_id=row["rel_to"],
                     type=rel_type,
                     properties=RelationshipProperties(
                         strength=rel_props.get("strength", 0.5),
@@ -1342,12 +1409,14 @@ class SQLiteMemoryDatabase:
                         valid_from=valid_from,
                         valid_until=valid_until,
                         recorded_at=recorded_at,
-                        invalidated_by=row['invalidated_by']
-                    )
+                        invalidated_by=row["invalidated_by"],
+                    ),
                 )
                 relationships.append(relationship)
 
-            logger.info(f"Found {len(relationships)} relationships in history for {memory_id}")
+            logger.info(
+                f"Found {len(relationships)} relationships in history for {memory_id}"
+            )
             return relationships
 
         except Exception as e:
@@ -1356,10 +1425,7 @@ class SQLiteMemoryDatabase:
             logger.error(f"Failed to get relationship history for {memory_id}: {e}")
             raise DatabaseConnectionError(f"Failed to get relationship history: {e}")
 
-    async def what_changed(
-        self,
-        since: datetime
-    ) -> Dict[str, List[Relationship]]:
+    async def what_changed(self, since: datetime) -> Dict[str, List[Relationship]]:
         """
         Get all relationship changes since a given time.
 
@@ -1392,7 +1458,9 @@ class SQLiteMemoryDatabase:
                 ORDER BY r.recorded_at DESC
             """
 
-            new_result = await asyncio.to_thread(self.backend.execute_sync, new_query, (since_str,))
+            new_result = await asyncio.to_thread(
+                self.backend.execute_sync, new_query, (since_str,)
+            )
 
             # Query for invalidated relationships (valid_until set since)
             invalidated_query = """
@@ -1411,27 +1479,41 @@ class SQLiteMemoryDatabase:
                 ORDER BY r.valid_until DESC
             """
 
-            invalidated_result = await asyncio.to_thread(self.backend.execute_sync, invalidated_query, (since_str,))
+            invalidated_result = await asyncio.to_thread(
+                self.backend.execute_sync, invalidated_query, (since_str,)
+            )
 
             # Parse results
             new_relationships = []
             for row in new_result:
-                rel_props = json.loads(row['rel_props'])
-                rel_type_str = row['rel_type']
+                rel_props = json.loads(row["rel_props"])
+                rel_type_str = row["rel_type"]
 
                 try:
                     rel_type = RelationshipType(rel_type_str)
                 except ValueError:
                     rel_type = RelationshipType.RELATED_TO
 
-                valid_from = datetime.fromisoformat(row['valid_from']) if row['valid_from'] else None
-                valid_until = datetime.fromisoformat(row['valid_until']) if row['valid_until'] else None
-                recorded_at = datetime.fromisoformat(row['recorded_at']) if row['recorded_at'] else None
+                valid_from = (
+                    datetime.fromisoformat(row["valid_from"])
+                    if row["valid_from"]
+                    else None
+                )
+                valid_until = (
+                    datetime.fromisoformat(row["valid_until"])
+                    if row["valid_until"]
+                    else None
+                )
+                recorded_at = (
+                    datetime.fromisoformat(row["recorded_at"])
+                    if row["recorded_at"]
+                    else None
+                )
 
                 relationship = Relationship(
-                    id=row['rel_id'],
-                    from_memory_id=row['rel_from'],
-                    to_memory_id=row['rel_to'],
+                    id=row["rel_id"],
+                    from_memory_id=row["rel_from"],
+                    to_memory_id=row["rel_to"],
                     type=rel_type,
                     properties=RelationshipProperties(
                         strength=rel_props.get("strength", 0.5),
@@ -1440,29 +1522,41 @@ class SQLiteMemoryDatabase:
                         valid_from=valid_from,
                         valid_until=valid_until,
                         recorded_at=recorded_at,
-                        invalidated_by=row['invalidated_by']
-                    )
+                        invalidated_by=row["invalidated_by"],
+                    ),
                 )
                 new_relationships.append(relationship)
 
             invalidated_relationships = []
             for row in invalidated_result:
-                rel_props = json.loads(row['rel_props'])
-                rel_type_str = row['rel_type']
+                rel_props = json.loads(row["rel_props"])
+                rel_type_str = row["rel_type"]
 
                 try:
                     rel_type = RelationshipType(rel_type_str)
                 except ValueError:
                     rel_type = RelationshipType.RELATED_TO
 
-                valid_from = datetime.fromisoformat(row['valid_from']) if row['valid_from'] else None
-                valid_until = datetime.fromisoformat(row['valid_until']) if row['valid_until'] else None
-                recorded_at = datetime.fromisoformat(row['recorded_at']) if row['recorded_at'] else None
+                valid_from = (
+                    datetime.fromisoformat(row["valid_from"])
+                    if row["valid_from"]
+                    else None
+                )
+                valid_until = (
+                    datetime.fromisoformat(row["valid_until"])
+                    if row["valid_until"]
+                    else None
+                )
+                recorded_at = (
+                    datetime.fromisoformat(row["recorded_at"])
+                    if row["recorded_at"]
+                    else None
+                )
 
                 relationship = Relationship(
-                    id=row['rel_id'],
-                    from_memory_id=row['rel_from'],
-                    to_memory_id=row['rel_to'],
+                    id=row["rel_id"],
+                    from_memory_id=row["rel_from"],
+                    to_memory_id=row["rel_to"],
                     type=rel_type,
                     properties=RelationshipProperties(
                         strength=rel_props.get("strength", 0.5),
@@ -1471,15 +1565,17 @@ class SQLiteMemoryDatabase:
                         valid_from=valid_from,
                         valid_until=valid_until,
                         recorded_at=recorded_at,
-                        invalidated_by=row['invalidated_by']
-                    )
+                        invalidated_by=row["invalidated_by"],
+                    ),
                 )
                 invalidated_relationships.append(relationship)
 
-            logger.info(f"Found {len(new_relationships)} new and {len(invalidated_relationships)} invalidated relationships since {since}")
+            logger.info(
+                f"Found {len(new_relationships)} new and {len(invalidated_relationships)} invalidated relationships since {since}"
+            )
             return {
                 "new_relationships": new_relationships,
-                "invalidated_relationships": invalidated_relationships
+                "invalidated_relationships": invalidated_relationships,
             }
 
         except Exception as e:
@@ -1496,7 +1592,7 @@ class SQLiteMemoryDatabase:
         evidence: Optional[List[str]] = None,
         components: Optional[List[str]] = None,
         temporal: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
     ) -> List[Relationship]:
         """
         Search relationships by structured context fields.
@@ -1554,14 +1650,16 @@ class SQLiteMemoryDatabase:
                 LIMIT ?
             """
 
-            result = await asyncio.to_thread(self.backend.execute_sync, query, (fetch_limit,))
+            result = await asyncio.to_thread(
+                self.backend.execute_sync, query, (fetch_limit,)
+            )
 
             # Filter relationships in Python by parsing context
             matching_relationships = []
 
             for row in result:
                 # Parse relationship properties
-                rel_props = json.loads(row['rel_props'])
+                rel_props = json.loads(row["rel_props"])
                 context_text = rel_props.get("context")
 
                 # Parse context to get structure
@@ -1583,7 +1681,10 @@ class SQLiteMemoryDatabase:
                         # Check if any provided condition matches any extracted condition
                         extracted_conditions = context_struct.get("conditions", [])
                         condition_match = any(
-                            any(cond.lower() in extracted.lower() for extracted in extracted_conditions)
+                            any(
+                                cond.lower() in extracted.lower()
+                                for extracted in extracted_conditions
+                            )
                             for cond in conditions
                         )
                         if not condition_match:
@@ -1603,7 +1704,10 @@ class SQLiteMemoryDatabase:
                         # Check if any provided evidence matches any extracted evidence
                         extracted_evidence = context_struct.get("evidence", [])
                         evidence_match = any(
-                            any(ev.lower() in extracted.lower() for extracted in extracted_evidence)
+                            any(
+                                ev.lower() in extracted.lower()
+                                for extracted in extracted_evidence
+                            )
                             for ev in evidence
                         )
                         if not evidence_match:
@@ -1617,7 +1721,10 @@ class SQLiteMemoryDatabase:
                         # Check if any provided component matches any extracted component
                         extracted_components = context_struct.get("components", [])
                         component_match = any(
-                            any(comp.lower() in extracted.lower() for extracted in extracted_components)
+                            any(
+                                comp.lower() in extracted.lower()
+                                for extracted in extracted_components
+                            )
                             for comp in components
                         )
                         if not component_match:
@@ -1626,42 +1733,51 @@ class SQLiteMemoryDatabase:
                 # Filter by temporal
                 if temporal is not None and matches:
                     extracted_temporal = context_struct.get("temporal")
-                    if not extracted_temporal or temporal.lower() not in extracted_temporal.lower():
+                    if (
+                        not extracted_temporal
+                        or temporal.lower() not in extracted_temporal.lower()
+                    ):
                         matches = False
 
                 # If all filters match, add to results
                 if matches:
                     try:
-                        rel_type = RelationshipType(row['rel_type'])
+                        rel_type = RelationshipType(row["rel_type"])
                     except ValueError:
                         rel_type = RelationshipType.RELATED_TO
 
                     relationship = Relationship(
-                        id=row['rel_id'],
-                        from_memory_id=row['rel_from'],
-                        to_memory_id=row['rel_to'],
+                        id=row["rel_id"],
+                        from_memory_id=row["rel_from"],
+                        to_memory_id=row["rel_to"],
                         type=rel_type,
                         properties=RelationshipProperties(
                             strength=rel_props.get("strength", 0.5),
                             confidence=rel_props.get("confidence", 0.8),
                             context=rel_props.get("context"),
-                            evidence_count=rel_props.get("evidence_count", 1)
-                        )
+                            evidence_count=rel_props.get("evidence_count", 1),
+                        ),
                     )
                     matching_relationships.append(relationship)
 
             # Sort by strength (descending) and limit
-            matching_relationships.sort(key=lambda r: r.properties.strength, reverse=True)
+            matching_relationships.sort(
+                key=lambda r: r.properties.strength, reverse=True
+            )
             matching_relationships = matching_relationships[:limit]
 
-            logger.info(f"Found {len(matching_relationships)} relationships matching context filters")
+            logger.info(
+                f"Found {len(matching_relationships)} relationships matching context filters"
+            )
             return matching_relationships
 
         except Exception as e:
             if isinstance(e, DatabaseConnectionError):
                 raise
             logger.error(f"Failed to search relationships by context: {e}")
-            raise DatabaseConnectionError(f"Failed to search relationships by context: {e}")
+            raise DatabaseConnectionError(
+                f"Failed to search relationships by context: {e}"
+            )
 
     async def get_memory_statistics(self) -> Dict[str, Any]:
         """
@@ -1679,9 +1795,9 @@ class SQLiteMemoryDatabase:
             # Total memories
             result = await asyncio.to_thread(
                 self.backend.execute_sync,
-                "SELECT COUNT(*) as count FROM nodes WHERE label = 'Memory'"
+                "SELECT COUNT(*) as count FROM nodes WHERE label = 'Memory'",
             )
-            stats['total_memories'] = result[0] if result else {'count': 0}
+            stats["total_memories"] = result[0] if result else {"count": 0}
 
             # Memories by type
             result = await asyncio.to_thread(
@@ -1694,16 +1810,17 @@ class SQLiteMemoryDatabase:
                 WHERE label = 'Memory'
                 GROUP BY json_extract(properties, '$.type')
                 ORDER BY count DESC
-                """
+                """,
             )
-            stats['memories_by_type'] = {row['type']: row['count'] for row in result} if result else {}
+            stats["memories_by_type"] = (
+                {row["type"]: row["count"] for row in result} if result else {}
+            )
 
             # Total relationships
             result = await asyncio.to_thread(
-                self.backend.execute_sync,
-                "SELECT COUNT(*) as count FROM relationships"
+                self.backend.execute_sync, "SELECT COUNT(*) as count FROM relationships"
             )
-            stats['total_relationships'] = result[0] if result else {'count': 0}
+            stats["total_relationships"] = result[0] if result else {"count": 0}
 
             # Average importance
             result = await asyncio.to_thread(
@@ -1712,9 +1829,9 @@ class SQLiteMemoryDatabase:
                 SELECT AVG(CAST(json_extract(properties, '$.importance') AS REAL)) as avg_importance
                 FROM nodes
                 WHERE label = 'Memory'
-                """
+                """,
             )
-            stats['avg_importance'] = result[0] if result else {'avg_importance': 0}
+            stats["avg_importance"] = result[0] if result else {"avg_importance": 0}
 
             # Average confidence
             result = await asyncio.to_thread(
@@ -1723,9 +1840,9 @@ class SQLiteMemoryDatabase:
                 SELECT AVG(CAST(json_extract(properties, '$.confidence') AS REAL)) as avg_confidence
                 FROM nodes
                 WHERE label = 'Memory'
-                """
+                """,
             )
-            stats['avg_confidence'] = result[0] if result else {'avg_confidence': 0}
+            stats["avg_confidence"] = result[0] if result else {"avg_confidence": 0}
 
             return stats
 
@@ -1734,9 +1851,7 @@ class SQLiteMemoryDatabase:
             raise DatabaseConnectionError(f"Failed to get statistics: {e}")
 
     async def get_recent_activity(
-        self,
-        days: int = 7,
-        project: Optional[str] = None
+        self, days: int = 7, project: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get recent activity summary for session briefing.
@@ -1765,21 +1880,25 @@ class SQLiteMemoryDatabase:
             # Build WHERE conditions
             where_conditions = [
                 "label = 'Memory'",
-                "json_extract(properties, '$.created_at') >= ?"
+                "json_extract(properties, '$.created_at') >= ?",
             ]
             params = [cutoff_iso]
 
             # Add project filter if specified
             if project:
-                where_conditions.append("json_extract(properties, '$.context_project_path') = ?")
+                where_conditions.append(
+                    "json_extract(properties, '$.context_project_path') = ?"
+                )
                 params.append(project)
 
             where_clause = " AND ".join(where_conditions)
 
             # Get total count
             count_query = f"SELECT COUNT(*) as count FROM nodes WHERE {where_clause}"
-            count_result = await asyncio.to_thread(self.backend.execute_sync, count_query, tuple(params))
-            total_count = count_result[0]['count'] if count_result else 0
+            count_result = await asyncio.to_thread(
+                self.backend.execute_sync, count_query, tuple(params)
+            )
+            total_count = count_result[0]["count"] if count_result else 0
 
             # Get memories by type
             type_query = f"""
@@ -1790,8 +1909,14 @@ class SQLiteMemoryDatabase:
                 WHERE {where_clause}
                 GROUP BY json_extract(properties, '$.type')
             """
-            type_result = await asyncio.to_thread(self.backend.execute_sync, type_query, tuple(params))
-            memories_by_type = {row['type']: row['count'] for row in type_result} if type_result else {}
+            type_result = await asyncio.to_thread(
+                self.backend.execute_sync, type_query, tuple(params)
+            )
+            memories_by_type = (
+                {row["type"]: row["count"] for row in type_result}
+                if type_result
+                else {}
+            )
 
             # Get recent memories (limited to 20)
             recent_query = f"""
@@ -1801,11 +1926,13 @@ class SQLiteMemoryDatabase:
                 ORDER BY json_extract(properties, '$.created_at') DESC
                 LIMIT 20
             """
-            recent_result = await asyncio.to_thread(self.backend.execute_sync, recent_query, tuple(params))
+            recent_result = await asyncio.to_thread(
+                self.backend.execute_sync, recent_query, tuple(params)
+            )
 
             recent_memories = []
             for row in recent_result:
-                properties = json.loads(row['properties'])
+                properties = json.loads(row["properties"])
                 memory = self._properties_to_memory(properties)
                 if memory:
                     recent_memories.append(memory)
@@ -1825,11 +1952,13 @@ class SQLiteMemoryDatabase:
                 ORDER BY CAST(json_extract(properties, '$.importance') AS REAL) DESC
                 LIMIT 10
             """
-            unresolved_result = await asyncio.to_thread(self.backend.execute_sync, unresolved_query, tuple(params))
+            unresolved_result = await asyncio.to_thread(
+                self.backend.execute_sync, unresolved_query, tuple(params)
+            )
 
             unresolved_problems = []
             for row in unresolved_result:
-                properties = json.loads(row['properties'])
+                properties = json.loads(row["properties"])
                 memory = self._properties_to_memory(properties)
                 if memory:
                     unresolved_problems.append(memory)
@@ -1840,7 +1969,7 @@ class SQLiteMemoryDatabase:
                 "recent_memories": recent_memories,
                 "unresolved_problems": unresolved_problems,
                 "days": days,
-                "project": project
+                "project": project,
             }
 
         except Exception as e:
@@ -1858,4 +1987,5 @@ class SQLiteMemoryDatabase:
             Memory object or None if conversion fails
         """
         from .utils.memory_parser import parse_memory_from_properties
+
         return parse_memory_from_properties(properties, source="SQLite")

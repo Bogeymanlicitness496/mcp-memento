@@ -1,8 +1,8 @@
 """
 Abstract base class for graph database backends.
 
-This module defines the interface that all backend implementations must follow,
-ensuring compatibility across Neo4j, Memgraph, and SQLite fallback.
+This module defines the interface for SQLite backend implementation,
+ensuring compatibility with the memory server.
 """
 
 from abc import ABC, abstractmethod
@@ -13,8 +13,8 @@ class GraphBackend(ABC):
     """
     Abstract base class for graph database backends.
 
-    All backend implementations (Neo4j, Memgraph, SQLite) must implement
-    this interface to ensure compatibility with the memory server.
+    SQLite backend implementation must implement this interface
+    to ensure compatibility with the memory server.
     """
 
     @abstractmethod
@@ -44,7 +44,7 @@ class GraphBackend(ABC):
         self,
         query: str,
         parameters: Optional[dict[str, Any]] = None,
-        write: bool = False
+        write: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Execute a Cypher query and return results.
@@ -95,7 +95,7 @@ class GraphBackend(ABC):
         Return the name of this backend implementation.
 
         Returns:
-            Backend name (e.g., "neo4j", "memgraph", "sqlite")
+            Backend name (always "sqlite")
         """
         pass
 
@@ -147,20 +147,17 @@ class GraphBackend(ABC):
         await self.disconnect()
         return False
 
-    # Compatibility methods for legacy MemoryDatabase interface
+    # Compatibility methods for legacy interface
     async def execute_write_query(
-        self,
-        query: str,
-        parameters: Optional[dict[str, Any]] = None
+        self, query: str, parameters: Optional[dict[str, Any]] = None
     ) -> list[dict[str, Any]]:
         """
         Execute a write query (compatibility wrapper for execute_query).
 
-        This method provides compatibility with the legacy Neo4jConnection interface
-        used by MemoryDatabase.
+        This method provides compatibility with legacy interfaces.
 
         Args:
-            query: The Cypher query string
+            query: The SQL query string
             parameters: Query parameters for parameterized queries
 
         Returns:
@@ -169,18 +166,15 @@ class GraphBackend(ABC):
         return await self.execute_query(query, parameters, write=True)
 
     async def execute_read_query(
-        self,
-        query: str,
-        parameters: Optional[dict[str, Any]] = None
+        self, query: str, parameters: Optional[dict[str, Any]] = None
     ) -> list[dict[str, Any]]:
         """
         Execute a read query (compatibility wrapper for execute_query).
 
-        This method provides compatibility with the legacy Neo4jConnection interface
-        used by MemoryDatabase.
+        This method provides compatibility with legacy interfaces.
 
         Args:
-            query: The Cypher query string
+            query: The SQL query string
             parameters: Query parameters for parameterized queries
 
         Returns:
@@ -192,6 +186,6 @@ class GraphBackend(ABC):
         """
         Close the connection (compatibility wrapper for disconnect).
 
-        This method provides compatibility with the legacy Neo4jConnection interface.
+        This method provides compatibility with legacy interfaces.
         """
         await self.disconnect()

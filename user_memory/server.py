@@ -1,59 +1,53 @@
 """
-Claude Code Memory Server - MCP implementation.
+MemoryGraph MCP Server for Zed Editor.
 
 This module implements the Model Context Protocol server that provides intelligent
-memory capabilities for Claude Code using Neo4j as the backend storage.
+memory capabilities for Zed editor using SQLite as the backend storage.
 """
 
 import logging
 from typing import Any, Dict, List, Optional
 
-from mcp.server import Server, NotificationOptions
+from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import (
-    Tool,
-    TextContent,
     CallToolResult,
     ListToolsRequest,
     ListToolsResult,
+    TextContent,
+    Tool,
 )
 
 from . import __version__
-from .database import MemoryDatabase
+from .advanced_tools import ADVANCED_RELATIONSHIP_TOOLS, AdvancedRelationshipHandlers
 from .backends.sqlite_fallback import SQLiteFallbackBackend
-from .backends.cloud_backend import CloudRESTAdapter
-from .sqlite_database import SQLiteMemoryDatabase
-from .cloud_database import CloudMemoryDatabase
+from .config import Config
+
 # Note: Only DatabaseConnectionError and MemoryType from models are imported at module level.
 # Other domain model classes (Memory, RelationshipType, etc.) are passed via tool handlers.
 from .models import (
-    MemoryType,
     DatabaseConnectionError,
+    MemoryType,
 )
-from .advanced_tools import ADVANCED_RELATIONSHIP_TOOLS, AdvancedRelationshipHandlers
-from .migration_tools_module import MIGRATION_TOOLS, MIGRATION_TOOL_HANDLERS
-# Removed: intelligence_tools, integration_tools, proactive_tools (moved to experimental/)
-from .config import Config
+from .sqlite_database import SQLiteMemoryDatabase
 from .tools.registry import get_handler
-
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
-class ClaudeMemoryServer:
-    """Claude Code Memory MCP Server implementation."""
-    
+class MemoryGraphServer:
+    """MemoryGraph MCP Server for Zed Editor."""
+
     def __init__(self):
         """Initialize the memory server."""
-        self.server = Server("claude-memory")
+        self.server = Server("memorygraph")
         self.db_connection = None  # GraphBackend instance
-        self.memory_db: Optional[MemoryDatabase] = None
+        self.memory_db: Optional[SQLiteMemoryDatabase] = None
         self.advanced_handlers: Optional[AdvancedRelationshipHandlers] = None
 
         # Register MCP handlers
@@ -71,7 +65,9 @@ class ClaudeMemoryServer:
         else:
             # Filter tools by name
             self.tools = [tool for tool in all_tools if tool.name in enabled_tool_names]
-            logger.info(f"Tool profile: {Config.TOOL_PROFILE.upper()} - {len(self.tools)}/{len(all_tools)} tools enabled")
+            logger.info(
+                f"Tool profile: {Config.TOOL_PROFILE.upper()} - {len(self.tools)}/{len(all_tools)} tools enabled"
+            )
 
     def _collect_all_tools(self) -> List[Tool]:
         """Collect all tool definitions from all modules."""
@@ -104,33 +100,33 @@ FALLBACK: If recall returns no relevant results, try search_memories with tags f
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Natural language query for what you're looking for"
+                            "description": "Natural language query for what you're looking for",
                         },
                         "memory_types": {
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": [t.value for t in MemoryType]
+                                "enum": [t.value for t in MemoryType],
                             },
-                            "description": "Optional: Filter by memory types for more precision"
+                            "description": "Optional: Filter by memory types for more precision",
                         },
                         "project_path": {
                             "type": "string",
-                            "description": "Optional: Filter by project path to scope results"
+                            "description": "Optional: Filter by project path to scope results",
                         },
                         "limit": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 1000,
-                            "description": "Maximum number of results per page (default: 20)"
+                            "description": "Maximum number of results per page (default: 20)",
                         },
                         "offset": {
                             "type": "integer",
                             "minimum": 0,
-                            "description": "Number of results to skip for pagination (default: 0)"
-                        }
-                    }
-                }
+                            "description": "Number of results to skip for pagination (default: 0)",
+                        },
+                    },
+                },
             ),
             Tool(
                 name="store_memory",
@@ -161,38 +157,38 @@ Returns memory_id. Use create_relationship to link related memories.""",
                         "type": {
                             "type": "string",
                             "enum": [t.value for t in MemoryType],
-                            "description": "Type of memory to store"
+                            "description": "Type of memory to store",
                         },
                         "title": {
                             "type": "string",
-                            "description": "Short descriptive title for the memory"
+                            "description": "Short descriptive title for the memory",
                         },
                         "content": {
                             "type": "string",
-                            "description": "Detailed content of the memory"
+                            "description": "Detailed content of the memory",
                         },
                         "summary": {
                             "type": "string",
-                            "description": "Optional brief summary of the memory"
+                            "description": "Optional brief summary of the memory",
                         },
                         "tags": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Tags to categorize the memory"
+                            "description": "Tags to categorize the memory",
                         },
                         "importance": {
                             "type": "number",
                             "minimum": 0.0,
                             "maximum": 1.0,
-                            "description": "Importance score (0.0-1.0)"
+                            "description": "Importance score (0.0-1.0)",
                         },
                         "context": {
                             "type": "object",
-                            "description": "Context information for the memory"
-                        }
+                            "description": "Context information for the memory",
+                        },
                     },
-                    "required": ["type", "title", "content"]
-                }
+                    "required": ["type", "title", "content"],
+                },
             ),
             Tool(
                 name="get_memory",
@@ -207,15 +203,15 @@ EXAMPLE: get_memory(memory_id="abc-123")""",
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "ID of the memory to retrieve"
+                            "description": "ID of the memory to retrieve",
                         },
                         "include_relationships": {
                             "type": "boolean",
-                            "description": "Whether to include related memories"
-                        }
+                            "description": "Whether to include related memories",
+                        },
                     },
-                    "required": ["memory_id"]
-                }
+                    "required": ["memory_id"],
+                },
             ),
             Tool(
                 name="search_memories",
@@ -248,64 +244,64 @@ For conceptual/natural language queries, use recall_memories instead.""",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Text to search for in memory content"
+                            "description": "Text to search for in memory content",
                         },
                         "terms": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Multiple search terms for complex queries (alternative to query)"
+                            "description": "Multiple search terms for complex queries (alternative to query)",
                         },
                         "memory_types": {
                             "type": "array",
                             "items": {
                                 "type": "string",
-                                "enum": [t.value for t in MemoryType]
+                                "enum": [t.value for t in MemoryType],
                             },
-                            "description": "Filter by memory types"
+                            "description": "Filter by memory types",
                         },
                         "tags": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Filter by tags"
+                            "description": "Filter by tags",
                         },
                         "project_path": {
                             "type": "string",
-                            "description": "Filter by project path"
+                            "description": "Filter by project path",
                         },
                         "min_importance": {
                             "type": "number",
                             "minimum": 0.0,
                             "maximum": 1.0,
-                            "description": "Minimum importance score"
+                            "description": "Minimum importance score",
                         },
                         "limit": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 1000,
-                            "description": "Maximum number of results per page (default: 50)"
+                            "description": "Maximum number of results per page (default: 50)",
                         },
                         "offset": {
                             "type": "integer",
                             "minimum": 0,
-                            "description": "Number of results to skip for pagination (default: 0)"
+                            "description": "Number of results to skip for pagination (default: 0)",
                         },
                         "search_tolerance": {
                             "type": "string",
                             "enum": ["strict", "normal", "fuzzy"],
-                            "description": "Search tolerance mode: 'strict' for exact matches, 'normal' for stemming (default), 'fuzzy' for typo tolerance"
+                            "description": "Search tolerance mode: 'strict' for exact matches, 'normal' for stemming (default), 'fuzzy' for typo tolerance",
                         },
                         "match_mode": {
                             "type": "string",
                             "enum": ["any", "all"],
-                            "description": "Match mode for terms: 'any' returns results matching ANY term (OR), 'all' requires ALL terms (AND)"
+                            "description": "Match mode for terms: 'any' returns results matching ANY term (OR), 'all' requires ALL terms (AND)",
                         },
                         "relationship_filter": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Filter results to only include memories with these relationship types"
-                        }
-                    }
-                }
+                            "description": "Filter results to only include memories with these relationship types",
+                        },
+                    },
+                },
             ),
             Tool(
                 name="update_memory",
@@ -315,23 +311,20 @@ For conceptual/natural language queries, use recall_memories instead.""",
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "ID of the memory to update"
+                            "description": "ID of the memory to update",
                         },
                         "title": {"type": "string"},
                         "content": {"type": "string"},
                         "summary": {"type": "string"},
-                        "tags": {
-                            "type": "array",
-                            "items": {"type": "string"}
-                        },
+                        "tags": {"type": "array", "items": {"type": "string"}},
                         "importance": {
                             "type": "number",
                             "minimum": 0.0,
-                            "maximum": 1.0
-                        }
+                            "maximum": 1.0,
+                        },
                     },
-                    "required": ["memory_id"]
-                }
+                    "required": ["memory_id"],
+                },
             ),
             Tool(
                 name="delete_memory",
@@ -341,11 +334,11 @@ For conceptual/natural language queries, use recall_memories instead.""",
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "ID of the memory to delete"
+                            "description": "ID of the memory to delete",
                         }
                     },
-                    "required": ["memory_id"]
-                }
+                    "required": ["memory_id"],
+                },
             ),
             Tool(
                 name="create_relationship",
@@ -363,35 +356,35 @@ Optional: strength (0-1), confidence (0-1), context (description)""",
                     "properties": {
                         "from_memory_id": {
                             "type": "string",
-                            "description": "ID of the source memory"
+                            "description": "ID of the source memory",
                         },
                         "to_memory_id": {
                             "type": "string",
-                            "description": "ID of the target memory"
+                            "description": "ID of the target memory",
                         },
                         "relationship_type": {
                             "type": "string",
-                            "description": "Type of relationship to create"
+                            "description": "Type of relationship to create",
                         },
                         "strength": {
                             "type": "number",
                             "minimum": 0.0,
                             "maximum": 1.0,
-                            "description": "Strength of the relationship (0.0-1.0)"
+                            "description": "Strength of the relationship (0.0-1.0)",
                         },
                         "confidence": {
                             "type": "number",
                             "minimum": 0.0,
                             "maximum": 1.0,
-                            "description": "Confidence in the relationship (0.0-1.0)"
+                            "description": "Confidence in the relationship (0.0-1.0)",
                         },
                         "context": {
                             "type": "string",
-                            "description": "Context or description of the relationship"
-                        }
+                            "description": "Context or description of the relationship",
+                        },
                     },
-                    "required": ["from_memory_id", "to_memory_id", "relationship_type"]
-                }
+                    "required": ["from_memory_id", "to_memory_id", "relationship_type"],
+                },
             ),
             Tool(
                 name="get_related_memories",
@@ -407,32 +400,27 @@ EXAMPLES:
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "ID of the memory to find relations for"
+                            "description": "ID of the memory to find relations for",
                         },
                         "relationship_types": {
                             "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "Filter by relationship types"
+                            "items": {"type": "string"},
+                            "description": "Filter by relationship types",
                         },
                         "max_depth": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 5,
-                            "description": "Maximum relationship depth to traverse"
-                        }
+                            "description": "Maximum relationship depth to traverse",
+                        },
                     },
-                    "required": ["memory_id"]
-                }
+                    "required": ["memory_id"],
+                },
             ),
             Tool(
                 name="get_memory_statistics",
                 description="Get statistics about the memory database",
-                inputSchema={
-                    "type": "object",
-                    "properties": {}
-                }
+                inputSchema={"type": "object", "properties": {}},
             ),
             Tool(
                 name="get_recent_activity",
@@ -450,14 +438,14 @@ EXAMPLES:
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 365,
-                            "description": "Number of days to look back (default: 7)"
+                            "description": "Number of days to look back (default: 7)",
                         },
                         "project": {
                             "type": "string",
-                            "description": "Optional: Filter by project path"
-                        }
-                    }
-                }
+                            "description": "Optional: Filter by project path",
+                        },
+                    },
+                },
             ),
             Tool(
                 name="search_relationships_by_context",
@@ -468,39 +456,39 @@ EXAMPLES:
                         "scope": {
                             "type": "string",
                             "enum": ["partial", "full", "conditional"],
-                            "description": "Filter by scope (partial, full, or conditional implementation)"
+                            "description": "Filter by scope (partial, full, or conditional implementation)",
                         },
                         "conditions": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Filter by conditions (e.g., ['production', 'Redis enabled']). Matches any."
+                            "description": "Filter by conditions (e.g., ['production', 'Redis enabled']). Matches any.",
                         },
                         "has_evidence": {
                             "type": "boolean",
-                            "description": "Filter by presence/absence of evidence (verified by tests, etc.)"
+                            "description": "Filter by presence/absence of evidence (verified by tests, etc.)",
                         },
                         "evidence": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Filter by specific evidence types (e.g., ['integration tests', 'unit tests']). Matches any."
+                            "description": "Filter by specific evidence types (e.g., ['integration tests', 'unit tests']). Matches any.",
                         },
                         "components": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Filter by components mentioned (e.g., ['auth', 'Redis']). Matches any."
+                            "description": "Filter by components mentioned (e.g., ['auth', 'Redis']). Matches any.",
                         },
                         "temporal": {
                             "type": "string",
-                            "description": "Filter by temporal information (e.g., 'v2.1.0', 'since 2024')"
+                            "description": "Filter by temporal information (e.g., 'v2.1.0', 'since 2024')",
                         },
                         "limit": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 100,
-                            "description": "Maximum number of results (default: 20)"
-                        }
-                    }
-                }
+                            "description": "Maximum number of results (default: 20)",
+                        },
+                    },
+                },
             ),
             # Contextual search tool for semantic graph traversal
             Tool(
@@ -529,21 +517,21 @@ RETURNS:
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "Memory ID to use as context root (required)"
+                            "description": "Memory ID to use as context root (required)",
                         },
                         "query": {
                             "type": "string",
-                            "description": "Search query within context (required)"
+                            "description": "Search query within context (required)",
                         },
                         "max_depth": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 5,
-                            "description": "Maximum relationship traversal depth (default: 2)"
-                        }
+                            "description": "Maximum relationship traversal depth (default: 2)",
+                        },
                     },
-                    "required": ["memory_id", "query"]
-                }
+                    "required": ["memory_id", "query"],
+                },
             ),
             # Temporal tools deferred per ADR-017 (Context Budget Constraint)
             # Backend methods available via Python API:
@@ -552,33 +540,31 @@ RETURNS:
         ]
 
         # Combine all tools from all modules
-        all_tools = (
-            basic_tools +
-            ADVANCED_RELATIONSHIP_TOOLS +
-            MIGRATION_TOOLS
-        )
+        all_tools = basic_tools + ADVANCED_RELATIONSHIP_TOOLS
 
         return all_tools
 
     def _register_handlers(self):
         """Register MCP protocol handlers."""
-        
+
         @self.server.list_tools()
         async def handle_list_tools() -> ListToolsResult:
             """List available tools."""
             return ListToolsResult(tools=self.tools)
-        
+
         @self.server.call_tool()
         async def handle_call_tool(name: str, arguments: dict) -> CallToolResult:
             """Handle tool calls."""
             try:
                 if not self.memory_db:
                     return CallToolResult(
-                        content=[TextContent(
-                            type="text",
-                            text="Error: Memory database not initialized"
-                        )],
-                        isError=True
+                        content=[
+                            TextContent(
+                                type="text",
+                                text="Error: Memory database not initialized",
+                            )
+                        ],
+                        isError=True,
                     )
 
                 # Check core tool handlers first using registry
@@ -586,9 +572,15 @@ RETURNS:
                 if handler:
                     return await handler(self.memory_db, arguments)
                 # Advanced relationship tools
-                elif name in ["find_memory_path", "analyze_memory_clusters", "find_bridge_memories",
-                                       "suggest_relationship_type", "reinforce_relationship",
-                                       "get_relationship_types_by_category", "analyze_graph_metrics"]:
+                elif name in [
+                    "find_memory_path",
+                    "analyze_memory_clusters",
+                    "find_bridge_memories",
+                    "suggest_relationship_type",
+                    "reinforce_relationship",
+                    "get_relationship_types_by_category",
+                    "analyze_graph_metrics",
+                ]:
                     # Dispatch to advanced handlers
                     method_name = f"handle_{name}"
                     handler = getattr(self.advanced_handlers, method_name, None)
@@ -596,84 +588,61 @@ RETURNS:
                         return await handler(arguments)
                     else:
                         return CallToolResult(
-                            content=[TextContent(type="text", text=f"Handler not found: {name}")],
-                            isError=True
-                        )
-
-                # Migration tools
-                elif name in ["migrate_database", "validate_migration"]:
-                    handler = MIGRATION_TOOL_HANDLERS.get(name)
-                    if handler:
-                        # Migration tools don't need memory_db parameter - they create their own connections
-                        result = await handler(**arguments)
-                        # Format result as MCP response
-                        import json
-                        return CallToolResult(
-                            content=[TextContent(
-                                type="text",
-                                text=json.dumps(result, indent=2)
-                            )],
-                            isError=not result.get("success", False)
-                        )
-                    else:
-                        return CallToolResult(
-                            content=[TextContent(type="text", text=f"Migration handler not found: {name}")],
-                            isError=True
+                            content=[
+                                TextContent(
+                                    type="text", text=f"Handler not found: {name}"
+                                )
+                            ],
+                            isError=True,
                         )
 
                 else:
                     return CallToolResult(
-                        content=[TextContent(
-                            type="text",
-                            text=f"Unknown tool: {name}"
-                        )],
-                        isError=True
+                        content=[
+                            TextContent(type="text", text=f"Unknown tool: {name}")
+                        ],
+                        isError=True,
                     )
 
             except Exception as e:
                 logger.error(f"Error handling tool call {name}: {e}", exc_info=True)
                 return CallToolResult(
-                    content=[TextContent(
-                        type="text",
-                        text=f"Error: {str(e)}"
-                    )],
-                    isError=True
+                    content=[TextContent(type="text", text=f"Error: {str(e)}")],
+                    isError=True,
                 )
-    
+
     async def initialize(self):
         """Initialize the server and establish database connection."""
         try:
             # Initialize backend connection using factory
             from .backends.factory import BackendFactory
+
             self.db_connection = await BackendFactory.create_backend()
 
-            # Initialize memory database - choose wrapper based on backend type
-            if isinstance(self.db_connection, SQLiteFallbackBackend):
-                logger.info("Using SQLiteMemoryDatabase for SQLite backend")
-                self.memory_db = SQLiteMemoryDatabase(self.db_connection)
-            elif isinstance(self.db_connection, CloudRESTAdapter):
-                logger.info("Using CloudMemoryDatabase for Cloud backend")
-                self.memory_db = CloudMemoryDatabase(self.db_connection)
-            else:
-                logger.info("Using MemoryDatabase for Cypher-compatible backend")
-                self.memory_db = MemoryDatabase(self.db_connection)
+            # Initialize memory database - always use SQLiteMemoryDatabase
+            logger.info("Using SQLiteMemoryDatabase for SQLite backend")
+            self.memory_db = SQLiteMemoryDatabase(self.db_connection)
 
             await self.memory_db.initialize_schema()
 
             # Initialize advanced relationship handlers
             self.advanced_handlers = AdvancedRelationshipHandlers(self.memory_db)
 
-            backend_name = getattr(self.db_connection, 'backend_name', lambda: 'Unknown')
+            backend_name = getattr(
+                self.db_connection, "backend_name", lambda: "Unknown"
+            )
             if callable(backend_name):
                 backend_name = backend_name()
-            logger.info(f"Claude Memory Server initialized successfully")
+            logger.info(f"MemoryGraph Server initialized successfully")
             logger.info(f"Backend: {backend_name}")
-            logger.info(f"Tool profile: {Config.TOOL_PROFILE.upper()} ({len(self.tools)} tools enabled)")
+            logger.info(
+                f"Tool profile: {Config.TOOL_PROFILE.upper()} ({len(self.tools)} tools enabled)"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize server: {e}", exc_info=True)
             raise
-    
+
     async def cleanup(self):
         """Clean up resources."""
         if self.db_connection:
@@ -683,7 +652,7 @@ RETURNS:
 
 async def main():
     """Main entry point for the MCP server."""
-    server = ClaudeMemoryServer()
+    server = MemoryGraphServer()
 
     try:
         # Initialize the server
@@ -703,7 +672,7 @@ async def main():
                 read_stream,
                 write_stream,
                 InitializationOptions(
-                    server_name="claude-memory",
+                    server_name="memorygraph",
                     server_version=__version__,
                     capabilities=capabilities,
                 ),

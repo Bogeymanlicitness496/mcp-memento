@@ -1,27 +1,27 @@
 """
-SQLite fallback backend implementation for MemoryGraph.
+SQLite backend implementation for MemoryGraph.
 
-This module provides a zero-dependency fallback using SQLite for persistence
+This module provides a zero-dependency backend using SQLite for persistence
 and NetworkX for graph operations. This enables the memory server to work
-without requiring Neo4j or Memgraph installation.
+without requiring external database servers.
 """
 
+import json
 import logging
 import os
-import json
 import sqlite3
 import uuid
-from typing import Any, Optional
 from pathlib import Path
+from typing import Any, Optional
 
 try:
     import networkx as nx
 except ImportError:
     nx = None
 
-from .base import GraphBackend
-from ..models import DatabaseConnectionError, SchemaError
 from ..config import Config
+from ..models import DatabaseConnectionError, SchemaError
+from .base import GraphBackend
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +29,7 @@ logger = logging.getLogger(__name__)
 class SQLiteFallbackBackend(GraphBackend):
     """SQLite + NetworkX fallback implementation of the GraphBackend interface."""
 
-    def __init__(
-        self,
-        db_path: Optional[str] = None
-    ):
+    def __init__(self, db_path: Optional[str] = None):
         """
         Initialize SQLite fallback backend.
 
@@ -97,7 +94,7 @@ class SQLiteFallbackBackend(GraphBackend):
         self,
         query: str,
         parameters: Optional[dict[str, Any]] = None,
-        write: bool = False
+        write: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Execute a Cypher-like query translated to SQLite/NetworkX operations.
@@ -119,7 +116,9 @@ class SQLiteFallbackBackend(GraphBackend):
             Complex Cypher queries will raise NotImplementedError.
         """
         if not self._connected or not self.conn:
-            raise DatabaseConnectionError("Connection failed: not connected to SQLite (call connect() first)")
+            raise DatabaseConnectionError(
+                "Connection failed: not connected to SQLite (call connect() first)"
+            )
 
         params = parameters or {}
 
@@ -134,7 +133,9 @@ class SQLiteFallbackBackend(GraphBackend):
 
         # For data operations, translate to SQLite/NetworkX
         # This is a simplified implementation - full Cypher translation would be complex
-        logger.warning("Direct Cypher execution not supported in SQLite backend. Use database.py methods.")
+        logger.warning(
+            "Direct Cypher execution not supported in SQLite backend. Use database.py methods."
+        )
         return []
 
     async def initialize_schema(self) -> None:
@@ -187,10 +188,18 @@ class SQLiteFallbackBackend(GraphBackend):
 
             # Create indexes
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_nodes_label ON nodes(label)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_nodes_created ON nodes(created_at)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_from ON relationships(from_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_to ON relationships(to_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(rel_type)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_nodes_created ON nodes(created_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_from ON relationships(from_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_to ON relationships(to_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(rel_type)"
+            )
 
             # Temporal indexes (Phase 2.2)
             cursor.execute("""
@@ -207,10 +216,6 @@ class SQLiteFallbackBackend(GraphBackend):
                 ON relationships(recorded_at)
             """)
 
-            # Conditional multi-tenant indexes (Phase 1)
-            if Config.is_multi_tenant_mode():
-                self._create_multitenant_indexes(cursor)
-
             # Create FTS5 virtual table for full-text search
             try:
                 cursor.execute("""
@@ -225,69 +230,9 @@ class SQLiteFallbackBackend(GraphBackend):
                 """)
                 logger.debug("Created FTS5 table for full-text search")
             except sqlite3.Error as e:
-                logger.warning(f"Could not create FTS5 table (may not be available): {e}")
-
-            self.conn.commit()
-            logger.info("Schema initialization completed")
-
-        except sqlite3.Error as e:
-            self.conn.rollback()
-            raise SchemaError(f"Failed to initialize schema: {e}")
-
-    def _create_multitenant_indexes(self, cursor: sqlite3.Cursor) -> None:
-        """
-        Create indexes for multi-tenant queries.
-
-        Only called when MEMORY_MULTI_TENANT_MODE=true. These indexes optimize
-        queries filtering by tenant_id, team_id, visibility, and created_by.
-
-        Args:
-            cursor: SQLite cursor for executing index creation
-
-        Note:
-            Context fields are stored as JSON in properties column, so we use
-            JSON extraction for indexing (requires SQLite 3.9.0+)
-        """
-        logger.info("Creating multi-tenant indexes...")
-
-        try:
-            # Tenant index - for tenant isolation queries
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_memory_tenant
-                ON nodes(json_extract(properties, '$.context.tenant_id'))
-                WHERE label = 'Memory'
-            """)
-
-            # Team index - for team-scoped queries
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_memory_team
-                ON nodes(json_extract(properties, '$.context.team_id'))
-                WHERE label = 'Memory'
-            """)
-
-            # Visibility index - for access control filtering
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_memory_visibility
-                ON nodes(json_extract(properties, '$.context.visibility'))
-                WHERE label = 'Memory'
-            """)
-
-            # Created_by index - for user-specific queries
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_memory_created_by
-                ON nodes(json_extract(properties, '$.context.created_by'))
-                WHERE label = 'Memory'
-            """)
-
-            # Composite index for common query pattern (tenant + visibility)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_memory_tenant_visibility
-                ON nodes(
-                    json_extract(properties, '$.context.tenant_id'),
-                    json_extract(properties, '$.context.visibility')
+                logger.warning(
+                    f"Could not create FTS5 table (may not be available): {e}"
                 )
-                WHERE label = 'Memory'
-            """)
 
             # Version index for optimistic locking
             cursor.execute("""
@@ -296,12 +241,12 @@ class SQLiteFallbackBackend(GraphBackend):
                 WHERE label = 'Memory'
             """)
 
-            logger.info("Multi-tenant indexes created successfully")
+            self.conn.commit()
+            logger.info("Schema initialization completed")
 
         except sqlite3.Error as e:
-            logger.warning(f"Could not create some multi-tenant indexes: {e}")
-            # Don't fail schema initialization if indexes fail
-            # (e.g., older SQLite versions without JSON support)
+            self.conn.rollback()
+            raise SchemaError(f"Failed to initialize schema: {e}")
 
     async def _load_graph_to_memory(self) -> None:
         """Load graph data from SQLite into NetworkX graph."""
@@ -319,7 +264,9 @@ class SQLiteFallbackBackend(GraphBackend):
             self.graph.add_node(node_id, label=label, **properties)
 
         # Load relationships
-        cursor.execute("SELECT id, from_id, to_id, rel_type, properties FROM relationships")
+        cursor.execute(
+            "SELECT id, from_id, to_id, rel_type, properties FROM relationships"
+        )
         for row in cursor.fetchall():
             rel_id = row[0]
             from_id = row[1]
@@ -328,7 +275,9 @@ class SQLiteFallbackBackend(GraphBackend):
             properties = json.loads(row[4])
             self.graph.add_edge(from_id, to_id, id=rel_id, type=rel_type, **properties)
 
-        logger.debug(f"Loaded {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges into memory")
+        logger.debug(
+            f"Loaded {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges into memory"
+        )
 
     async def _sync_to_sqlite(self) -> None:
         """Sync in-memory NetworkX graph to SQLite database."""
@@ -349,7 +298,7 @@ class SQLiteFallbackBackend(GraphBackend):
         health_info = {
             "connected": self._connected,
             "backend_type": "sqlite",
-            "db_path": self.db_path
+            "db_path": self.db_path,
         }
 
         if self._connected and self.conn:
@@ -358,16 +307,16 @@ class SQLiteFallbackBackend(GraphBackend):
                 cursor.execute("SELECT COUNT(*) FROM nodes WHERE label = 'Memory'")
                 count = cursor.fetchone()[0]
 
-                health_info["statistics"] = {
-                    "memory_count": count
-                }
+                health_info["statistics"] = {"memory_count": count}
 
                 # Get SQLite version
                 cursor.execute("SELECT sqlite_version()")
                 health_info["version"] = cursor.fetchone()[0]
 
                 # Get database size
-                db_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+                db_size = (
+                    os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+                )
                 health_info["database_size_bytes"] = db_size
 
             except Exception as e:
@@ -392,7 +341,9 @@ class SQLiteFallbackBackend(GraphBackend):
 
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='nodes_fts'")
+            cursor.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='nodes_fts'"
+            )
             result = cursor.fetchone()
             return bool(result[0] > 0) if result else False
         except Exception:
@@ -424,7 +375,7 @@ class SQLiteFallbackBackend(GraphBackend):
         await backend.connect()
         return backend
 
-    # Helper methods for direct database operations (used by MemoryDatabase)
+    # Helper methods for direct database operations
 
     def _validate_connection(self) -> bool:
         """
@@ -441,7 +392,9 @@ class SQLiteFallbackBackend(GraphBackend):
         except Exception:
             return False
 
-    def execute_sync(self, query: str, parameters: Optional[tuple[Any, ...]] = None) -> list[dict[str, Any]]:
+    def execute_sync(
+        self, query: str, parameters: Optional[tuple[Any, ...]] = None
+    ) -> list[dict[str, Any]]:
         """
         Execute a synchronous SQL query (for internal use).
 
@@ -453,7 +406,9 @@ class SQLiteFallbackBackend(GraphBackend):
             List of result rows as dictionaries
         """
         if not self._validate_connection():
-            raise DatabaseConnectionError("SQLite connection is not valid. Call connect() first.")
+            raise DatabaseConnectionError(
+                "SQLite connection is not valid. Call connect() first."
+            )
 
         cursor = self.conn.cursor()
         if parameters:

@@ -2,7 +2,7 @@
 Configuration management for MemoryGraph.
 
 This module centralizes all configuration options and environment variable handling
-for the multi-backend memory server.
+for the SQLite-only memory server with YAML file support.
 
 Config attributes are dynamic descriptors that read environment variables on each
 access. This ensures tests using patch.dict(os.environ) and direct Config attribute
@@ -11,18 +11,16 @@ overrides both work correctly.
 
 import os
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
 
 
 class BackendType(Enum):
-    """Supported backend types."""
+    """Supported backend types (SQLite only)."""
 
-    NEO4J = "neo4j"
-    MEMGRAPH = "memgraph"
     SQLITE = "sqlite"
-    TURSO = "turso"
-    CLOUD = "cloud"
-    FALKORDB = "falkordb"
-    FALKORDBLITE = "falkordblite"
     AUTO = "auto"
 
 
@@ -44,9 +42,20 @@ _EXTENDED_EXTRA_TOOLS = [
     "contextual_search",
 ]
 
+_ADVANCED_TOOLS = [
+    "analyze_memory_graph",
+    "find_patterns",
+    "suggest_relationships",
+    "get_memory_clusters",
+    "get_central_memories",
+    "find_path_between_memories",
+    "get_memory_network",
+]
+
 TOOL_PROFILES = {
     "core": _CORE_TOOLS,
     "extended": _CORE_TOOLS + _EXTENDED_EXTRA_TOOLS,
+    "advanced": _CORE_TOOLS + _EXTENDED_EXTRA_TOOLS + _ADVANCED_TOOLS,
 }
 
 
@@ -57,7 +66,7 @@ class _EnvVar:
     which reads from os.environ at call time. This makes Config reactive to
     env var changes (e.g., via patch.dict(os.environ) in tests).
 
-    Direct assignment (e.g., Config.BACKEND = "neo4j") replaces the descriptor
+    Direct assignment (e.g., Config.BACKEND = "sqlite") replaces the descriptor
     with a static value, which is useful for tests that patch Config directly.
     """
 
@@ -103,8 +112,147 @@ class _EnvVar:
 
 
 _DEFAULT_DB_PATH = os.path.expanduser("~/.memorygraph/memory.db")
-_DEFAULT_FALKORDBLITE_PATH = os.path.expanduser("~/.memorygraph/falkordblite.db")
-_DEFAULT_LADYBUGDB_PATH = os.path.expanduser("~/.memorygraph/ladybugdb.db")
+_DEFAULT_CONFIG_PATHS = [
+    Path.cwd() / "memorygraph.yaml",
+    Path.home() / ".memorygraph" / "config.yaml",
+]
+
+
+class YAMLConfig:
+    """YAML configuration loader with environment variable override support."""
+
+    _config_cache: Dict[Path, Dict[str, Any]] = {}
+
+    @classmethod
+    def load_config(cls) -> Dict[str, Any]:
+        """Load configuration from YAML files with environment variable overrides.
+
+        Hierarchy (highest priority last):
+        1. Default values
+        2. Global config (~/.memorygraph/config.yaml)
+        3. Project config (./memorygraph.yaml)
+        4. Environment variables
+        """
+        config = cls._get_defaults()
+
+        # Load from global config
+        global_config_path = Path.home() / ".memorygraph" / "config.yaml"
+        if global_config_path.exists():
+            config.update(cls._load_yaml_file(global_config_path))
+
+        # Load from project config
+        project_config_path = Path.cwd() / "memorygraph.yaml"
+        if project_config_path.exists():
+            config.update(cls._load_yaml_file(project_config_path))
+
+        # Apply environment variable overrides
+        config = cls._apply_env_overrides(config)
+
+        return config
+
+    @classmethod
+    def _get_defaults(cls) -> Dict[str, Any]:
+        """Get default configuration values."""
+        return {
+            "backend": "sqlite",
+            "sqlite_path": str(_DEFAULT_DB_PATH),
+            "tool_profile": "core",
+            "enable_advanced_tools": False,
+            "logging": {
+                "level": "INFO",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            },
+            "features": {
+                "auto_extract_entities": True,
+                "session_briefing": True,
+                "briefing_verbosity": "standard",
+                "briefing_recency_days": 7,
+                "allow_relationship_cycles": False,
+            },
+        }
+
+    @classmethod
+    def _load_yaml_file(cls, path: Path) -> Dict[str, Any]:
+        """Load YAML configuration from a file."""
+        if path in cls._config_cache:
+            return cls._config_cache[path]
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+                cls._config_cache[path] = config
+                return config
+        except Exception as e:
+            print(f"Warning: Failed to load config from {path}: {e}")
+            return {}
+
+    @classmethod
+    def _apply_env_overrides(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply environment variable overrides to configuration."""
+        # Backend configuration
+        if os.getenv("MEMORY_BACKEND"):
+            config["backend"] = os.getenv("MEMORY_BACKEND")
+
+        # SQLite configuration
+        if os.getenv("MEMORY_SQLITE_PATH"):
+            config["sqlite_path"] = os.getenv("MEMORY_SQLITE_PATH")
+
+        # Tool configuration
+        if os.getenv("MEMORY_TOOL_PROFILE"):
+            config["tool_profile"] = os.getenv("MEMORY_TOOL_PROFILE")
+
+        if os.getenv("MEMORY_ENABLE_ADVANCED_TOOLS"):
+            config["enable_advanced_tools"] = (
+                os.getenv("MEMORY_ENABLE_ADVANCED_TOOLS").lower() == "true"
+            )
+
+        # Logging configuration
+        if os.getenv("MEMORY_LOG_LEVEL"):
+            config["logging"]["level"] = os.getenv("MEMORY_LOG_LEVEL")
+
+        # Feature configuration
+        if os.getenv("MEMORY_AUTO_EXTRACT_ENTITIES"):
+            config["features"]["auto_extract_entities"] = (
+                os.getenv("MEMORY_AUTO_EXTRACT_ENTITIES").lower() == "true"
+            )
+
+        if os.getenv("MEMORY_SESSION_BRIEFING"):
+            config["features"]["session_briefing"] = (
+                os.getenv("MEMORY_SESSION_BRIEFING").lower() == "true"
+            )
+
+        if os.getenv("MEMORY_BRIEFING_VERBOSITY"):
+            config["features"]["briefing_verbosity"] = os.getenv(
+                "MEMORY_BRIEFING_VERBOSITY"
+            )
+
+        if os.getenv("MEMORY_BRIEFING_RECENCY_DAYS"):
+            config["features"]["briefing_recency_days"] = int(
+                os.getenv("MEMORY_BRIEFING_RECENCY_DAYS")
+            )
+
+        if os.getenv("MEMORY_ALLOW_CYCLES"):
+            config["features"]["allow_relationship_cycles"] = (
+                os.getenv("MEMORY_ALLOW_CYCLES").lower() == "true"
+            )
+
+        return config
+
+    @classmethod
+    def save_config(cls, config: Dict[str, Any], path: Optional[Path] = None) -> None:
+        """Save configuration to a YAML file."""
+        if path is None:
+            path = Path.cwd() / "memorygraph.yaml"
+
+        # Ensure directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+        # Clear cache for this path
+        if path in cls._config_cache:
+            del cls._config_cache[path]
 
 
 class Config:
@@ -115,117 +263,76 @@ class Config:
     on each access. This makes Config the single source of truth for configuration
     while remaining reactive to runtime env var changes.
 
-    Attributes can be overridden via direct assignment (e.g., Config.BACKEND = "neo4j")
+    Attributes can be overridden via direct assignment (e.g., Config.BACKEND = "sqlite")
     for testing or programmatic configuration.
 
     Environment Variables:
-        MEMORY_BACKEND: Backend type (neo4j|memgraph|sqlite|turso|cloud|falkordb|falkordblite|auto) [default: sqlite]
-
-        Neo4j Configuration:
-            MEMORY_NEO4J_URI or NEO4J_URI: Connection URI [default: bolt://localhost:7687]
-            MEMORY_NEO4J_USER or NEO4J_USER: Username [default: neo4j]
-            MEMORY_NEO4J_PASSWORD or NEO4J_PASSWORD: Password [required for Neo4j]
-
-        Memgraph Configuration:
-            MEMORY_MEMGRAPH_URI: Connection URI [default: bolt://localhost:7687]
-            MEMORY_MEMGRAPH_USER: Username [default: ""]
-            MEMORY_MEMGRAPH_PASSWORD: Password [default: ""]
-
-        SQLite Configuration:
-            MEMORY_SQLITE_PATH: Database file path [default: ~/.memorygraph/memory.db]
-
-        Turso Configuration:
-            MEMORY_TURSO_PATH: Local database file path [default: ~/.memorygraph/memory.db]
-            TURSO_DATABASE_URL: Turso database URL (e.g., libsql://your-db.turso.io)
-            TURSO_AUTH_TOKEN: Turso authentication token
-
-        Cloud Configuration:
-            MEMORYGRAPH_API_KEY: API key for MemoryGraph Cloud (required for cloud backend)
-            MEMORYGRAPH_API_URL: Cloud API base URL [default: https://graph-api.memorygraph.dev]
-            MEMORYGRAPH_TIMEOUT: Request timeout in seconds [default: 30]
-
-        Tool Profile Configuration:
-            MEMORY_TOOL_PROFILE: Tool profile (core|extended) [default: core]
-
-        Logging Configuration:
-            MEMORY_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
-
-        Feature Configuration:
-            MEMORY_AUTO_EXTRACT_ENTITIES: Automatically extract entities from memory content [default: true]
-            MEMORY_SESSION_BRIEFING: Enable session briefing feature [default: true]
-            MEMORY_BRIEFING_VERBOSITY: Briefing verbosity level [default: standard]
-            MEMORY_BRIEFING_RECENCY_DAYS: Number of days to consider for briefing [default: 7]
-            MEMORY_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
+        MEMORY_BACKEND: Backend type (sqlite|auto) [default: sqlite]
+        MEMORY_SQLITE_PATH: Database file path [default: ~/.memorygraph/memory.db]
+        MEMORY_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
+        MEMORY_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
+        MEMORY_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
+        MEMORY_AUTO_EXTRACT_ENTITIES: Automatically extract entities from memory content [default: true]
+        MEMORY_SESSION_BRIEFING: Enable session briefing feature [default: true]
+        MEMORY_BRIEFING_VERBOSITY: Briefing verbosity level [default: standard]
+        MEMORY_BRIEFING_RECENCY_DAYS: Number of days to consider for briefing [default: 7]
+        MEMORY_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
     """
 
-    BACKEND = _EnvVar("MEMORY_BACKEND", default="sqlite")
+    # Load YAML configuration
+    _yaml_config = YAMLConfig.load_config()
 
-    NEO4J_URI = _EnvVar(
-        "MEMORY_NEO4J_URI", "NEO4J_URI", default="bolt://localhost:7687"
-    )
-    NEO4J_USER = _EnvVar("MEMORY_NEO4J_USER", "NEO4J_USER", default="neo4j")
-    NEO4J_PASSWORD = _EnvVar("MEMORY_NEO4J_PASSWORD", "NEO4J_PASSWORD", default=None)
-    NEO4J_DATABASE = _EnvVar("MEMORY_NEO4J_DATABASE", default="neo4j")
-
-    MEMGRAPH_URI = _EnvVar("MEMORY_MEMGRAPH_URI", default="bolt://localhost:7687")
-    MEMGRAPH_USER = _EnvVar("MEMORY_MEMGRAPH_USER", default="")
-    MEMGRAPH_PASSWORD = _EnvVar("MEMORY_MEMGRAPH_PASSWORD", default="")
-
-    SQLITE_PATH = _EnvVar("MEMORY_SQLITE_PATH", default=_DEFAULT_DB_PATH)
-
-    TURSO_PATH = _EnvVar("MEMORY_TURSO_PATH", default=_DEFAULT_DB_PATH)
-    TURSO_DATABASE_URL = _EnvVar("TURSO_DATABASE_URL", default=None)
-    TURSO_AUTH_TOKEN = _EnvVar("TURSO_AUTH_TOKEN", default=None)
-
-    MEMORYGRAPH_API_KEY = _EnvVar("MEMORYGRAPH_API_KEY", default=None)
-    MEMORYGRAPH_API_URL = _EnvVar(
-        "MEMORYGRAPH_API_URL", default="https://graph-api.memorygraph.dev"
-    )
-    MEMORYGRAPH_TIMEOUT = _EnvVar("MEMORYGRAPH_TIMEOUT", default=30, cast=int)
-
-    CLOUD_MAX_RETRIES = _EnvVar("MEMORYGRAPH_MAX_RETRIES", default=3, cast=int)
-    CLOUD_RETRY_BACKOFF_BASE = _EnvVar(
-        "MEMORYGRAPH_RETRY_BACKOFF", default=1.0, cast=float
-    )
-    CLOUD_CIRCUIT_BREAKER_THRESHOLD = _EnvVar(
-        "MEMORYGRAPH_CB_THRESHOLD", default=5, cast=int
-    )
-    CLOUD_CIRCUIT_BREAKER_TIMEOUT = _EnvVar(
-        "MEMORYGRAPH_CB_TIMEOUT", default=60.0, cast=float
+    # Backend configuration
+    BACKEND = _EnvVar("MEMORY_BACKEND", default=_yaml_config.get("backend", "sqlite"))
+    SQLITE_PATH = _EnvVar(
+        "MEMORY_SQLITE_PATH", default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
     )
 
-    FALKORDB_HOST = _EnvVar(
-        "MEMORY_FALKORDB_HOST", "FALKORDB_HOST", default="localhost"
+    # Tool configuration
+    TOOL_PROFILE = _EnvVar(
+        "MEMORY_TOOL_PROFILE", default=_yaml_config.get("tool_profile", "core")
     )
-    FALKORDB_PORT = _EnvVar(
-        "MEMORY_FALKORDB_PORT", "FALKORDB_PORT", default=6379, cast=int
-    )
-    FALKORDB_PASSWORD = _EnvVar(
-        "MEMORY_FALKORDB_PASSWORD", "FALKORDB_PASSWORD", default=None
-    )
-
-    FALKORDBLITE_PATH = _EnvVar(
-        "MEMORY_FALKORDBLITE_PATH",
-        "FALKORDBLITE_PATH",
-        default=_DEFAULT_FALKORDBLITE_PATH,
+    ENABLE_ADVANCED_TOOLS = _EnvVar(
+        "MEMORY_ENABLE_ADVANCED_TOOLS",
+        default=_yaml_config.get("enable_advanced_tools", False),
+        cast=bool,
     )
 
-    LADYBUGDB_PATH = _EnvVar(
-        "MEMORY_LADYBUGDB_PATH", "LADYBUGDB_PATH", default=_DEFAULT_LADYBUGDB_PATH
+    # Logging configuration
+    LOG_LEVEL = _EnvVar(
+        "MEMORY_LOG_LEVEL", default=_yaml_config.get("logging", {}).get("level", "INFO")
+    )
+    LOG_FORMAT = _yaml_config.get("logging", {}).get(
+        "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    TOOL_PROFILE = _EnvVar("MEMORY_TOOL_PROFILE", default="core")
-
-    LOG_LEVEL = _EnvVar("MEMORY_LOG_LEVEL", default="INFO")
-
+    # Feature configuration
     AUTO_EXTRACT_ENTITIES = _EnvVar(
-        "MEMORY_AUTO_EXTRACT_ENTITIES", default=True, cast=bool
+        "MEMORY_AUTO_EXTRACT_ENTITIES",
+        default=_yaml_config.get("features", {}).get("auto_extract_entities", True),
+        cast=bool,
     )
-    SESSION_BRIEFING = _EnvVar("MEMORY_SESSION_BRIEFING", default=True, cast=bool)
-    BRIEFING_VERBOSITY = _EnvVar("MEMORY_BRIEFING_VERBOSITY", default="standard")
-    BRIEFING_RECENCY_DAYS = _EnvVar("MEMORY_BRIEFING_RECENCY_DAYS", default=7, cast=int)
-
-    ALLOW_RELATIONSHIP_CYCLES = _EnvVar("MEMORY_ALLOW_CYCLES", default=False, cast=bool)
+    SESSION_BRIEFING = _EnvVar(
+        "MEMORY_SESSION_BRIEFING",
+        default=_yaml_config.get("features", {}).get("session_briefing", True),
+        cast=bool,
+    )
+    BRIEFING_VERBOSITY = _EnvVar(
+        "MEMORY_BRIEFING_VERBOSITY",
+        default=_yaml_config.get("features", {}).get("briefing_verbosity", "standard"),
+    )
+    BRIEFING_RECENCY_DAYS = _EnvVar(
+        "MEMORY_BRIEFING_RECENCY_DAYS",
+        default=_yaml_config.get("features", {}).get("briefing_recency_days", 7),
+        cast=int,
+    )
+    ALLOW_RELATIONSHIP_CYCLES = _EnvVar(
+        "MEMORY_ALLOW_CYCLES",
+        default=_yaml_config.get("features", {}).get(
+            "allow_relationship_cycles", False
+        ),
+        cast=bool,
+    )
 
     @classmethod
     def get_backend_type(cls) -> BackendType:
@@ -252,16 +359,6 @@ class Config:
         return attr_name in cls.__dict__
 
     @classmethod
-    def is_neo4j_configured(cls) -> bool:
-        """Check if Neo4j backend is properly configured."""
-        return cls.is_env_set("NEO4J_PASSWORD")
-
-    @classmethod
-    def is_memgraph_configured(cls) -> bool:
-        """Check if Memgraph backend is configured."""
-        return cls.is_env_set("MEMGRAPH_URI")
-
-    @classmethod
     def get_enabled_tools(cls) -> list[str]:
         """Get the list of enabled tools based on the configured profile.
 
@@ -269,51 +366,131 @@ class Config:
         modern equivalents. Unrecognized profiles fall back to core.
         """
         profile = cls.TOOL_PROFILE.lower()
-        legacy_map = {"lite": "core", "standard": "extended", "full": "extended"}
+        legacy_map = {"lite": "core", "standard": "extended", "full": "advanced"}
         profile = legacy_map.get(profile, profile)
-        return TOOL_PROFILES.get(profile, TOOL_PROFILES["core"])
+
+        # Get base tools from profile
+        base_tools = TOOL_PROFILES.get(profile, TOOL_PROFILES["core"])
+
+        # Add advanced tools if enabled
+        if cls.ENABLE_ADVANCED_TOOLS and profile != "advanced":
+            base_tools = list(set(base_tools + _ADVANCED_TOOLS))
+
+        return base_tools
 
     @classmethod
     def get_config_summary(cls) -> dict:
         """Get a summary of current configuration (without sensitive data)."""
         return {
             "backend": cls.BACKEND,
-            "neo4j": {
-                "uri": cls.NEO4J_URI,
-                "user": cls.NEO4J_USER,
-                "password_configured": bool(cls.NEO4J_PASSWORD),
-                "database": cls.NEO4J_DATABASE,
-            },
-            "memgraph": {
-                "uri": cls.MEMGRAPH_URI,
-                "user": cls.MEMGRAPH_USER,
-                "password_configured": bool(cls.MEMGRAPH_PASSWORD),
-            },
             "sqlite": {"path": cls.SQLITE_PATH},
-            "turso": {
-                "path": cls.TURSO_PATH,
-                "database_url": cls.TURSO_DATABASE_URL,
-                "auth_token_configured": bool(cls.TURSO_AUTH_TOKEN),
+            "tools": {
+                "profile": cls.TOOL_PROFILE,
+                "enable_advanced": cls.ENABLE_ADVANCED_TOOLS,
+                "enabled_tools_count": len(cls.get_enabled_tools()),
             },
-            "cloud": {
-                "api_url": cls.MEMORYGRAPH_API_URL,
-                "api_key_configured": bool(cls.MEMORYGRAPH_API_KEY),
-                "timeout": cls.MEMORYGRAPH_TIMEOUT,
+            "logging": {
+                "level": cls.LOG_LEVEL,
+                "format": cls.LOG_FORMAT,
             },
-            "falkordb": {
-                "host": cls.FALKORDB_HOST,
-                "port": cls.FALKORDB_PORT,
-                "password_configured": bool(cls.FALKORDB_PASSWORD),
-            },
-            "falkordblite": {
-                "path": cls.FALKORDBLITE_PATH,
-            },
-            "logging": {"level": cls.LOG_LEVEL},
             "features": {
                 "auto_extract_entities": cls.AUTO_EXTRACT_ENTITIES,
                 "session_briefing": cls.SESSION_BRIEFING,
                 "briefing_verbosity": cls.BRIEFING_VERBOSITY,
                 "briefing_recency_days": cls.BRIEFING_RECENCY_DAYS,
+                "allow_relationship_cycles": cls.ALLOW_RELATIONSHIP_CYCLES,
             },
-            "relationships": {"allow_cycles": cls.ALLOW_RELATIONSHIP_CYCLES},
+            "config_sources": {
+                "yaml_files": [
+                    str(path) for path in _DEFAULT_CONFIG_PATHS if path.exists()
+                ],
+                "env_vars": {
+                    attr: cls.is_env_set(attr)
+                    for attr in [
+                        "BACKEND",
+                        "SQLITE_PATH",
+                        "TOOL_PROFILE",
+                        "ENABLE_ADVANCED_TOOLS",
+                        "LOG_LEVEL",
+                        "AUTO_EXTRACT_ENTITIES",
+                        "SESSION_BRIEFING",
+                        "BRIEFING_VERBOSITY",
+                        "BRIEFING_RECENCY_DAYS",
+                        "ALLOW_RELATIONSHIP_CYCLES",
+                    ]
+                },
+            },
         }
+
+    @classmethod
+    def reload_config(cls) -> None:
+        """Reload configuration from YAML files and environment variables."""
+        cls._yaml_config = YAMLConfig.load_config()
+
+        # Update all descriptors with new defaults
+        for attr_name, descriptor in cls.__dict__.items():
+            if isinstance(descriptor, _EnvVar):
+                # Get new default from YAML config
+                if attr_name == "BACKEND":
+                    descriptor.default = cls._yaml_config.get("backend", "sqlite")
+                elif attr_name == "SQLITE_PATH":
+                    descriptor.default = cls._yaml_config.get(
+                        "sqlite_path", _DEFAULT_DB_PATH
+                    )
+                elif attr_name == "TOOL_PROFILE":
+                    descriptor.default = cls._yaml_config.get("tool_profile", "core")
+                elif attr_name == "ENABLE_ADVANCED_TOOLS":
+                    descriptor.default = cls._yaml_config.get(
+                        "enable_advanced_tools", False
+                    )
+                elif attr_name == "LOG_LEVEL":
+                    descriptor.default = cls._yaml_config.get("logging", {}).get(
+                        "level", "INFO"
+                    )
+                elif attr_name == "AUTO_EXTRACT_ENTITIES":
+                    descriptor.default = cls._yaml_config.get("features", {}).get(
+                        "auto_extract_entities", True
+                    )
+                elif attr_name == "SESSION_BRIEFING":
+                    descriptor.default = cls._yaml_config.get("features", {}).get(
+                        "session_briefing", True
+                    )
+                elif attr_name == "BRIEFING_VERBOSITY":
+                    descriptor.default = cls._yaml_config.get("features", {}).get(
+                        "briefing_verbosity", "standard"
+                    )
+                elif attr_name == "BRIEFING_RECENCY_DAYS":
+                    descriptor.default = cls._yaml_config.get("features", {}).get(
+                        "briefing_recency_days", 7
+                    )
+                elif attr_name == "ALLOW_RELATIONSHIP_CYCLES":
+                    descriptor.default = cls._yaml_config.get("features", {}).get(
+                        "allow_relationship_cycles", False
+                    )
+
+    @classmethod
+    def create_default_config(cls, path: Optional[Path] = None) -> None:
+        """Create a default configuration file."""
+        if path is None:
+            path = Path.cwd() / "memorygraph.yaml"
+
+        default_config = {
+            "backend": "sqlite",
+            "sqlite_path": str(_DEFAULT_DB_PATH),
+            "tool_profile": "extended",
+            "enable_advanced_tools": True,
+            "logging": {
+                "level": "INFO",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            },
+            "features": {
+                "auto_extract_entities": True,
+                "session_briefing": True,
+                "briefing_verbosity": "standard",
+                "briefing_recency_days": 7,
+                "allow_relationship_cycles": False,
+            },
+        }
+
+        YAMLConfig.save_config(default_config, path)
+        print(f"Created default configuration file at: {path}")
