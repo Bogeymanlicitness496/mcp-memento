@@ -1,5 +1,5 @@
 .serena
-docs/
+# docs/
 test/
 *.db
 __pycache__/
