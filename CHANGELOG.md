@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-03-14
+
+### Changed
+- Updated environment variable prefixes from MEMORY_ to CONTEXT_
+- Changed default database path to ~/.mcp-context-server/context.db
+- Updated configuration file names to context-server.yaml
+- Fixed module entry point to properly handle CLI arguments
+- Improved Zed editor MCP configuration compatibility
+
+### Fixed
+- Module execution with `python -m context_server` now works correctly
+- CLI arguments like `--health` and `--show-config` are properly handled
+- Environment variable support for Zed editor integration
+- Configuration file path references
+
 ## [0.1.5] - 2026-03-13
 
 ### Added

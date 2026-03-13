@@ -137,10 +137,10 @@ async def handle_migrate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     _eprint("\nNote: For SQLite to SQLite migrations, simply copy the database file.")
-    _eprint("Example: cp ~/.memorygraph/memory.db ~/.memorygraph/memory_backup.db")
+    _eprint("Example: cp ~/.context-server/memory.db ~/.context-server/memory_backup.db")
     _eprint("\nOr use the export/import commands:")
-    _eprint("  memorygraph export --format json --output memories.json")
-    _eprint("  memorygraph import --format json --input memories.json")
+    _eprint("  context-server export --format json --output memories.json")
+    _eprint("  context-server import --format json --input memories.json")
     sys.exit(0)
 
 
@@ -263,44 +263,44 @@ def main() -> None:
         epilog="""
 Examples:
   # Start with default settings (SQLite backend, core profile)
-  memorygraph
+  context-server
 
   # Use extended profile (11 tools)
-  memorygraph --profile extended
+  context-server --profile extended
 
   # Show current configuration
-  memorygraph --show-config
+  context-server --show-config
 
   # Run health check
-  memorygraph --health
+  context-server --health
 
   # Run health check
-  memorygraph --health
+  context-server --health
 
 Environment Variables:
-  MEMORY_TOOL_PROFILE    Tool profile (core|extended|advanced) [default: core]
-  MEMORY_ENABLE_ADVANCED_TOOLS  Enable advanced tools [default: false]
-  MEMORY_SQLITE_PATH     SQLite database path [default: ~/.memorygraph/memory.db]
-  MEMORY_LOG_LEVEL       Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
+  CONTEXT_TOOL_PROFILE    Tool profile (core|extended|advanced) [default: core]
+  CONTEXT_ENABLE_ADVANCED_TOOLS  Enable advanced tools [default: false]
+  CONTEXT_SQLITE_PATH     SQLite database path [default: ~/.context-server/memory.db]
+  CONTEXT_LOG_LEVEL       Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
 
   Feature Configuration:
-    MEMORY_AUTO_EXTRACT_ENTITIES  Automatically extract entities from memory content [default: true]
-    MEMORY_SESSION_BRIEFING       Enable session briefing feature [default: true]
-    MEMORY_BRIEFING_VERBOSITY     Briefing verbosity level [default: standard]
-    MEMORY_BRIEFING_RECENCY_DAYS  Number of days to consider for briefing [default: 7]
-    MEMORY_ALLOW_CYCLES           Allow cycles in relationship graph [default: false]
+    CONTEXT_AUTO_EXTRACT_ENTITIES  Automatically extract entities from memory content [default: true]
+    CONTEXT_SESSION_BRIEFING       Enable session briefing feature [default: true]
+    CONTEXT_BRIEFING_VERBOSITY     Briefing verbosity level [default: standard]
+    CONTEXT_BRIEFING_RECENCY_DAYS  Number of days to consider for briefing [default: 7]
+    CONTEXT_ALLOW_CYCLES           Allow cycles in relationship graph [default: false]
         """,
     )
 
     parser.add_argument(
-        "--version", action="version", version=f"memorygraph {__version__}"
+        "--version", action="version", version=f"context-server {__version__}"
     )
 
     parser.add_argument(
         "--backend",
         type=str,
         choices=["sqlite", "auto"],
-        help="Database backend to use (overrides MEMORY_BACKEND env var)",
+        help="Database backend to use (overrides CONTEXT_BACKEND env var)",
     )
 
     parser.add_argument(
@@ -320,7 +320,7 @@ Environment Variables:
         "--log-level",
         type=str,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level (overrides MEMORY_LOG_LEVEL env var)",
+        help="Logging level (overrides CONTEXT_LOG_LEVEL env var)",
     )
 
     parser.add_argument(
@@ -394,7 +394,7 @@ Environment Variables:
         dest="source_backend",
         type=str,
         choices=["sqlite"],
-        help="Source backend type (defaults to current MEMORY_BACKEND)",
+        help="Source backend type (defaults to current CONTEXT_BACKEND)",
     )
     migrate_parser.add_argument(
         "--from-path",
@@ -478,17 +478,17 @@ Environment Variables:
     # so setting env vars is sufficient for the current process.
     if args.backend:
         validate_backend(args.backend)
-        os.environ["MEMORY_BACKEND"] = args.backend
+        os.environ["CONTEXT_BACKEND"] = args.backend
 
     if args.profile:
         validate_profile(args.profile)
         profile = {"lite": "core", "standard": "extended", "full": "extended"}.get(
             args.profile, args.profile
         )
-        os.environ["MEMORY_TOOL_PROFILE"] = profile
+        os.environ["CONTEXT_TOOL_PROFILE"] = profile
 
     if args.log_level:
-        os.environ["MEMORY_LOG_LEVEL"] = args.log_level
+        os.environ["CONTEXT_LOG_LEVEL"] = args.log_level
 
     # Configure logging to stderr (default) so it doesn't pollute MCP stdout
     logging.basicConfig(

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-context-server"
-version = "0.1.5"
+version = "0.1.6"
 description = "MCP Context Server per gestione contestuale della memoria"
 authors = [
     {name = "Hannibal", email = "annibale.x@gmail.com"}

@@ -4,7 +4,7 @@
 
 # Backend configuration
 backend: "sqlite" # Only sqlite is supported
-sqlite_path: "~/.mcp-context-server/context.db" # Path to SQLite database file
+sqlite_path: "~/.db/context.db" # Path to SQLite database file
 
 # Tool configuration
 tool_profile: "extended" # Options: core, extended, advanced

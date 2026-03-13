@@ -111,10 +111,10 @@ class _EnvVar:
         return f"_EnvVar({', '.join(repr(n) for n in self.env_names)}, default={self.default!r})"
 
 
-_DEFAULT_DB_PATH = os.path.expanduser("~/.memorygraph/memory.db")
+_DEFAULT_DB_PATH = os.path.expanduser("~/.mcp-context-server/context.db")
 _DEFAULT_CONFIG_PATHS = [
-    Path.cwd() / "memorygraph.yaml",
-    Path.home() / ".memorygraph" / "config.yaml",
+    Path.cwd() / "context-server.yaml",
+    Path.home() / ".mcp-context-server" / "config.yaml",
 ]
 
 
@@ -129,8 +129,8 @@ class YAMLConfig:
 
         Hierarchy (highest priority last):
         1. Default values
-        2. Global config (~/.memorygraph/config.yaml)
-        3. Project config (./memorygraph.yaml)
+        2. Global config (~/.mcp-context-server/config.yaml)
+        3. Project config (./context-server.yaml)
         4. Environment variables
         """
         config = cls._get_defaults()
@@ -141,7 +141,7 @@ class YAMLConfig:
             config.update(cls._load_yaml_file(global_config_path))
 
         # Load from project config
-        project_config_path = Path.cwd() / "memorygraph.yaml"
+        project_config_path = Path.cwd() / "context-server.yaml"
         if project_config_path.exists():
             config.update(cls._load_yaml_file(project_config_path))
 
@@ -190,51 +190,39 @@ class YAMLConfig:
     def _apply_env_overrides(cls, config: Dict[str, Any]) -> Dict[str, Any]:
         """Apply environment variable overrides to configuration."""
         # Backend configuration
-        if os.getenv("MEMORY_BACKEND"):
-            config["backend"] = os.getenv("MEMORY_BACKEND")
+        if os.getenv("CONTEXT_BACKEND"):
+            config["backend"] = os.getenv("CONTEXT_BACKEND")
 
         # SQLite configuration
-        if os.getenv("MEMORY_SQLITE_PATH"):
-            config["sqlite_path"] = os.getenv("MEMORY_SQLITE_PATH")
+        if os.getenv("CONTEXT_SQLITE_PATH"):
+            config["sqlite_path"] = os.getenv("CONTEXT_SQLITE_PATH")
 
         # Tool configuration
-        if os.getenv("MEMORY_TOOL_PROFILE"):
-            config["tool_profile"] = os.getenv("MEMORY_TOOL_PROFILE")
+        if os.getenv("CONTEXT_TOOL_PROFILE"):
+            config["tool_profile"] = os.getenv("CONTEXT_TOOL_PROFILE")
 
-        if os.getenv("MEMORY_ENABLE_ADVANCED_TOOLS"):
-            config["enable_advanced_tools"] = (
-                os.getenv("MEMORY_ENABLE_ADVANCED_TOOLS").lower() == "true"
-            )
+        if os.getenv("CONTEXT_ENABLE_ADVANCED_TOOLS"):
+            config["enable_advanced_tools"] = os.getenv("CONTEXT_ENABLE_ADVANCED_TOOLS").lower() == "true"
 
         # Logging configuration
-        if os.getenv("MEMORY_LOG_LEVEL"):
-            config["logging"]["level"] = os.getenv("MEMORY_LOG_LEVEL")
+        if os.getenv("CONTEXT_LOG_LEVEL"):
+            config["logging"]["level"] = os.getenv("CONTEXT_LOG_LEVEL")
 
         # Feature configuration
-        if os.getenv("MEMORY_AUTO_EXTRACT_ENTITIES"):
-            config["features"]["auto_extract_entities"] = (
-                os.getenv("MEMORY_AUTO_EXTRACT_ENTITIES").lower() == "true"
-            )
+        if os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES"):
+            config["features"]["auto_extract_entities"] = os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES").lower() == "true"
 
-        if os.getenv("MEMORY_SESSION_BRIEFING"):
-            config["features"]["session_briefing"] = (
-                os.getenv("MEMORY_SESSION_BRIEFING").lower() == "true"
-            )
+        if os.getenv("CONTEXT_SESSION_BRIEFING"):
+            config["features"]["session_briefing"] = os.getenv("CONTEXT_SESSION_BRIEFING").lower() == "true"
 
-        if os.getenv("MEMORY_BRIEFING_VERBOSITY"):
-            config["features"]["briefing_verbosity"] = os.getenv(
-                "MEMORY_BRIEFING_VERBOSITY"
-            )
+        if os.getenv("CONTEXT_BRIEFING_VERBOSITY"):
+            config["features"]["briefing_verbosity"] = os.getenv("CONTEXT_BRIEFING_VERBOSITY")
 
-        if os.getenv("MEMORY_BRIEFING_RECENCY_DAYS"):
-            config["features"]["briefing_recency_days"] = int(
-                os.getenv("MEMORY_BRIEFING_RECENCY_DAYS")
-            )
+        if os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS"):
+            config["features"]["briefing_recency_days"] = int(os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS"))
 
-        if os.getenv("MEMORY_ALLOW_CYCLES"):
-            config["features"]["allow_relationship_cycles"] = (
-                os.getenv("MEMORY_ALLOW_CYCLES").lower() == "true"
-            )
+        if os.getenv("CONTEXT_ALLOW_CYCLES"):
+            config["features"]["allow_relationship_cycles"] = os.getenv("CONTEXT_ALLOW_CYCLES").lower() == "true"
 
         return config
 
@@ -242,7 +230,7 @@ class YAMLConfig:
     def save_config(cls, config: Dict[str, Any], path: Optional[Path] = None) -> None:
         """Save configuration to a YAML file."""
         if path is None:
-            path = Path.cwd() / "memorygraph.yaml"
+            path = Path.cwd() / "context-server.yaml"
 
         # Ensure directory exists
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -267,40 +255,40 @@ class Config:
     for testing or programmatic configuration.
 
     Environment Variables:
-        MEMORY_BACKEND: Backend type (sqlite|auto) [default: sqlite]
-        MEMORY_SQLITE_PATH: Database file path [default: ~/.memorygraph/memory.db]
-        MEMORY_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
-        MEMORY_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
-        MEMORY_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
-        MEMORY_AUTO_EXTRACT_ENTITIES: Automatically extract entities from memory content [default: true]
-        MEMORY_SESSION_BRIEFING: Enable session briefing feature [default: true]
-        MEMORY_BRIEFING_VERBOSITY: Briefing verbosity level [default: standard]
-        MEMORY_BRIEFING_RECENCY_DAYS: Number of days to consider for briefing [default: 7]
-        MEMORY_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
+        CONTEXT_BACKEND or CONTEXT_BACKEND: Backend type (sqlite|auto) [default: sqlite]
+        CONTEXT_SQLITE_PATH or CONTEXT_SQLITE_PATH: Database file path [default: ~/.memorygraph/memory.db]
+        CONTEXT_TOOL_PROFILE or CONTEXT_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
+        CONTEXT_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
+        CONTEXT_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
+        CONTEXT_AUTO_EXTRACT_ENTITIES: Automatically extract entities from memory content [default: true]
+        CONTEXT_SESSION_BRIEFING: Enable session briefing feature [default: true]
+        CONTEXT_BRIEFING_VERBOSITY: Briefing verbosity level [default: standard]
+        CONTEXT_BRIEFING_RECENCY_DAYS: Number of days to consider for briefing [default: 7]
+        CONTEXT_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
     """
 
     # Load YAML configuration
     _yaml_config = YAMLConfig.load_config()
 
     # Backend configuration
-    BACKEND = _EnvVar("MEMORY_BACKEND", default=_yaml_config.get("backend", "sqlite"))
+    BACKEND = _EnvVar("CONTEXT_BACKEND", default=_yaml_config.get("backend", "sqlite"))
     SQLITE_PATH = _EnvVar(
-        "MEMORY_SQLITE_PATH", default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
+        "CONTEXT_SQLITE_PATH", default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
     )
 
     # Tool configuration
     TOOL_PROFILE = _EnvVar(
-        "MEMORY_TOOL_PROFILE", default=_yaml_config.get("tool_profile", "core")
+        "CONTEXT_TOOL_PROFILE", default=_yaml_config.get("tool_profile", "core")
     )
     ENABLE_ADVANCED_TOOLS = _EnvVar(
-        "MEMORY_ENABLE_ADVANCED_TOOLS",
+        "CONTEXT_ENABLE_ADVANCED_TOOLS",
         default=_yaml_config.get("enable_advanced_tools", False),
         cast=bool,
     )
 
     # Logging configuration
     LOG_LEVEL = _EnvVar(
-        "MEMORY_LOG_LEVEL", default=_yaml_config.get("logging", {}).get("level", "INFO")
+        "CONTEXT_LOG_LEVEL", default=_yaml_config.get("logging", {}).get("level", "INFO")
     )
     LOG_FORMAT = _yaml_config.get("logging", {}).get(
         "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -308,26 +296,26 @@ class Config:
 
     # Feature configuration
     AUTO_EXTRACT_ENTITIES = _EnvVar(
-        "MEMORY_AUTO_EXTRACT_ENTITIES",
+        "CONTEXT_AUTO_EXTRACT_ENTITIES",
         default=_yaml_config.get("features", {}).get("auto_extract_entities", True),
         cast=bool,
     )
     SESSION_BRIEFING = _EnvVar(
-        "MEMORY_SESSION_BRIEFING",
+        "CONTEXT_SESSION_BRIEFING",
         default=_yaml_config.get("features", {}).get("session_briefing", True),
         cast=bool,
     )
     BRIEFING_VERBOSITY = _EnvVar(
-        "MEMORY_BRIEFING_VERBOSITY",
+        "CONTEXT_BRIEFING_VERBOSITY",
         default=_yaml_config.get("features", {}).get("briefing_verbosity", "standard"),
     )
     BRIEFING_RECENCY_DAYS = _EnvVar(
-        "MEMORY_BRIEFING_RECENCY_DAYS",
+        "CONTEXT_BRIEFING_RECENCY_DAYS",
         default=_yaml_config.get("features", {}).get("briefing_recency_days", 7),
         cast=int,
     )
     ALLOW_RELATIONSHIP_CYCLES = _EnvVar(
-        "MEMORY_ALLOW_CYCLES",
+        "CONTEXT_ALLOW_CYCLES",
         default=_yaml_config.get("features", {}).get(
             "allow_relationship_cycles", False
         ),
@@ -472,7 +460,7 @@ class Config:
     def create_default_config(cls, path: Optional[Path] = None) -> None:
         """Create a default configuration file."""
         if path is None:
-            path = Path.cwd() / "memorygraph.yaml"
+            path = Path.cwd() / "context-server.yaml"
 
         default_config = {
             "backend": "sqlite",

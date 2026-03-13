@@ -1,12 +1,16 @@
 """
-Entry point for running MemoryGraph as a module.
+Entry point for running MCP Context Server as a module.
 
 Usage:
-    python -m memorygraph
+    python -m context_server [options]
+
+This module entry point delegates to the CLI interface for proper
+argument parsing and command handling.
 """
 
-import asyncio
-from .server import main
+import sys
+
+from .cli import main
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(main())
