@@ -8,8 +8,8 @@ Supports SQLite backend only for simplified deployment with Zed editor.
 """
 
 __version__ = "0.1.4"
-__author__ = "Gregory Dickson"
-__email__ = "gregory.d.dickson@gmail.com"
+__author__ = "Hannibal"
+__email__ = "annibale.x@gmail.com"
 
 from .models import (
     BackendError,

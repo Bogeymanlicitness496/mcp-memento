@@ -4,15 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-user-memory"
-version = "0.12.4"
+version = "0.1.4"
 description = "Versione personalizzata di MemoryGraph con tool _user_memory"
+authors = [
+    {name = "Hannibal", email = "annibale.x@gmail.com"}
+]
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.23.0",
     "networkx>=3.0.0",
     "pydantic>=2.10.0",
     "python-dotenv>=1.0.0",
-    "typing-extensions>=4.0.0"
+    "typing-extensions>=4.0.0",
+    "pyyaml>=6.0.0"
 ]
 
 [tool.setuptools.packages.find]
