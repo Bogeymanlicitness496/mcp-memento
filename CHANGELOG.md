@@ -9,18 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.6] - 2026-03-14
 
+### Added
+- Persistent tool naming convention to avoid conflicts with Serena Context Server
+- Clear distinction between persistent (cross-session) and session memory storage
+
 ### Changed
 - Updated environment variable prefixes from MEMORY_ to CONTEXT_
 - Changed default database path to ~/.mcp-context-server/context.db
 - Updated configuration file names to context-server.yaml
 - Fixed module entry point to properly handle CLI arguments
 - Improved Zed editor MCP configuration compatibility
+- **BREAKING CHANGE**: Renamed all MCP tools with `_persistent` suffix:
+  - Core tools: `store_memory` → `store_persistent_memory`, `get_memory` → `get_persistent_memory`, etc.
+  - Extended tools: `get_memory_statistics` → `get_persistent_memory_statistics`, etc.
+  - Advanced tools: `find_memory_path` → `find_path_between_persistent_memories`, etc.
 
 ### Fixed
 - Module execution with `python -m context_server` now works correctly
 - CLI arguments like `--health` and `--show-config` are properly handled
 - Environment variable support for Zed editor integration
 - Configuration file path references
+- Tool registry mapping with new persistent tool names
 
 ## [0.1.5] - 2026-03-13
 
