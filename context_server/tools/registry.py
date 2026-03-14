@@ -12,6 +12,7 @@ To add a new tool:
 Tool handlers receive a ToolContext and kwargs from the tool call,
 and return the result to be sent back to the MCP client.
 """
+
 from typing import Any, Awaitable, Callable, Dict
 
 from mcp.types import CallToolResult
@@ -42,19 +43,20 @@ ToolHandler = Callable[[Any, Dict[str, Any]], Awaitable[CallToolResult]]
 
 # Registry mapping tool names to handlers
 TOOL_HANDLERS: Dict[str, ToolHandler] = {
-    "store_memory": handle_store_memory,
-    "get_memory": handle_get_memory,
-    "update_memory": handle_update_memory,
-    "delete_memory": handle_delete_memory,
-    "search_memories": handle_search_memories,
-    "recall_memories": handle_recall_memories,
-    "contextual_search": handle_contextual_search,
-    "create_relationship": handle_create_relationship,
-    "get_related_memories": handle_get_related_memories,
-    "get_memory_statistics": handle_get_memory_statistics,
-    "get_recent_activity": handle_get_recent_activity,
-    "search_relationships_by_context": handle_search_relationships_by_context,
+    "store_persistent_memory": handle_store_memory,
+    "get_persistent_memory": handle_get_memory,
+    "update_persistent_memory": handle_update_memory,
+    "delete_persistent_memory": handle_delete_memory,
+    "search_persistent_memories": handle_search_memories,
+    "recall_persistent_memories": handle_recall_memories,
+    "persistent_contextual_search": handle_contextual_search,
+    "create_persistent_relationship": handle_create_relationship,
+    "get_related_persistent_memories": handle_get_related_memories,
+    "get_persistent_memory_statistics": handle_get_memory_statistics,
+    "get_persistent_recent_activity": handle_get_recent_activity,
+    "search_persistent_relationships_by_context": handle_search_relationships_by_context,
 }
+
 
 def get_handler(tool_name: str) -> ToolHandler | None:
     """

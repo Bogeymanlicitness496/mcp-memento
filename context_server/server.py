@@ -74,8 +74,8 @@ class MemoryGraphServer:
         # Basic tools (defined inline below)
         basic_tools = [
             Tool(
-                name="recall_memories",
-                description="""Primary tool for finding past memories using natural language queries.
+                name="recall_persistent_memories",
+                description="""Primary tool for finding persistent memories using natural language queries.
 
 Optimized for fuzzy matching - handles plurals, tenses, and case variations automatically.
 
@@ -84,8 +84,11 @@ BEST FOR:
 - General exploration ("what do we know about authentication")
 - Fuzzy/approximate matching
 
+USE FOR: Long-term knowledge that survives across sessions.
+DO NOT USE FOR: Temporary session context or project-specific state.
+
 LESS EFFECTIVE FOR:
-- Acronyms (DCAD, JWT, API) - use search_memories with tags instead
+- Acronyms (DCAD, JWT, API) - use search_persistent_memories with tags instead
 - Proper nouns (company names, services)
 - Exact technical terms
 
@@ -129,10 +132,13 @@ FALLBACK: If recall returns no relevant results, try search_memories with tags f
                 },
             ),
             Tool(
-                name="store_memory",
-                description="""Store a new memory with context and metadata.
+                name="store_persistent_memory",
+                description="""Store a new persistent memory with context and metadata.
 
 Required: type, title, content. Optional: tags, importance (0-1), context.
+
+USE FOR: Long-term knowledge that should survive across ALL sessions.
+DO NOT USE FOR: Temporary session state or project-specific context.
 
 LIMITS:
 - title: max 500 characters
@@ -147,8 +153,8 @@ TAGGING BEST PRACTICE:
 Types: solution, problem, error, fix, pattern, decision, task, code_pattern, technology, command, workflow, general
 
 EXAMPLES:
-- store_memory(type="solution", title="Fixed Redis timeout", content="Increased timeout to 30s...", tags=["redis"], importance=0.8)
-- store_memory(type="error", title="OAuth2 auth failure", content="Error details...", tags=["auth", "oauth2"])
+- store_persistent_memory(type="solution", title="Fixed Redis timeout", content="Increased timeout to 30s...", tags=["redis"], importance=0.8)
+- store_persistent_memory(type="error", title="OAuth2 auth failure", content="Error details...", tags=["auth", "oauth2"])
 
 Returns memory_id. Use create_relationship to link related memories.""",
                 inputSchema={
@@ -191,8 +197,8 @@ Returns memory_id. Use create_relationship to link related memories.""",
                 },
             ),
             Tool(
-                name="get_memory",
-                description="""Retrieve a specific memory by ID.
+                name="get_persistent_memory",
+                description="""Retrieve a specific persistent memory by ID.
 
 Use when you have a memory_id from search results or store_memory.
 Set include_relationships=true (default) to see connected memories.
@@ -214,8 +220,8 @@ EXAMPLE: get_memory(memory_id="abc-123")""",
                 },
             ),
             Tool(
-                name="search_memories",
-                description="""Advanced search with fine-grained filters for precise retrieval.
+                name="search_persistent_memories",
+                description="""Advanced search with fine-grained filters for precise retrieval of persistent memories.
 
 USE THIS TOOL FIRST (not recall) when searching for:
 - Acronyms: DCAD, JWT, MCR2, API, etc.
@@ -304,8 +310,8 @@ For conceptual/natural language queries, use recall_memories instead.""",
                 },
             ),
             Tool(
-                name="update_memory",
-                description="Update an existing memory",
+                name="update_persistent_memory",
+                description="Update an existing persistent memory",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -327,8 +333,8 @@ For conceptual/natural language queries, use recall_memories instead.""",
                 },
             ),
             Tool(
-                name="delete_memory",
-                description="Delete a memory and all its relationships",
+                name="delete_persistent_memory",
+                description="Delete a persistent memory and all its relationships",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -341,8 +347,8 @@ For conceptual/natural language queries, use recall_memories instead.""",
                 },
             ),
             Tool(
-                name="create_relationship",
-                description="""Link two memories with a typed relationship.
+                name="create_persistent_relationship",
+                description="""Link two persistent memories with a typed relationship.
 
 Common types: SOLVES (solution→problem), CAUSES (cause→effect), ADDRESSES (fix→error), REQUIRES (dependent→dependency), RELATED_TO (general)
 
@@ -387,8 +393,8 @@ Optional: strength (0-1), confidence (0-1), context (description)""",
                 },
             ),
             Tool(
-                name="get_related_memories",
-                description="""Find memories connected to a specific memory via relationships.
+                name="get_related_persistent_memories",
+                description="""Find persistent memories connected to a specific memory via relationships.
 
 Filter by relationship_types (e.g., ["SOLVES"], ["CAUSES"]) and max_depth (default 1).
 
@@ -418,13 +424,13 @@ EXAMPLES:
                 },
             ),
             Tool(
-                name="get_memory_statistics",
-                description="Get statistics about the memory database",
+                name="get_persistent_memory_statistics",
+                description="Get statistics about the persistent memory database",
                 inputSchema={"type": "object", "properties": {}},
             ),
             Tool(
-                name="get_recent_activity",
-                description="""Get summary of recent memory activity for session context.
+                name="get_persistent_recent_activity",
+                description="""Get summary of recent persistent memory activity for session context.
 
 Returns: memory counts by type, recent memories (up to 20), unresolved problems.
 
@@ -448,8 +454,8 @@ EXAMPLES:
                 },
             ),
             Tool(
-                name="search_relationships_by_context",
-                description="Search relationships by their structured context fields (scope, conditions, evidence, components)",
+                name="search_persistent_relationships_by_context",
+                description="Search persistent relationships by their structured context fields (scope, conditions, evidence, components)",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -492,8 +498,8 @@ EXAMPLES:
             ),
             # Contextual search tool for semantic graph traversal
             Tool(
-                name="contextual_search",
-                description="""Search only within the context of a given memory (scoped search).
+                name="persistent_contextual_search",
+                description="""Search only within the context of a given persistent memory (scoped search).
 
 Two-phase process: (1) Find related memories, (2) Search only within that set.
 Provides semantic scoping without embeddings.
@@ -573,13 +579,13 @@ RETURNS:
                     return await handler(self.memory_db, arguments)
                 # Advanced relationship tools
                 elif name in [
-                    "find_memory_path",
-                    "analyze_memory_clusters",
-                    "find_bridge_memories",
-                    "suggest_relationship_type",
-                    "reinforce_relationship",
-                    "get_relationship_types_by_category",
-                    "analyze_graph_metrics",
+                    "find_path_between_persistent_memories",
+                    "get_persistent_memory_clusters",
+                    "get_persistent_central_memories",
+                    "suggest_persistent_relationships",
+                    "find_persistent_patterns",
+                    "analyze_persistent_memory_graph",
+                    "get_persistent_memory_network",
                 ]:
                     # Dispatch to advanced handlers
                     method_name = f"handle_{name}"

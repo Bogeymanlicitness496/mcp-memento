@@ -25,31 +25,31 @@ class BackendType(Enum):
 
 
 _CORE_TOOLS = [
-    "store_memory",
-    "get_memory",
-    "search_memories",
-    "update_memory",
-    "delete_memory",
-    "create_relationship",
-    "get_related_memories",
-    "recall_memories",
-    "get_recent_activity",
+    "store_persistent_memory",
+    "get_persistent_memory",
+    "search_persistent_memories",
+    "update_persistent_memory",
+    "delete_persistent_memory",
+    "create_persistent_relationship",
+    "get_related_persistent_memories",
+    "recall_persistent_memories",
+    "get_persistent_recent_activity",
 ]
 
 _EXTENDED_EXTRA_TOOLS = [
-    "get_memory_statistics",
-    "search_relationships_by_context",
-    "contextual_search",
+    "get_persistent_memory_statistics",
+    "search_persistent_relationships_by_context",
+    "persistent_contextual_search",
 ]
 
 _ADVANCED_TOOLS = [
-    "analyze_memory_graph",
-    "find_patterns",
-    "suggest_relationships",
-    "get_memory_clusters",
-    "get_central_memories",
-    "find_path_between_memories",
-    "get_memory_network",
+    "analyze_persistent_memory_graph",
+    "find_persistent_patterns",
+    "suggest_persistent_relationships",
+    "get_persistent_memory_clusters",
+    "get_persistent_central_memories",
+    "find_path_between_persistent_memories",
+    "get_persistent_memory_network",
 ]
 
 TOOL_PROFILES = {
@@ -202,7 +202,9 @@ class YAMLConfig:
             config["tool_profile"] = os.getenv("CONTEXT_TOOL_PROFILE")
 
         if os.getenv("CONTEXT_ENABLE_ADVANCED_TOOLS"):
-            config["enable_advanced_tools"] = os.getenv("CONTEXT_ENABLE_ADVANCED_TOOLS").lower() == "true"
+            config["enable_advanced_tools"] = (
+                os.getenv("CONTEXT_ENABLE_ADVANCED_TOOLS").lower() == "true"
+            )
 
         # Logging configuration
         if os.getenv("CONTEXT_LOG_LEVEL"):
@@ -210,19 +212,29 @@ class YAMLConfig:
 
         # Feature configuration
         if os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES"):
-            config["features"]["auto_extract_entities"] = os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES").lower() == "true"
+            config["features"]["auto_extract_entities"] = (
+                os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES").lower() == "true"
+            )
 
         if os.getenv("CONTEXT_SESSION_BRIEFING"):
-            config["features"]["session_briefing"] = os.getenv("CONTEXT_SESSION_BRIEFING").lower() == "true"
+            config["features"]["session_briefing"] = (
+                os.getenv("CONTEXT_SESSION_BRIEFING").lower() == "true"
+            )
 
         if os.getenv("CONTEXT_BRIEFING_VERBOSITY"):
-            config["features"]["briefing_verbosity"] = os.getenv("CONTEXT_BRIEFING_VERBOSITY")
+            config["features"]["briefing_verbosity"] = os.getenv(
+                "CONTEXT_BRIEFING_VERBOSITY"
+            )
 
         if os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS"):
-            config["features"]["briefing_recency_days"] = int(os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS"))
+            config["features"]["briefing_recency_days"] = int(
+                os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS")
+            )
 
         if os.getenv("CONTEXT_ALLOW_CYCLES"):
-            config["features"]["allow_relationship_cycles"] = os.getenv("CONTEXT_ALLOW_CYCLES").lower() == "true"
+            config["features"]["allow_relationship_cycles"] = (
+                os.getenv("CONTEXT_ALLOW_CYCLES").lower() == "true"
+            )
 
         return config
 
@@ -288,7 +300,8 @@ class Config:
 
     # Logging configuration
     LOG_LEVEL = _EnvVar(
-        "CONTEXT_LOG_LEVEL", default=_yaml_config.get("logging", {}).get("level", "INFO")
+        "CONTEXT_LOG_LEVEL",
+        default=_yaml_config.get("logging", {}).get("level", "INFO"),
     )
     LOG_FORMAT = _yaml_config.get("logging", {}).get(
         "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

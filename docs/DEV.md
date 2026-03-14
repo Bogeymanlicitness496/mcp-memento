@@ -1,11 +1,11 @@
 
-## MCP CLI COMMANDS
+# MCP CLI COMMANDS
 
 python -m context_server 
 python -m context_server --help
 python -m context_server --health
 
-## TOOLS
+# TOOLS
 
 Lista dei 19 Tool Esposti (Extended + Advanced):
 
@@ -37,3 +37,43 @@ Lista dei 19 Tool Esposti (Extended + Advanced):
 **Totale: 19 tool**
 
 Se vuoi solo i 12 tool del profilo "extended" (senza advanced), devi impostare `CONTEXT_ENABLE_ADVANCED_TOOLS=false` nella configurazione Zed.
+
+
+# CROSS COMPILATION
+
+### Opzione 1: Usare `cross` (la più comoda per casi complessi)
+Se il tuo progetto ha dipendenze C (come spesso succede), la cross-compilation manuale può diventare un incubo. Esiste **`cross`**, un wrapper che usa Docker per gestire tutto automaticamente:
+
+```bash
+# Installa cross
+cargo install cross
+
+# Compila per Windows (senza impazzire)
+cross build --target x86_64-pc-windows-gnu --release
+```
+`cross` si occupa di tutto: toolchain, linker, librerie di sistema .
+
+## Casi particolari da tenere d'occhio
+
+| Scenario | Problema | Soluzione |
+|----------|----------|-----------|
+| **Dipendenze C** (es. `ring`, `openssl-sys`) | La compilazione incrociata fallisce perché cerca librerie C del sistema target | Usa `cross` con Docker, o installa manualmente le librerie di cross-compilation  |
+| **Glibc vs musl** | Binario Linux compilato su Ubuntu potrebbe non funzionare su CentOS vecchio (versione glibc diversa) | Compila per `x86_64-unknown-linux-musl` per avere binari statici che girano **su qualsiasi Linux**  |
+| **Windows MSVC vs GNU** | `x86_64-pc-windows-msvc` (Micosoft) dà eseguibili più "nativi", ma richiede Visual Studio | Per semplicità, usa `x86_64-pc-windows-gnu` (MinGW)  |
+| **macOS** | Compilare per macOS da Linux è **estremamente difficile** per via delle licenze Apple | Compila nativamente su Mac o usa CI su GitHub Actions con runner macOS  |
+
+## Opzione 2:
+
+Considerando che stai sviluppando un MCP server in Rust e vuoi distribuirlo su più piattaforme, ti consiglio:
+
+1. **In fase di sviluppo**: compila nativamente sul sistema che stai usando
+2. **Per le release**: usa GitHub Actions con una matrice di build che compila automaticamente per Windows, Linux e macOS 
+3. **Per Linux**: considera di usare il target `musl` per avere un singolo eseguibile statico che funziona su tutte le distro
+
+Esempio di matrice GitHub Actions:
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, windows-latest, macos-latest]
+    target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu, x86_64-apple-darwin]
+```

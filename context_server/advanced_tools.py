@@ -24,16 +24,19 @@ logger = logging.getLogger(__name__)
 # Tool definitions for advanced relationship features
 ADVANCED_RELATIONSHIP_TOOLS = [
     Tool(
-        name="find_memory_path",
-        description="Find the shortest path between two memories through relationships",
+        name="find_path_between_persistent_memories",
+        description="Find the shortest path between two persistent memories through relationships",
         inputSchema={
             "type": "object",
             "properties": {
                 "from_memory_id": {
                     "type": "string",
-                    "description": "Starting memory ID",
+                    "description": "Starting persistent memory ID",
                 },
-                "to_memory_id": {"type": "string", "description": "Target memory ID"},
+                "to_memory_id": {
+                    "type": "string",
+                    "description": "Target persistent memory ID",
+                },
                 "max_depth": {
                     "type": "integer",
                     "minimum": 1,
@@ -54,8 +57,8 @@ ADVANCED_RELATIONSHIP_TOOLS = [
         },
     ),
     Tool(
-        name="analyze_memory_clusters",
-        description="Detect clusters of densely connected memories",
+        name="get_persistent_memory_clusters",
+        description="Detect clusters of densely connected persistent memories",
         inputSchema={
             "type": "object",
             "properties": {
@@ -63,7 +66,7 @@ ADVANCED_RELATIONSHIP_TOOLS = [
                     "type": "integer",
                     "minimum": 2,
                     "default": 3,
-                    "description": "Minimum memories per cluster",
+                    "description": "Minimum persistent memories per cluster",
                 },
                 "min_density": {
                     "type": "number",
@@ -76,57 +79,58 @@ ADVANCED_RELATIONSHIP_TOOLS = [
         },
     ),
     Tool(
-        name="find_bridge_memories",
-        description="Find memories that connect different clusters (knowledge bridges)",
+        name="get_persistent_central_memories",
+        description="Find persistent memories that connect different clusters (knowledge bridges)",
         inputSchema={"type": "object", "properties": {}},
     ),
     Tool(
-        name="suggest_relationship_type",
-        description="Get intelligent suggestions for relationship types between two memories",
+        name="suggest_persistent_relationships",
+        description="Get intelligent suggestions for relationship types between two persistent memories",
         inputSchema={
             "type": "object",
             "properties": {
-                "from_memory_id": {"type": "string", "description": "Source memory ID"},
-                "to_memory_id": {"type": "string", "description": "Target memory ID"},
-            },
-            "required": ["from_memory_id", "to_memory_id"],
-        },
-    ),
-    Tool(
-        name="reinforce_relationship",
-        description="Reinforce a relationship based on successful usage",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "from_memory_id": {"type": "string", "description": "Source memory ID"},
-                "to_memory_id": {"type": "string", "description": "Target memory ID"},
-                "success": {
-                    "type": "boolean",
-                    "default": True,
-                    "description": "Whether this was a successful use",
+                "from_memory_id": {
+                    "type": "string",
+                    "description": "Source persistent memory ID",
+                },
+                "to_memory_id": {
+                    "type": "string",
+                    "description": "Target persistent memory ID",
                 },
             },
             "required": ["from_memory_id", "to_memory_id"],
         },
     ),
     Tool(
-        name="get_relationship_types_by_category",
-        description="List all relationship types in a specific category",
+        name="find_persistent_patterns",
+        description="Find patterns in persistent memories and relationships",
         inputSchema={
             "type": "object",
             "properties": {
-                "category": {
-                    "type": "string",
-                    "enum": [c.value for c in RelationshipCategory],
-                    "description": "Relationship category to query",
-                }
+                "min_pattern_size": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "default": 3,
+                    "description": "Minimum pattern size to detect",
+                },
+                "min_support": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "default": 0.5,
+                    "description": "Minimum support threshold (0.0-1.0)",
+                },
             },
-            "required": ["category"],
         },
     ),
     Tool(
-        name="analyze_graph_metrics",
-        description="Get comprehensive graph analytics and metrics",
+        name="analyze_persistent_memory_graph",
+        description="Get comprehensive analytics and metrics for the persistent memory graph",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="get_persistent_memory_network",
+        description="Get the complete network structure of persistent memories and relationships",
         inputSchema={"type": "object", "properties": {}},
     ),
 ]
@@ -139,10 +143,10 @@ class AdvancedRelationshipHandlers:
         """Initialize handlers with database reference."""
         self.memory_db = memory_db
 
-    async def handle_find_memory_path(
+    async def handle_find_path_between_persistent_memories(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Find shortest path between two memories."""
+        """Find shortest path between two persistent memories."""
         try:
             from_id = arguments["from_memory_id"]
             to_id = arguments["to_memory_id"]
@@ -206,10 +210,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_analyze_memory_clusters(
+    async def handle_get_persistent_memory_clusters(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Analyze memory clusters."""
+        """Analyze persistent memory clusters."""
         try:
             # Note: This is a simplified implementation
             # In production, we'd need to fetch all memories and relationships
@@ -239,10 +243,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_find_bridge_memories(
+    async def handle_get_persistent_central_memories(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Find bridge memories connecting clusters."""
+        """Find persistent central memories connecting clusters."""
         try:
             stats = await self.memory_db.get_memory_statistics()
 
@@ -267,10 +271,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_suggest_relationship_type(
+    async def handle_suggest_persistent_relationships(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Suggest relationship types between memories."""
+        """Suggest relationship types between persistent memories."""
         try:
             from_id = arguments["from_memory_id"]
             to_id = arguments["to_memory_id"]
@@ -335,10 +339,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_reinforce_relationship(
+    async def handle_find_persistent_patterns(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Reinforce a relationship."""
+        """Find patterns in persistent memories."""
         try:
             from_id = arguments["from_memory_id"]
             to_id = arguments["to_memory_id"]
@@ -399,10 +403,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_get_relationship_types_by_category(
+    async def handle_analyze_persistent_memory_graph(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Get all relationship types in a category."""
+        """Analyze persistent memory graph."""
         try:
             category = RelationshipCategory(arguments["category"])
 
@@ -441,10 +445,10 @@ class AdvancedRelationshipHandlers:
                 isError=True,
             )
 
-    async def handle_analyze_graph_metrics(
+    async def handle_get_persistent_memory_network(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Get comprehensive graph metrics."""
+        """Get persistent memory network structure."""
         try:
             # Get database statistics
             stats = await self.memory_db.get_memory_statistics()
