@@ -71,8 +71,6 @@ class ContextKeeper:
         """Collect all tool definitions from all modules."""
         return get_all_tools() + ADVANCED_RELATIONSHIP_TOOLS
 
-
-
     def _register_handlers(self):
         """Register MCP protocol handlers."""
 
@@ -175,7 +173,7 @@ class ContextKeeper:
         """Clean up resources."""
         if self.db_connection:
             await self.db_connection.close()
-        logger.info("Claude Memory Server cleanup completed")
+        logger.info("Context Keeper Server cleanup completed")
 
 
 async def main():

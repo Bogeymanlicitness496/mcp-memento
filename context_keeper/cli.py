@@ -344,10 +344,6 @@ Environment Variables:
     # Apply CLI arguments to environment variables.
     # Config uses _EnvVar descriptors that read os.environ dynamically,
     # so setting env vars is sufficient for the current process.
-    if args.backend:
-        validate_backend(args.backend)
-        os.environ["CONTEXT_BACKEND"] = args.backend
-
     if args.profile:
         validate_profile(args.profile)
         profile = {"lite": "core", "standard": "extended", "full": "extended"}.get(
