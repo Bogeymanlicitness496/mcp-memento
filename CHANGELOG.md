@@ -1,5 +1,12 @@
 # Changelog
 
+* 2026-03-14: v0.1.10 - Path resolution and Windows compatibility fixes (Hannibal)
+  * Fixed SQLite database path issues on Windows systems
+  * Changed default database path from `.db` to `context.db` in configuration
+  * Fixed indentation error in `context_keeper.py` wrapper script
+  * Improved environment variable handling for configuration overrides
+  * Enhanced Windows compatibility for database file operations
+
 * 2026-03-14: v0.1.9 - Code quality analysis and dead code removal (Hannibal)
   * Removed unused `SimpleGraph` and graph algorithms classes
   * Removed unused `MemoryNode` and graph-related models
