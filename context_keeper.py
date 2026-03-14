@@ -23,6 +23,7 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+
 try:
     from context_keeper.cli import main as cli_main
     from context_keeper.config import Config
@@ -47,14 +48,18 @@ def run_server():
     # SQLite database path
     if sqlite_path := os.getenv("CONTEXT_SQLITE_PATH"):
         env_config["sqlite_path"] = sqlite_path
+        # Also set environment variable directly to ensure Config reads it
+        os.environ["CONTEXT_SQLITE_PATH"] = sqlite_path
 
     # Tool profile
     if tool_profile := os.getenv("CONTEXT_TOOL_PROFILE"):
         env_config["tool_profile"] = tool_profile
+        os.environ["CONTEXT_TOOL_PROFILE"] = tool_profile
 
     # Log level
     if log_level := os.getenv("CONTEXT_LOG_LEVEL"):
         env_config["log_level"] = log_level
+        os.environ["CONTEXT_LOG_LEVEL"] = log_level
 
     # Apply environment configuration
     if env_config:
@@ -64,7 +69,7 @@ def run_server():
                 setattr(config, key, value)
                 print(f"Config: {key} = {value}")
 
-print("Starting MCP Context Keeper...")
+    print("Starting MCP Context Keeper...")
     print(f"Project root: {project_root}")
 
     # Run the server
