@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test runner shell script for mcp-context-server project
+# Test runner shell script for mcp-context-keeper project
 # Usage: ./run_tests.sh [options]
 
 set -e
@@ -20,7 +20,7 @@ print_colored() {
 
 print_header() {
     echo "============================================================"
-    print_colored "$BLUE" "Starting test suite for mcp-context-server"
+    print_colored "${BLUE}" "Starting test suite for mcp-context-keeper"
     echo "============================================================"
     echo
 }

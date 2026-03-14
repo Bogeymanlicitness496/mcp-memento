@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test runner for mcp-context-server project.
+Test runner for mcp-context-keeper project.
 
 This script runs all test files and provides a comprehensive test report.
 All output is in English.
@@ -8,21 +8,19 @@ All output is in English.
 
 import argparse
 import asyncio
-import io
 import json
-import os
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict
 
 # Add parent directory to path to import user_memory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from context_server import MemoryGraphServer
-    from context_server.models import MemoryType, RelationshipType
+    from context_keeper import ContextKeeper
+    from context_keeper.models import MemoryType, RelationshipType
 
     IMPORT_SUCCESS = True
 except ImportError as e:
@@ -38,7 +36,7 @@ class TestRunner:
         self.output_file = output_file
         self.results = {
             "timestamp": datetime.now().isoformat(),
-            "project": "mcp-context-server",
+            "project": "mcp-context-keeper",
             "tests": {},
             "summary": {
                 "total": 0,
@@ -216,11 +214,11 @@ class TestRunner:
 
         try:
             if not IMPORT_SUCCESS:
-                raise ImportError(f"Failed to import context_server: {IMPORT_ERROR}")
+                raise ImportError(f"Failed to import context_keeper: {IMPORT_ERROR}")
 
             # Test basic imports
             test_result["details"]["imports"] = {
-                "MemoryGraphServer": MemoryGraphServer.__name__,
+                "ContextKeeper": ContextKeeper.__name__,
                 "MemoryType_count": len(list(MemoryType)),
                 "RelationshipType_count": len(list(RelationshipType)),
             }
@@ -231,7 +229,7 @@ class TestRunner:
             )
 
             # Test server instantiation
-            server = MemoryGraphServer()
+            server = ContextKeeper()
             test_result["details"]["server_instance"] = str(server)
 
             test_result["status"] = "passed"
@@ -335,7 +333,7 @@ class TestRunner:
         """Run all available tests."""
         self.start_time = time.time()
         self.log("=" * 60)
-        self.log("Starting test suite for mcp-context-server")
+        self.log("Starting test suite for mcp-context-keeper")
         self.log("=" * 60)
 
         # Run import test first
@@ -476,7 +474,7 @@ class TestRunner:
 
 async def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Run tests for mcp-context-server")
+    parser = argparse.ArgumentParser(description="Run tests for mcp-context-keeper")
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )

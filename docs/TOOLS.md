@@ -1,8 +1,8 @@
-# MCP Tools Reference - mcp-context-server
+# MCP Tools Reference - mcp-context-keeper
 
 ## Overview
 
-This document provides a comprehensive reference for all MCP (Model Context Protocol) tools available in the mcp-context-server server. This is a simplified version of MemoryGraph focused on SQLite-only backend for Zed editor integration.
+This document provides a comprehensive reference for all MCP (Model Context Protocol) tools available in the mcp-context-keeper server. This is a simplified version of Context Keeper focused on SQLite-only backend for Zed editor integration.
 
 **IMPORTANT NAMING CONVENTION**: All tools use the `_persistent` suffix to distinguish them from session-based memory tools (like Serena Context Server). Use these tools for long-term knowledge that survives across sessions.
 
@@ -475,17 +475,17 @@ Extended tools + 7 advanced tools for graph analysis and pattern detection.
 ```
 CONTEXT_TOOL_PROFILE=core|extended|advanced
 CONTEXT_ENABLE_ADVANCED_TOOLS=true|false
-CONTEXT_SQLITE_PATH=~/.mcp-context-server/context.db
+CONTEXT_SQLITE_PATH=~/.mcp-context-keeper/context.db
 CONTEXT_LOG_LEVEL=DEBUG|INFO|WARNING|ERROR
 ```
 
-### Configuration File (`context-server.yaml`)
+### Configuration File (`context-keeper.yaml`)
 
 ```yaml
 backend: "sqlite"
 tool_profile: "extended"
 enable_advanced_tools: true
-sqlite_path: "~/.mcp-context-server/context.db"
+sqlite_path: "~/.mcp-context-keeper/context.db"
 logging:
   level: "INFO"
 features:
@@ -501,7 +501,7 @@ features:
 ### Basic Persistent Memory Storage
 ```bash
 # Store a persistent memory
-python -m context_server --profile extended
+python -m context_keeper --profile extended
 
 # Then use MCP client to call:
 {

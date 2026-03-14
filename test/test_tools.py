@@ -1,5 +1,5 @@
 """
-Test file for MCP tools functionality in mcp-context-server
+Test file for MCP tools functionality in mcp-context-keeper
 Tests tool-related models and validation without requiring server initialization.
 """
 
@@ -7,10 +7,10 @@ import json
 import os
 import sys
 
-# Add parent directory to path to import context_server
+# Add parent directory to path to import context_keeper
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from context_server.models import Memory, MemoryContext, MemoryType, RelationshipType
+from context_keeper.models import Memory, MemoryContext, MemoryType, RelationshipType
 
 
 def test_memory_model_validation():

@@ -1,5 +1,5 @@
 """
-Test file for relationship functionality in mcp-context-server
+Test file for relationship functionality in mcp-context-keeper
 Tests relationship models and types without requiring server initialization.
 """
 
@@ -10,7 +10,7 @@ import sys
 # Add parent directory to path to import user_memory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from context_server.models import (
+from context_keeper.models import (
     Memory,
     MemoryType,
     Relationship,
@@ -201,7 +201,7 @@ def test_relationship_properties():
 def main():
     """Main test function"""
     print("=" * 60)
-    print("Running relationship model tests for mcp-context-server")
+    print("Running relationship model tests for mcp-context-keeper")
     print("=" * 60)
 
     # Run all tests

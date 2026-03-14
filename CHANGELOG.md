@@ -1,11 +1,26 @@
 # Changelog
 
-All notable changes to the mcp-context-server project will be documented in this file.
+All notable changes to the mcp-context-keeper project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.8] - 2026-03-14
+
+### Changed
+- Renamed database files for better clarity:
+  - `sqlite_backend.py` → `engine.py` (database engine/connection management)
+  - `sqlite_database.py` → `interface.py` (domain interface for memories and relationships)
+- Renamed `backends` directory to `database` for accurate representation
+- Updated all imports to reflect new file structure
+- Improved code organization and separation of concerns
+
+### Fixed
+- Removed unused work files (`simple_sqlite_db.py`)
+- Cleaned up import paths after file reorganization
+- Ensured all tests pass with new file structure
 
 ## [0.1.7] - 2026-03-15
 
@@ -35,8 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated environment variable prefixes from MEMORY_ to CONTEXT_
-- Changed default database path to ~/.mcp-context-server/context.db
-- Updated configuration file names to context-server.yaml
+- Changed default database path to ~/.mcp-context-keeper/context.db
+- Updated configuration file names to context-keeper.yaml
 - Fixed module entry point to properly handle CLI arguments
 - Improved Zed editor MCP configuration compatibility
 - **BREAKING CHANGE**: Renamed all MCP tools with `_persistent` suffix:
@@ -45,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Advanced tools: `find_memory_path` → `find_path_between_persistent_memories`, etc.
 
 ### Fixed
-- Module execution with `python -m context_server` now works correctly
+- Module execution with `python -m context_keeper` now works correctly
 - CLI arguments like `--health` and `--show-config` are properly handled
 - Environment variable support for Zed editor integration
 - Configuration file path references
@@ -108,7 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic configuration system
 
 ### Changed
-- Project renamed to mcp-context-server
+- Project renamed to mcp-context-keeper
 - Focus on context-aware memory management for MCP servers
 - Simplified architecture for Zed editor compatibility
 
@@ -161,7 +176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This fork focuses on simplicity and Zed editor integration
 - Only SQLite backend is supported
 - Advanced features have been removed in favor of core functionality
-- The project is now named "mcp-context-server" to reflect its purpose
+- The project is now named "mcp-context-keeper" to reflect its purpose
 
 ## Acknowledgments
 

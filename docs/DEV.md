@@ -1,9 +1,9 @@
 
 # MCP CLI COMMANDS
 
-python -m context_server 
-python -m context_server --help
-python -m context_server --health
+python -m context_keeper 
+python -m context_keeper --help
+python -m context_keeper --health
 
 # TOOLS
 

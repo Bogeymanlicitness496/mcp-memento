@@ -3,9 +3,9 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-context-server"
-version = "0.1.7"
-description = "MCP Context Server per gestione contestuale della memoria"
+name = "mcp-context-keeper"
+version = "0.1.8"
+description = "MCP Context Keeper per gestione contestuale della memoria"
 authors = [
     {name = "Hannibal", email = "annibale.x@gmail.com"}
 ]
@@ -20,4 +20,4 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["context_server*"]
+include = ["context_keeper*"]

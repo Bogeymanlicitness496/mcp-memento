@@ -1,8 +1,8 @@
-# MCP Context Server (mcp-context-keeper)
+# MCP Context Keeper (mcp-context-keeper)
 
 ## Overview
 
-MCP Context Server is a context-aware memory management system for MCP (Model Context Protocol) clients like Zed Editor. It provides intelligent memory storage, retrieval, and relationship management with contextual awareness for development workflows.
+MCP Context Keeper is a context-aware memory management system for MCP (Model Context Protocol) clients like Zed Editor. It provides intelligent memory storage, retrieval, and relationship management with contextual awareness for development workflows.
 
 ## Features
 
@@ -24,23 +24,23 @@ MCP Context Server is a context-aware memory management system for MCP (Model Co
 pip install -e .
 
 # Or install directly
-pip install mcp-context-server
+pip install mcp-context-keeper
 ```
 
 ### Basic Usage
 
 ```bash
 # Start the server
-python -m context_server
+python -m context_keeper
 
 # Start with extended tool profile
-python -m context_server --profile extended
+python -m context_keeper --profile extended
 
 # Show configuration
-python -m context_server --show-config
+python -m context_keeper --show-config
 
 # Health check
-python -m context_server --health
+python -m context_keeper --health
 ```
 
 ### Getting Help with Tool Usage
@@ -49,7 +49,7 @@ When using with other MCP context servers (like Serena Context Server), use the 
 
 ```bash
 # Get comprehensive guidance on persistent vs session memory
-python -m context_server --profile extended
+python -m context_keeper --profile extended
 
 # Then call from your MCP client:
 {
@@ -74,12 +74,12 @@ All MCP tools in this server use the `_persistent` suffix to distinguish them fr
 
 ### Configuration
 
-Create `context-server.yaml` in your project root:
+Create `context-keeper.yaml` in your project root:
 
 ```yaml
 # Backend configuration
 backend: "sqlite"
-sqlite_path: "~/.mcp-context-server/context.db"
+sqlite_path: "~/.mcp-context-keeper/context.db"
 
 # Tool configuration
 tool_profile: "extended"
@@ -199,8 +199,8 @@ The system supports 35+ relationship types including:
 ### Project Structure
 
 ```
-mcp-context-server/
-├── context_server/          # Core package
+mcp-context-keeper/
+├── context_keeper/          # Core package
 │   ├── backends/           # Database backends
 │   ├── tools/              # MCP tool handlers
 │   ├── utils/              # Utility functions
@@ -237,16 +237,16 @@ cd test && python run_tests.py --verbose
 
 ```bash
 # Format code
-black context_server/ test/
+black context_keeper/ test/
 
 # Sort imports
-isort context_server/ test/
+isort context_keeper/ test/
 
 # Type checking
-mypy context_server/
+mypy context_keeper/
 
 # Linting
-flake8 context_server/ test/
+flake8 context_keeper/ test/
 ```
 
 ## Environment Variables
@@ -254,7 +254,7 @@ flake8 context_server/ test/
 ```bash
 # Backend configuration
 export CONTEXT_BACKEND=sqlite
-export CONTEXT_SQLITE_PATH=~/.mcp-context-server/context.db
+export CONTEXT_SQLITE_PATH=~/.mcp-context-keeper/context.db
 
 # Tool configuration
 export CONTEXT_TOOL_PROFILE=extended
@@ -278,11 +278,11 @@ Add to your Zed MCP configuration:
 ```json
 {
   "mcpServers": {
-    "context-server": {
+    "context-keeper": {
       "command": "python",
-      "args": ["-m", "context_server"],
+      "args": ["-m", "context_keeper"],
       "env": {
-        "CONTEXT_SQLITE_PATH": "~/.mcp-context-server/context.db"
+        "CONTEXT_SQLITE_PATH": "~/.mcp-context-keeper/context.db"
       }
     }
   }
@@ -294,7 +294,7 @@ Add to your Zed MCP configuration:
 ### Storing a Memory
 
 ```python
-from context_server import Memory, MemoryType
+from context_keeper import Memory, MemoryType
 
 memory = Memory(
     type=MemoryType.SOLUTION,
@@ -312,7 +312,7 @@ memory = Memory(
 ### Creating Relationships
 
 ```python
-from context_server import Relationship, RelationshipType
+from context_keeper import Relationship, RelationshipType
 
 relationship = Relationship(
     from_memory_id="problem_123",
@@ -338,13 +338,13 @@ relationship = Relationship(
 
 ```bash
 # Run with debug logging
-set CONTEXT_LOG_LEVEL=DEBUG && python -m context_server
+set CONTEXT_LOG_LEVEL=DEBUG && python -m context_keeper
 
 # Check Python version
 python --version
 
 # Check installed packages
-pip list | grep mcp-context-server
+pip list | grep mcp-context-keeper
 ```
 
 ## Contributing
@@ -381,4 +381,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [MCP Specification](https://spec.modelcontextprotocol.io/)
 - [Zed Editor](https://zed.dev/)
-- [GitHub Repository](https://github.com/yourusername/mcp-context-server)
+- [GitHub Repository](https://github.com/yourusername/mcp-context-keeper)

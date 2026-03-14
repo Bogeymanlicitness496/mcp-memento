@@ -1,5 +1,5 @@
 @echo off
-REM Test runner batch script for mcp-context-server project
+REM Test runner batch script for mcp-context-keeper project
 REM Usage: run_tests.bat [options]
 
 setlocal enabledelayedexpansion
@@ -16,7 +16,7 @@ if "%CI%" == "" (
     echo ============================================================
 )
 
-echo Starting test suite for mcp-context-server
+echo Starting test suite for mcp-context-keeper
 if "%CI%" == "" (
     call :colorEcho 0A "============================================================"
     echo.
