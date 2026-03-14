@@ -1,8 +1,6 @@
 .serena
-.agent-work
-# docs/
-
-*.db
+.agent
+db
 __pycache__/
 *.pyc
 *.pyo
@@ -12,5 +10,3 @@ env/
 venv/
 .venv/
 .env
-*.sqlite
-*.sqlite3
