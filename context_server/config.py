@@ -163,10 +163,6 @@ class YAMLConfig:
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
             "features": {
-                "auto_extract_entities": True,
-                "session_briefing": True,
-                "briefing_verbosity": "standard",
-                "briefing_recency_days": 7,
                 "allow_relationship_cycles": False,
             },
         }
@@ -211,26 +207,6 @@ class YAMLConfig:
             config["logging"]["level"] = os.getenv("CONTEXT_LOG_LEVEL")
 
         # Feature configuration
-        if os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES"):
-            config["features"]["auto_extract_entities"] = (
-                os.getenv("CONTEXT_AUTO_EXTRACT_ENTITIES").lower() == "true"
-            )
-
-        if os.getenv("CONTEXT_SESSION_BRIEFING"):
-            config["features"]["session_briefing"] = (
-                os.getenv("CONTEXT_SESSION_BRIEFING").lower() == "true"
-            )
-
-        if os.getenv("CONTEXT_BRIEFING_VERBOSITY"):
-            config["features"]["briefing_verbosity"] = os.getenv(
-                "CONTEXT_BRIEFING_VERBOSITY"
-            )
-
-        if os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS"):
-            config["features"]["briefing_recency_days"] = int(
-                os.getenv("CONTEXT_BRIEFING_RECENCY_DAYS")
-            )
-
         if os.getenv("CONTEXT_ALLOW_CYCLES"):
             config["features"]["allow_relationship_cycles"] = (
                 os.getenv("CONTEXT_ALLOW_CYCLES").lower() == "true"
@@ -272,10 +248,6 @@ class Config:
         CONTEXT_TOOL_PROFILE or CONTEXT_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
         CONTEXT_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
         CONTEXT_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
-        CONTEXT_AUTO_EXTRACT_ENTITIES: Automatically extract entities from memory content [default: true]
-        CONTEXT_SESSION_BRIEFING: Enable session briefing feature [default: true]
-        CONTEXT_BRIEFING_VERBOSITY: Briefing verbosity level [default: standard]
-        CONTEXT_BRIEFING_RECENCY_DAYS: Number of days to consider for briefing [default: 7]
         CONTEXT_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
     """
 
@@ -308,25 +280,6 @@ class Config:
     )
 
     # Feature configuration
-    AUTO_EXTRACT_ENTITIES = _EnvVar(
-        "CONTEXT_AUTO_EXTRACT_ENTITIES",
-        default=_yaml_config.get("features", {}).get("auto_extract_entities", True),
-        cast=bool,
-    )
-    SESSION_BRIEFING = _EnvVar(
-        "CONTEXT_SESSION_BRIEFING",
-        default=_yaml_config.get("features", {}).get("session_briefing", True),
-        cast=bool,
-    )
-    BRIEFING_VERBOSITY = _EnvVar(
-        "CONTEXT_BRIEFING_VERBOSITY",
-        default=_yaml_config.get("features", {}).get("briefing_verbosity", "standard"),
-    )
-    BRIEFING_RECENCY_DAYS = _EnvVar(
-        "CONTEXT_BRIEFING_RECENCY_DAYS",
-        default=_yaml_config.get("features", {}).get("briefing_recency_days", 7),
-        cast=int,
-    )
     ALLOW_RELATIONSHIP_CYCLES = _EnvVar(
         "CONTEXT_ALLOW_CYCLES",
         default=_yaml_config.get("features", {}).get(
@@ -395,10 +348,6 @@ class Config:
                 "format": cls.LOG_FORMAT,
             },
             "features": {
-                "auto_extract_entities": cls.AUTO_EXTRACT_ENTITIES,
-                "session_briefing": cls.SESSION_BRIEFING,
-                "briefing_verbosity": cls.BRIEFING_VERBOSITY,
-                "briefing_recency_days": cls.BRIEFING_RECENCY_DAYS,
                 "allow_relationship_cycles": cls.ALLOW_RELATIONSHIP_CYCLES,
             },
             "config_sources": {
@@ -413,10 +362,6 @@ class Config:
                         "TOOL_PROFILE",
                         "ENABLE_ADVANCED_TOOLS",
                         "LOG_LEVEL",
-                        "AUTO_EXTRACT_ENTITIES",
-                        "SESSION_BRIEFING",
-                        "BRIEFING_VERBOSITY",
-                        "BRIEFING_RECENCY_DAYS",
                         "ALLOW_RELATIONSHIP_CYCLES",
                     ]
                 },
@@ -448,22 +393,7 @@ class Config:
                     descriptor.default = cls._yaml_config.get("logging", {}).get(
                         "level", "INFO"
                     )
-                elif attr_name == "AUTO_EXTRACT_ENTITIES":
-                    descriptor.default = cls._yaml_config.get("features", {}).get(
-                        "auto_extract_entities", True
-                    )
-                elif attr_name == "SESSION_BRIEFING":
-                    descriptor.default = cls._yaml_config.get("features", {}).get(
-                        "session_briefing", True
-                    )
-                elif attr_name == "BRIEFING_VERBOSITY":
-                    descriptor.default = cls._yaml_config.get("features", {}).get(
-                        "briefing_verbosity", "standard"
-                    )
-                elif attr_name == "BRIEFING_RECENCY_DAYS":
-                    descriptor.default = cls._yaml_config.get("features", {}).get(
-                        "briefing_recency_days", 7
-                    )
+
                 elif attr_name == "ALLOW_RELATIONSHIP_CYCLES":
                     descriptor.default = cls._yaml_config.get("features", {}).get(
                         "allow_relationship_cycles", False
@@ -485,10 +415,6 @@ class Config:
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
             "features": {
-                "auto_extract_entities": True,
-                "session_briefing": True,
-                "briefing_verbosity": "standard",
-                "briefing_recency_days": 7,
                 "allow_relationship_cycles": False,
             },
         }

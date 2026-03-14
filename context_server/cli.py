@@ -47,7 +47,7 @@ async def _create_backend_and_db() -> Tuple:
 
 
 async def handle_export(args: argparse.Namespace) -> None:
-    """Handle export command - works with all backends."""
+    """Handle export command - SQLite backend only."""
     from .utils.export_import import export_to_json, export_to_markdown
 
     try:
@@ -85,7 +85,7 @@ async def handle_export(args: argparse.Namespace) -> None:
 
 
 async def handle_import(args: argparse.Namespace) -> None:
-    """Handle import command - works with all backends."""
+    """Handle import command - SQLite backend only."""
     from .utils.export_import import import_from_json
 
     try:
@@ -119,37 +119,6 @@ async def handle_import(args: argparse.Namespace) -> None:
         _eprint(f"Import failed: {e}")
         logger.error(f"Import failed: {e}", exc_info=True)
         sys.exit(1)
-
-
-async def handle_migrate(args: argparse.Namespace) -> None:
-    """Handle migrate command (simplified for SQLite-only version)."""
-    _eprint("\nMigration functionality has been simplified for SQLite-only version.")
-    _eprint("Only SQLite to SQLite migrations are supported.")
-
-    if args.source_backend and args.source_backend != "sqlite":
-        _eprint(f"\nError: Source backend '{args.source_backend}' is not supported.")
-        _eprint("Only 'sqlite' backend is supported in this version.")
-        sys.exit(1)
-
-    if args.target_backend != "sqlite":
-        _eprint(f"\nError: Target backend '{args.target_backend}' is not supported.")
-        _eprint("Only 'sqlite' backend is supported in this version.")
-        sys.exit(1)
-
-    _eprint("\nNote: For SQLite to SQLite migrations, simply copy the database file.")
-    _eprint("Example: cp ~/.context-server/memory.db ~/.context-server/memory_backup.db")
-    _eprint("\nOr use the export/import commands:")
-    _eprint("  context-server export --format json --output memories.json")
-    _eprint("  context-server import --format json --input memories.json")
-    sys.exit(0)
-
-
-async def handle_migrate_multitenant(args: argparse.Namespace) -> None:
-    """Handle migrate-to-multitenant command (deprecated - multi-tenant removed)."""
-    _eprint("\nError: Multi-tenant functionality has been removed from this version.")
-    _eprint("The migrate-to-multitenant command is no longer available.")
-    _eprint("Please use the standard migrate command for SQLite to SQLite migrations.")
-    sys.exit(1)
 
 
 async def perform_health_check(timeout: float = 5.0) -> dict:
@@ -274,9 +243,6 @@ Examples:
   # Run health check
   context-server --health
 
-  # Run health check
-  context-server --health
-
 Environment Variables:
   CONTEXT_TOOL_PROFILE    Tool profile (core|extended|advanced) [default: core]
   CONTEXT_ENABLE_ADVANCED_TOOLS  Enable advanced tools [default: false]
@@ -284,10 +250,6 @@ Environment Variables:
   CONTEXT_LOG_LEVEL       Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
 
   Feature Configuration:
-    CONTEXT_AUTO_EXTRACT_ENTITIES  Automatically extract entities from memory content [default: true]
-    CONTEXT_SESSION_BRIEFING       Enable session briefing feature [default: true]
-    CONTEXT_BRIEFING_VERBOSITY     Briefing verbosity level [default: standard]
-    CONTEXT_BRIEFING_RECENCY_DAYS  Number of days to consider for briefing [default: 7]
     CONTEXT_ALLOW_CYCLES           Allow cycles in relationship graph [default: false]
         """,
     )
@@ -344,12 +306,12 @@ Environment Variables:
         help="Health check timeout in seconds (default: 5.0)",
     )
 
-    # Export/Import subcommand
+    # Export/Import subcommand (SQLite only)
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Export command
     export_parser = subparsers.add_parser(
-        "export", help="Export memories to file (works with all backends)"
+        "export", help="Export memories from SQLite database to file"
     )
     export_parser.add_argument(
         "--format",
@@ -367,7 +329,7 @@ Environment Variables:
 
     # Import command
     import_parser = subparsers.add_parser(
-        "import", help="Import memories from file (works with all backends)"
+        "import", help="Import memories from file to SQLite database"
     )
     import_parser.add_argument(
         "--format",
@@ -383,92 +345,6 @@ Environment Variables:
         "--skip-duplicates",
         action="store_true",
         help="Skip memories with existing IDs instead of overwriting",
-    )
-
-    # Migrate command
-    migrate_parser = subparsers.add_parser(
-        "migrate", help="Migrate memories between backends"
-    )
-    migrate_parser.add_argument(
-        "--from",
-        dest="source_backend",
-        type=str,
-        choices=["sqlite"],
-        help="Source backend type (defaults to current CONTEXT_BACKEND)",
-    )
-    migrate_parser.add_argument(
-        "--from-path",
-        type=str,
-        help="Source database path (for sqlite)",
-    )
-    migrate_parser.add_argument(
-        "--from-uri",
-        type=str,
-        help="Source database URI (not used for SQLite backend)",
-    )
-    migrate_parser.add_argument(
-        "--to",
-        dest="target_backend",
-        type=str,
-        required=True,
-        choices=["sqlite"],
-        help="Target backend type",
-    )
-    migrate_parser.add_argument(
-        "--to-path",
-        type=str,
-        help="Target database path (for sqlite)",
-    )
-    migrate_parser.add_argument(
-        "--to-uri",
-        type=str,
-        help="Target database URI (not used for SQLite backend)",
-    )
-    migrate_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate migration without making changes",
-    )
-    migrate_parser.add_argument(
-        "--verbose", action="store_true", help="Show detailed progress information"
-    )
-    migrate_parser.add_argument(
-        "--skip-duplicates",
-        action="store_true",
-        default=True,
-        help="Skip memories that already exist in target",
-    )
-    migrate_parser.add_argument(
-        "--no-verify",
-        action="store_true",
-        help="Skip post-migration verification (faster but less safe)",
-    )
-
-    # Migrate to multi-tenant command (deprecated - kept for backward compatibility)
-    multitenant_parser = subparsers.add_parser(
-        "migrate-to-multitenant",
-        help="[DEPRECATED] Multi-tenant functionality has been removed",
-    )
-    multitenant_parser.add_argument(
-        "--tenant-id",
-        type=str,
-        help="[DEPRECATED] Tenant ID (multi-tenant removed)",
-    )
-    multitenant_parser.add_argument(
-        "--visibility",
-        type=str,
-        choices=["private", "project", "team", "public"],
-        help="[DEPRECATED] Visibility (multi-tenant removed)",
-    )
-    multitenant_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="[DEPRECATED] Dry run (multi-tenant removed)",
-    )
-    multitenant_parser.add_argument(
-        "--rollback",
-        action="store_true",
-        help="[DEPRECATED] Rollback (multi-tenant removed)",
     )
 
     args = parser.parse_args()
@@ -555,17 +431,6 @@ Environment Variables:
     if args.command == "import":
         asyncio.run(handle_import(args))
         sys.exit(0)
-
-    if args.command == "migrate":
-        asyncio.run(handle_migrate(args))
-        sys.exit(0)
-
-    if args.command == "migrate-to-multitenant":
-        _eprint(
-            "\nError: Multi-tenant functionality has been removed from this version."
-        )
-        _eprint("The migrate-to-multitenant command is no longer available.")
-        sys.exit(1)
 
     # Start the server - all diagnostic output to stderr to keep stdout
     # clean for MCP JSON-RPC transport
