@@ -2,7 +2,7 @@
 
 This guide covers how to integrate Memento with various Integrated Development Environments (IDEs) and code editors that support the Model Context Protocol (MCP). Memento provides persistent memory capabilities to enhance your AI-assisted coding experience.
 
-## 1. Installation
+## Installation
 
 Before configuring any IDE, install Memento:
 
@@ -19,7 +19,7 @@ memento --version
 
 Memento uses SQLite for local storage by default. The database is automatically created at `~/.mcp-memento/context.db` unless configured otherwise.
 
-## 2. Supported IDEs
+## Supported IDEs
 
 - [Zed Editor](#zed-editor) - High-performance, multiplayer code editor
 - [Cursor](#cursor) - AI-powered code editor
@@ -27,7 +27,7 @@ Memento uses SQLite for local storage by default. The database is automatically 
 - [VSCode](#vscode) - Popular code editor via MCP extension
 - [Claude Desktop](#claude-desktop) - Anthropic's desktop application
 
-## 3. Zed Editor
+## Zed Editor
 
 ### Overview
 Zed is a high-performance, multiplayer code editor with native MCP support. Memento integrates seamlessly to provide contextual memory across your coding sessions.
@@ -98,7 +98,7 @@ mkdir -p ~/.mcp-memento
 chmod 755 ~/.mcp-memento
 ```
 
-## 4. Cursor
+## Cursor
 
 ### Overview
 Cursor is an AI-powered code editor that deeply integrates with MCP. Memento enhances Cursor's capabilities by providing persistent memory across sessions.
@@ -173,7 +173,7 @@ MCP tools only work in **Agent mode**:
 - Some Cursor versions require specific settings for Agent mode
 - Check Cursor documentation for current requirements
 
-## 5. Windsurf
+## Windsurf
 
 ### Overview
 Windsurf is a modern code editor with AI integration. Memento provides persistent memory capabilities to enhance Windsurf's AI features.
@@ -265,7 +265,7 @@ What coding standards should I follow for this project?
 }
 ```
 
-## 6. VSCode
+## VSCode
 
 ### Overview
 Visual Studio Code can integrate with Memento through the MCP extension, providing memory capabilities within the popular editor.
@@ -356,7 +356,7 @@ MCP tools work with GitHub Copilot in **Agent mode**:
 1. Must use Agent mode or `@workspace` prefix
 2. Restart MCP server: Command Palette > **MCP: Restart Server**
 
-## 7. Claude Desktop
+## Claude Desktop
 
 ### Overview
 Claude Desktop is Anthropic's desktop application for Claude AI. Memento integrates to provide persistent memory across conversations.
@@ -474,7 +474,7 @@ This means Claude Desktop can't find the Memento command. Solutions:
 2. Wait a few seconds
 3. Reopen Claude Desktop
 
-## 8. Troubleshooting Common Issues
+## Troubleshooting Common Issues
 
 ### Memento Not Found
 
@@ -570,7 +570,7 @@ This means Claude Desktop can't find the Memento command. Solutions:
    rm ~/.mcp-memento/context.db
    ```
 
-## 9. Best Practices
+## Best Practices
 
 ### Configuration Management
 
@@ -638,7 +638,7 @@ This means Claude Desktop can't find the Memento command. Solutions:
 
 3. **Use appropriate profile** for your needs
 
-## 10. Next Steps
+## Next Steps
 
 - Explore [Agent Integration Guide](./AGENT.md) for CLI tool setups
 - Review [Python API Guide](./PYTHON.md) for programmatic access

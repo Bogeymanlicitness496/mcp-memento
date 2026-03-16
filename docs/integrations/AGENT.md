@@ -2,7 +2,7 @@
 
 This guide covers how to integrate Memento with various AI agents and CLI tools that support the Model Context Protocol (MCP). Memento provides persistent memory capabilities to enhance your AI workflows across different platforms.
 
-## 1. Installation
+## Installation
 
 Before configuring any agent, install Memento:
 
@@ -19,7 +19,7 @@ memento --version
 
 Memento uses SQLite for local storage by default. The database is automatically created at `~/.mcp-memento/context.db` unless configured otherwise.
 
-## 2. Supported Agents
+## Supported Agents
 
 - [Gemini CLI](#gemini-cli) - Google's command-line interface for Gemini AI
 - [Claude CLI](#claude-cli) - Anthropic's command-line interface for Claude AI
