@@ -40,14 +40,6 @@ Build a personal or team knowledge base that grows smarter over time, accessible
 - **Automatic maintenance**: Confidence decay, relationship integrity
 - **Shared database**: Same database works across all integrations
 
-## 🔄 MCP Operational Protocols (Auto-Onboarding)
-
-When MCP tools are available, AI assistants should apply the following logic based on the active server:
-
-- **Memento Module**: If Memento tools are available, you MUST execute `memento_onboarding()` at the start of every session to inject the memory management protocol.
-
-This ensures proper guidance for memory operations, optimized retrieval flow (1-3 tool calls for simple info, max 5 for complex tasks), and adherence to best practices.
-
 ## 🚀 Quick Start
 
 ### 1. Installation
@@ -100,7 +92,17 @@ store_memento(
 recall_mementos(query="Redis timeout solutions")
 ```
 
-**💬 Natural Language**: You can also interact with Memento through natural conversation. Just tell your AI assistant things like "Remember that..." or "Store this..." - no code required.
+**💬 Natural Language**: You can also interact with Memento through natural conversation. Just tell your AI assistant things like "Remember that..." or "Store this..." or "Memento..."- no code required.
+
+
+## 🔄 Memento Auto-Onboarding Protocol
+
+Memento is designed to automatically inject its memory management protocol through the `memento_onboarding()` tool. Even without specific configuration protocols (like the examples in [AGENT_CONFIGURATION.md](docs/AGENT_CONFIGURATION.md)), Memento can provide comprehensive onboarding guidance.
+
+While some AI models may automatically call this tool at session start when MCP tools are detected, it's recommended to explicitly instruct models to call `memento_onboarding()` at the beginning of every session for reliable protocol injection.
+
+This ensures proper guidance for memory operations, optimized retrieval flow (1-3 tool calls for simple info, max 5 for complex tasks), and adherence to best practices.
+
 
 ## 📖 Core Concepts
 

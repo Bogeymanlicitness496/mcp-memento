@@ -6,11 +6,11 @@ Ready-to-use snippets for configuring your agent to effectively use Memento.
 
 ---
 
-## MCP Operational Protocols (Auto-Onboarding)
+## Memento Auto-Onboarding Protocol
 
-When MCP tools are available, apply the following logic based on the active server:
+Memento is designed to automatically inject its memory management protocol through the `memento_onboarding()` tool. Even without specific configuration protocols, Memento can provide comprehensive onboarding guidance.
 
-- **Memento Module**: If Memento tools are available, you MUST execute `memento_onboarding()` at the start of every session to inject the memory management protocol.
+While some AI models may automatically call this tool at session start when MCP tools are detected, it's recommended to explicitly instruct models to call `memento_onboarding()` at the beginning of every session for reliable protocol injection.
 
 This ensures the AI assistant has proper guidance for memory operations, retrieval flow optimization, and best practices.
 
