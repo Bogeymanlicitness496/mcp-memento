@@ -12,7 +12,7 @@ Memento provides multiple programmatic integration options for developers who ne
 | Node.js/JavaScript apps | Node.js SDK | Native JavaScript integration |
 | Python scripts/services | Python API | Direct Python integration |
 | Containerized deployment | Docker API | Consistent environment, easy scaling |
-| Cross-language systems | HTTP REST API | Universal compatibility |
+| Cross-language systems | HTTP REST API | Broad compatibility |
 | CLI tools/automation | Python API or Node.js SDK | Scripting-friendly |
 
 ## HTTP REST API

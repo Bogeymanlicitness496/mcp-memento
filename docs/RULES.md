@@ -107,20 +107,24 @@ Consider these factors when assigning importance:
 ## Relationship Guidelines
 
 ### 1. Relationship Types
-Use the most specific relationship type available:
+Memento supports 35 relationship types organized into 7 semantic categories. For a complete reference with all relationship types, examples, and usage guidelines, see [RELATIONSHIPS.md](./RELATIONSHIPS.md).
 
-| Type | Direction | When to Use |
-|------|-----------|-------------|
-| **SOLVES** | Solution → Problem | A solution fixes a specific problem |
-| **CAUSES** | Cause → Effect | One thing causes another |
-| **IMPROVES** | Improved → Original | Better version of something |
-| **USES** | Component → Dependency | One thing uses another |
-| **DEPENDS_ON** | Dependent → Dependency | Requires another component |
-| **RELATED_TO** | Any → Any | General relationship |
-| **ALTERNATIVE_TO** | Alternative → Original | Different approach to same problem |
-| **EXEMPLIFIES** | Example → Pattern | Concrete example of a pattern |
-| **PRECEDES** | Earlier → Later | Temporal sequence |
-| **CONTRADICTS** | Contradiction → Statement | Contradictory information |
+**Always use the most specific relationship type available.** Here are the most commonly used types:
+
+| Type | Category | When to Use | Example |
+|------|----------|-------------|---------|
+| **`SOLVES`** | Solution | Solution completely fixes a problem | Fix `SOLVES` bug |
+| **`CAUSES`** | Causal | A directly causes B | Error `CAUSES` crash |
+| **`APPLIES_TO`** | Context | Pattern applies to specific context | Pattern `APPLIES_TO` project |
+| **`IMPROVES`** | Solution | Improved version of something | v2 `IMPROVES` v1 |
+| **`DEPENDS_ON`** | Workflow | A requires B to function | Feature `DEPENDS_ON` API |
+| **`RELATED_TO`** | Similarity | General connection (use when unsure) | Topic A `RELATED_TO` Topic B |
+| **`BUILDS_ON`** | Learning | Advanced concept builds on basic | Advanced `BUILDS_ON` Basic |
+| **`REQUIRES`** | Context | Component requires another | Module `REQUIRES` library |
+| **`ALTERNATIVE_TO`** | Solution | Alternative approach (bidirectional) | Method A `ALTERNATIVE_TO` Method B |
+| **`CONFIRMS`** | Learning | Evidence confirms hypothesis | Test `CONFIRMS` implementation |
+
+For the complete list of all 35 relationship types with detailed examples, see the [complete relationship documentation](./RELATIONSHIPS.md).
 
 ### 2. Relationship Strength
 Set appropriate confidence for relationships:
@@ -269,7 +273,7 @@ When using a shared database:
 ## Template Examples
 
 ### Solution Template
-```markdown
+````markdown
 # Problem
 [Brief description of the problem]
 
@@ -298,10 +302,10 @@ When using a shared database:
 
 # Notes
 [Additional context, lessons learned, references]
-```
+````
 
 ### Pattern Template
-```markdown
+````markdown
 # Pattern Name
 [Descriptive name]
 
@@ -337,10 +341,10 @@ When using a shared database:
 # See Also
 - [Related documentation]
 - [Reference implementations]
-```
+````
 
 ### Decision Record Template
-```markdown
+````markdown
 # Decision Record: [Decision Title]
 
 ## Status
@@ -370,7 +374,7 @@ When using a shared database:
 
 ## Notes
 [Additional context, references, follow-up actions]
-```
+````
 
 ## Compliance and Security
 

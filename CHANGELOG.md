@@ -1,5 +1,19 @@
 # Changelog
 
+* 2026-03-16: v0.1.20 - Documentation restructuring and README enhancement (Hannibal)
+  * **Complete README restructuring**: Linear, modular structure without redundancies
+  * **Removed "Universal" terminology**: Replaced with "Cross-Platform", "Shared", "Consistent Behavior"
+  * **Added natural language interaction examples**: Show chat-based memento usage with "Remember that..." patterns
+  * **Relationship Types cross-linking**: Added prominent references to RELATIONSHIPS.md documentation
+  * **Eliminated duplicate content**: Each piece of information now in one place only
+  * **Improved documentation flow**: Clear path from installation to advanced usage
+  * **Multi-language trigger phrases**: English, Italian, Spanish support for natural interaction
+  * **All examples in English**: Removed Italian code examples from README
+  * **Enhanced integration table**: Clear overview of all supported platforms
+  * **Configuration hierarchy clarification**: Environment variables → YAML files → CLI args → defaults
+  * **Tool profile explanation**: Core (13), Extended (17), Advanced (25) tools
+  * **Architecture overview**: Simplified explanation of consistent behavior across platforms
+
 * 2026-03-16: v0.1.19 - Test suite fixes and warning resolution (Hannibal)
   * Fixed 2 failing tests in server startup and initialization flow
   * Corrected server cleanup to call `disconnect()` instead of `close()` on database backend

@@ -86,7 +86,7 @@ results = recall_mementos(query="Redis timeout solutions", limit=5)
 create_memento_relationship(
     from_memory_id=solution_id,
     to_memory_id=related_solution_id,
-    relationship_type="RELATED_TO"
+    relationship_type="RELATED_TO"  # See [RELATIONSHIPS.md](./RELATIONSHIPS.md) for all 35 relationship types
 )
 ```
 
@@ -131,7 +131,7 @@ analytics = analyze_memento_graph()
 - Include relevant `context` for better searchability
 
 ### 3. Relationship Management
-- Use meaningful `relationship_type`: `SOLVES`, `CAUSES`, `REQUIRES`, `RELATED_TO`
+- Use meaningful `relationship_type`: Choose from 35 available types (see [RELATIONSHIPS.md](./RELATIONSHIPS.md) for complete list)
 - Set initial `confidence` based on verification level
 - Regularly review and adjust confidence scores
 
@@ -209,7 +209,7 @@ async def store_test_results(test_name: str, results: dict):
     await create_memento_relationship(
         from_memory_id=code_change_id,
         to_memory_id=memento_id,
-        relationship_type="VALIDATED_BY",
+        relationship_type="VALIDATED_BY",  # One of 35 relationship types - see [RELATIONSHIPS.md](./RELATIONSHIPS.md)
         confidence=0.9
     )
 ```

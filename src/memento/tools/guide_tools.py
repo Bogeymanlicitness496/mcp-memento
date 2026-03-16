@@ -271,8 +271,8 @@ If `search_mementos` fails or returns no results:
 2. Check related memories with `get_related_mementos`
 3. Use `get_recent_memento_activity` for context
 
-## 3. AUTOMATIC STORAGE TRIGGERS
-Store via `store_memento` immediately on:
+## 3. STORAGE GUIDELINES
+Use `store_memento` for:
 - Git commits and version releases
 - Bug fixes and solutions
 - Architecture decisions and patterns
@@ -492,7 +492,7 @@ def _generate_comprehensive_onboarding() -> str:
 
 ## During Work:
 1. Use optimized retrieval flow (1-3 tools max)
-2. Follow automatic storage triggers
+2. Follow storage guidelines
 3. Apply memory schema requirements
 4. Link related memories
 
