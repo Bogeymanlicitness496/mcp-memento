@@ -1,6 +1,8 @@
 # Configuration Examples for Memento
 
-Ready-to-use snippets for configuring your agent to proactively use Memento.
+Ready-to-use snippets for configuring your agent to effectively use Memento.
+
+**Relationship Types Reference**: Memento supports 35 relationship types for connecting memories. For a complete reference with examples and usage guidelines, see [RELATIONSHIPS.md](./RELATIONSHIPS.md).
 
 ---
 
@@ -20,15 +22,15 @@ Rules for basic memory functionality:
 - **Flow**: Simple? → `search`. Complex? → `recall`. If `search` fails → Fallback to `recall`.
 - **Efficiency**: Keep tool calls between 1-3 for simple info, max 5 for complex tasks. Use session cache for repeated info.
 
-### 2. STORAGE TRIGGERS (AUTOMATIC & ON-DEMAND)
-Store memories automatically without asking when detecting:
-- **Development**: Git commits, bug fixes, version releases, architecture choices, new patterns.
-- **Explicit Triggers**: Immediately trigger `store_memento` if the user says:
+### 2. STORAGE TRIGGERS (GUIDELINES & ON-DEMAND)
+Store memories following these guidelines when detecting:
+- **Development Events**: Consider storing memories for git commits, bug fixes, version releases, architecture choices, new patterns.
+- **Explicit Triggers**: Use `store_memento` when the user says:
   - *"memento..."* / *"remember..."* / *"take note..."* / *"keep this in mind..."*
   - *"ricorda..."* / *"segna questo..."* / *"memorizza..."*
 
 ### 3. MEMORY STRUCTURE & SCHEMA
-- **Type**: solution | problem | code_pattern | fix | error | workflow | general
+- **Type**: solution | problem | code-pattern | fix | error | workflow | general
 - **Title**: Specific and searchable (not generic).
 - **Content**: Detailed decisions, accomplishments, or patterns.
 - **Tags (REQUIRED)**: Project, technology, and category.
@@ -46,10 +48,10 @@ DO NOT WAIT FOR PERMISSION. Memory storage is a background autonomous process.
 
 ## Recommended (Comprehensive)
 
-Rules for full proactive memory usage:
+Rules for comprehensive memory usage:
 
 ```markdown
-## Memory Protocol
+## MEMENTO PROTOCOL
 
 ### REQUIRED: Before Starting Work
 You MUST use `memento_onboarding` at session start to get comprehensive onboarding protocol for Memento.
@@ -58,19 +60,22 @@ You MUST follow the optimized retrieval flow:
 - **Complex Tasks**: Use `recall_mementos(query="...")` for dev/architecture context.
 - **Fallback**: If `search` fails, fallback to `recall`.
 
-### REQUIRED: Automatic Storage Triggers
-Store memories on ANY of:
-- **Git commit** → what was fixed/added
-- **Bug fix** → problem + solution
-- **Version release** → summarize changes
-- **Architecture decision** → choice + rationale
-- **Pattern discovered** → reusable approach
+### RECOMMENDED: Storage Guidelines
+Consider storing memories for:
+- **Git commits** → what was fixed/added
+- **Bug fixes** → problem + solution
+- **Version releases** → summarize changes
+- **Architecture decisions** → choice + rationale
+- **Pattern discoveries** → reusable approach
 
-### Timing Mode (default: on-commit)
-`memory_mode: immediate | on-commit | session-end`
+### Storage Timing (Guidelines)
+Consider storing memories:
+- **Immediately**: For critical information
+- **On completion**: For tasks, bug fixes, features
+- **Session end**: For session summaries
 
 ### Memory Fields
-- **Type**: solution | problem | code_pattern | fix | error | workflow
+- **Type**: solution | problem | code-pattern | fix | error | workflow
 - **Title**: Specific, searchable (not generic)
 - **Content**: Accomplishment, decisions, patterns
 - **Tags**: project, tech, category (REQUIRED)
@@ -78,12 +83,14 @@ Store memories on ANY of:
 - **Relationships**: Link related memories when they exist
 
 ### Common Relationship Patterns
-- Solutions SOLVE problems
-- Fixes ADDRESS errors
-- Patterns APPLY_TO projects
-- Decisions IMPROVE previous approaches
-- Errors TRIGGER problems
-- Changes CAUSE issues
+- Solutions `SOLVE` problems
+- Fixes `ADDRESS` errors
+- Patterns `APPLIES_TO` projects
+- Decisions `IMPROVE` previous approaches
+- Errors `TRIGGER` problems
+- Changes `CAUSE` issues
+
+*Note: Memento supports 35 relationship types. For complete reference with all types and examples, see [RELATIONSHIPS.md](./RELATIONSHIPS.md).*
 
 ### Session Management
 At the end of each session:
@@ -91,7 +98,7 @@ At the end of each session:
 2. Include what's next in the content
 3. Tag with project name and date
 
-Do NOT wait to be asked. Memory storage is automatic.
+Follow these guidelines to maintain a useful knowledge base.
 ```
 
 ---
@@ -101,7 +108,7 @@ Do NOT wait to be asked. Memory storage is automatic.
 Add this to in your project root for project-specific memory:
 
 ```markdown
-## Project: [Your Project Name]
+## MEMENTO PROTOCOL - Project: [Your Project Name]
 
 ### Memory Storage Protocol
 This project uses Memento for team knowledge sharing.
@@ -122,7 +129,7 @@ Always tag memories with:
 ### Memory Types for This Project
 - **solution**: Working implementations (API endpoints, features)
 - **problem**: Issues we encountered (performance, bugs)
-- **code_pattern**: Reusable patterns (error handling, validation)
+- **code-pattern**: Reusable patterns (error handling, validation)
 - **decision**: Architecture choices (why we chose X over Y)
 - **task**: Sprint work, feature completion
 
@@ -130,7 +137,7 @@ Always tag memories with:
 When fixing a bug:
 1. Store problem: type=problem, title="API timeout under load"
 2. Store solution: type=solution, title="Fixed with connection pooling"
-3. Link them: solution SOLVES problem
+3. Link them: solution `SOLVES` problem
 4. Both tagged: `project:myapp`, `component:api`, `postgresql`
 ```
 
@@ -141,7 +148,7 @@ When fixing a bug:
 For teams using shared memory, add this your rules:
 
 ```markdown
-## Team Memory Protocol
+## Team MEMENTO PROTOCOL
 
 ### Shared Memory Guidelines
 This team uses Memento for collective knowledge. Follow these practices:
@@ -182,18 +189,18 @@ Required tags for all team memories:
 **Bug fixing**:
 1. Check: "Have we seen [error] before?"
 2. Store: Problem (if new) + Solution
-3. Link: solution SOLVES problem
+3. Link: solution `SOLVES` problem
 4. Tag: `bug-fix`, component, technologies
 
 **Feature development**:
 1. Check: "What patterns have we used for [use case]?"
 2. Store: Implementation as code_pattern
-3. Link: pattern APPLIES_TO project
+3. Link: pattern `APPLIES_TO` project
 4. Tag: `feature`, component, pattern-name
 
 **Architecture decisions**:
 1. Store: Decision with full rationale
-2. Link: decision IMPROVES previous_approach (if applicable)
+2. Link: decision `IMPROVES` previous_approach (if applicable)
 3. Tag: `architecture`, `decision`, affected components
 
 ### Sprint Workflows
@@ -217,7 +224,7 @@ Required tags for all team memories:
 ### Web Development
 
 ```markdown
-## Memory Protocol - Web Development
+## MEMENTO PROTOCOL - Web Development
 
 ### Store These Patterns
 - **API Design**: Endpoint structure, error handling, validation
@@ -227,23 +234,23 @@ Required tags for all team memories:
 - **Deployment**: CI/CD configs, environment setup, rollback procedures
 
 ### Common Relationships
-- API endpoint patterns APPLY_TO projects
-- Performance optimizations IMPROVE slow_queries
-- Security fixes ADDRESS vulnerabilities
-- New patterns REPLACE deprecated_patterns
+- API endpoint patterns `APPLIES_TO` projects
+- Performance optimizations `IMPROVE` slow_queries
+- Security fixes `ADDRESS` vulnerabilities
+- New patterns `REPLACE` deprecated_patterns
 
 ### Typical Session Flow
 1. Start: "Recall API patterns for [feature]"
 2. Develop: [Implementation]
 3. Store: "Store this error handling pattern"
-4. Link: pattern APPLIES_TO this_project
+4. Link: pattern `APPLIES_TO` this_project
 5. End: "Store feature completion summary"
 ```
 
 ### Data Science / ML
 
 ```markdown
-## Memory Protocol - Data Science
+## MEMENTO PROTOCOL - Data Science
 
 ### Store These Patterns
 - **Model Training**: Hyperparameters, architectures, training tricks
@@ -252,23 +259,23 @@ Required tags for all team memories:
 - **Deployment**: Serving patterns, monitoring, drift detection
 
 ### Common Relationships
-- Model improvements IMPROVE baseline_model
-- Feature engineering SOLVES data_quality_problem
-- Experiment results CONFIRM hypothesis
-- New approach CONTRADICTS previous_assumption
+- Model improvements `IMPROVE` baseline_model
+- Feature engineering `SOLVES` data_quality_problem
+- Experiment results `CONFIRM` hypothesis
+- New approach `CONTRADICTS` previous_assumption
 
 ### Experiment Tracking
 After each experiment:
 1. Store: Results with type=solution or type=problem
 2. Tag: `experiment`, model-type, dataset-name
-3. Link: If improvement, link: new_model IMPROVES previous_model
+3. Link: If improvement, link: new_model `IMPROVES` previous_model
 4. Include: Metrics, parameters, insights in content
 ```
 
 ### DevOps / Infrastructure
 
 ```markdown
-## Memory Protocol - DevOps
+## MEMENTO PROTOCOL - DevOps
 
 ### Store These Patterns
 - **Deployment**: CI/CD configs, rollback procedures
@@ -277,17 +284,17 @@ After each experiment:
 - **Infrastructure**: IaC patterns, networking configs, security setups
 
 ### Common Relationships
-- Incident resolution SOLVES incident
-- Infrastructure change CAUSES issue (if it breaks)
-- Runbook procedure ADDRESSES alert_type
-- New config IMPROVES previous_config
+- Incident resolution `SOLVES` incident
+- Infrastructure change `CAUSES` issue (if it breaks)
+- Runbook procedure `ADDRESSES` alert_type
+- New config `IMPROVES` previous_config
 
 ### Incident Response Flow
 1. Alert fires: "Recall similar incidents for [service]"
 2. Debug: [Investigation]
 3. Store incident: type=problem with root cause
 4. Store resolution: type=solution with fix steps
-5. Link: solution SOLVES incident
+5. Link: solution `SOLVES` incident
 6. Update runbook: Store updated procedure
 ```
 
@@ -295,24 +302,24 @@ After each experiment:
 
 ## Testing Your Configuration
 
-After adding memory protocols, verify they work:
+After adding MEMENTO PROTOCOLs, verify they work:
 
 ### Test 1: Check Protocol Recognition
 ```
-You: "What's our memory protocol?"
+You: "What's our MEMENTO PROTOCOL?"
 Expected: The agent should reference the protocol from your rules.
 ```
 
-### Test 2: Proactive Storage
+### Test 2: Guideline-Based Storage
 ```
 You: [Fix a bug together]
-Expected: The agent should suggest storing the solution or ask if you want to store it
+Expected: The agent should follow storage guidelines and suggest storing the solution
 ```
 
-### Test 3: Proactive Recall
+### Test 3: Guideline-Based Recall
 ```
 You: "Let's work on authentication"
-Expected: The agent should proactively check: "What do you remember about authentication?"
+Expected: The agent should check memory: "What do you remember about authentication?"
 ```
 
 ### Test 4: Relationship Creation
@@ -333,10 +340,10 @@ Expected: The agent should suggest storing a session summary
 
 ### The agent Isn't Using Memory Tools
 
-**Issue**: The agent doesn't proactively store or recall memories.
+**Issue**: The agent doesn't follow memory usage guidelines.
 
 **Solutions**:
-1. **Verify your rules are loaded**: Ask "What's in your rules" - The agent should see your memory protocol
+1. **Verify your rules are loaded**: Ask "What's in your rules" - The agent should see your MEMENTO PROTOCOL
 2. **Be explicit initially**: Use trigger phrases like "Store this..." until the habit forms
 3. **Check file location**:
 4. **Restart your IDE**: After editing default rules, restart for changes to take effect
@@ -353,15 +360,15 @@ Only store memories when:
 - Decision has long-term impact
 ```
 
-**Too few**: Make protocol more proactive:
+**Too few**: Strengthen storage guidelines:
 ```markdown
-### Proactive Storage
-After ANY of these events, ALWAYS store a memory:
-- Solving a bug that took >30 minutes
-- Implementing a new feature
-- Making an architecture decision
-- Discovering a useful pattern
-- Encountering an error and fixing it
+### Storage Guidelines
+After these events, consider storing a memory:
+- Solving non-trivial bugs (>30 minutes)
+- Implementing new features
+- Making architecture decisions
+- Discovering useful patterns
+- Encountering and fixing errors
 ```
 
 ### Memories Aren't Well-Formatted
