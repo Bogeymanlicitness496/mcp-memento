@@ -307,6 +307,36 @@ The system works identically across all platforms:
 3. **Same search ranking**: Results ordered by `confidence × importance`
 4. **Same relationship types**: 35 semantic relationship types available everywhere
 
+## 📜 Background
+
+Memento is a simplified, lightweight fork of the original [MemoryGraph](https://github.com/memory-graph/memory-graph) project by Gregory Dickson. The goal of this fork is to create a focused, portable memory management system specifically optimized for MCP (Model Context Protocol) integration across all major IDEs and CLI agents.
+
+### Why a Simplified Fork?
+MemoryGraph is a powerful, feature-rich memory system with extensive capabilities. However, for MCP integration and broad IDE compatibility, we needed a more focused approach:
+
+- **Lightweight & Portable**: Removed heavy dependencies like NetworkX and complex backend systems
+- **Token-Efficient**: Simplified architecture reduces token consumption in AI interactions
+- **Cross-Platform Focus**: Optimized for seamless integration with Zed, Cursor, Windsurf, VSCode, Claude Desktop, and CLI agents
+- **Core Features Only**: Focused on essential memory operations, confidence tracking, and relationship mapping
+- **Simplified Storage**: SQLite-only backend removes complexity of multi-backend support
+
+### What Was Simplified?
+- **Removed**: Bi-temporal tracking system (replaced with simpler confidence-based decay)
+- **Removed**: Proactive memory features (now uses guideline-based storage)
+- **Removed**: Multi-tenant architecture (focused on single-user local storage)
+- **Removed**: Heavy dependencies (NetworkX, complex database backends)
+- **Removed**: ~10,000+ lines of backend-specific code
+
+### When to Choose MemoryGraph vs Memento?
+- **Use Memento**: For lightweight, cross-platform memory management in IDEs and CLI tools
+- **Use MemoryGraph**: For complex enterprise use cases requiring multi-tenancy, bi-temporal tracking, advanced analytics, or custom backend systems
+
+## 🙏 Acknowledgments
+
+Memento is built upon the solid foundation of Gregory Dickson's [MemoryGraph](https://github.com/memory-graph/memory-graph) project. We're grateful for his pioneering work in memory management systems.
+
+This fork maintains compatibility with MemoryGraph's core concepts while adapting them for the specific needs of MCP integration and modern development tooling. For users requiring the full power of MemoryGraph's advanced features, we recommend exploring the original project.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
