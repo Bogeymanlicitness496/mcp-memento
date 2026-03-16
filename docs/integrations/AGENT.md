@@ -1,405 +1,289 @@
 # Agent Integration Guide
 
-This guide covers how to integrate Memento with various AI agents, CLI tools, and custom applications that support the Model Context Protocol (MCP).
+This guide covers how to integrate Memento with various AI agents and CLI tools that support the Model Context Protocol (MCP). Memento provides persistent memory capabilities to enhance your AI workflows across different platforms.
 
-## Configuration Methods
+## 1. Installation
 
-Memento supports multiple configuration methods with the following hierarchy (highest priority last):
+Before configuring any agent, install Memento:
 
-### 1. Environment Variables (Highest Priority)
 ```bash
-# Database location
-export MEMENTO_SQLITE_PATH="~/.mcp-memento/context.db"
+# Install with pipx (recommended)
+pipx install mcp-memento
 
-# Tool profile (core, extended, advanced)
-export MEMENTO_TOOL_PROFILE="extended"
+# Or with pip
+pip install mcp-memento
 
-# Logging level
-export MEMENTO_LOG_LEVEL="INFO"
-
-# Advanced tools
-export MEMENTO_ENABLE_ADVANCED_TOOLS="true"
-
-# Allow relationship cycles
-export MEMENTO_ALLOW_CYCLES="false"
+# Verify installation
+memento --version
 ```
 
-### 2. YAML Configuration Files (Automatic Detection)
-Memento automatically searches for configuration files in this order:
+Memento uses SQLite for local storage by default. The database is automatically created at `~/.mcp-memento/context.db` unless configured otherwise.
 
-**Project Configuration** (`./memento.yaml` in current directory):
-```yaml
-sqlite_path: ~/.mcp-memento/context.db
-tool_profile: extended
-log_level: INFO
-enable_advanced_tools: true
-features:
-  allow_relationship_cycles: false
-```
+## 2. Supported Agents
 
-**Global Configuration** (`~/.mcp-memento/config.yaml` in home directory):
-```yaml
-# Global settings for all projects
-sqlite_path: ~/.mcp-memento/global.db
-tool_profile: extended
-log_level: INFO
-```
-
-### 3. CLI Arguments (Passed to MCP Server)
-```bash
-# Pass arguments directly to Memento server
-gemini --mcp-servers 'memento --profile advanced --log-level DEBUG'
-
-# Available CLI arguments:
-# --profile core|extended|advanced
-# --log-level DEBUG|INFO|WARNING|ERROR
-# --sqlite-path /custom/path/db.sqlite
-```
-
-### Configuration Priority Summary
-1. **Environment variables** - Highest priority, override everything
-2. **Project YAML** (`./memento.yaml`) - Project-specific settings
-3. **Global YAML** (`~/.mcp-memento/config.yaml`) - User-wide settings
-4. **Default values** - Hardcoded in application
-
-## Table of Contents
-- [Quick Start](#quick-start)
-- [Gemini CLI](#gemini-cli)
-- [Claude CLI](#claude-cli)
-- [Custom CLI Agents](#custom-cli-agents)
-- [API & Programmatic Integration](#api--programmatic-integration)
-- [Troubleshooting](#troubleshooting)
-- [Best Practices](#best-practices)
-
-## Quick Start
-
-### Prerequisites
-1. Install Memento:
-   ```bash
-   pipx install mcp-memento
-   ```
-
-2. Choose your agent from the options below
-3. Configure using the provided examples
-4. Test the integration
-
-### Basic Agent Test
-```bash
-# Test Memento standalone
-memento --health
-
-# Test MCP communication
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize"}' | memento
-```
+- [Gemini CLI](#gemini-cli) - Google's command-line interface for Gemini AI
+- [Claude CLI](#claude-cli) - Anthropic's command-line interface for Claude AI
+- [Claude Desktop](#claude-desktop) - Anthropic's desktop application (included here as it's agent-based)
 
 ## Gemini CLI
 
-### Overview
-Gemini CLI is Google's command-line interface for interacting with Gemini AI models. Memento provides persistent memory capabilities to enhance Gemini's context awareness.
+### Prerequisites
+- **Gemini CLI** installed ([Installation Guide](https://github.com/google-gemini/gemini-cli))
+- Gemini CLI version with MCP support
 
-### Configuration Methods for Gemini
+### Configuration
 
-#### Method 1: Environment Variables (Recommended)
-```bash
-# Set configuration via environment variables
-export MEMENTO_SQLITE_PATH="~/.gemini-memento/context.db"
-export MEMENTO_TOOL_PROFILE="extended"
-export MEMENTO_LOG_LEVEL="INFO"
+Gemini CLI configuration is stored in `~/.gemini/config.json`:
 
-# Start Gemini with Memento
-gemini --mcp-servers memento
+**Basic configuration:**
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": []
+    }
+  }
+}
 ```
 
-#### Method 2: YAML Configuration Files
-Create `memento.yaml` in your project directory:
-```yaml
-sqlite_path: ~/.gemini-memento/project.db
-tool_profile: advanced
-log_level: DEBUG
+**Advanced configuration with custom profile:**
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": ["--profile", "extended"],
+      "env": {
+        "MEMENTO_SQLITE_PATH": "~/.gemini-memento/context.db",
+        "MEMENTO_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
 ```
 
-Or create global config at `~/.mcp-memento/config.yaml`:
-```yaml
-sqlite_path: ~/.mcp-memento/global.db
-tool_profile: extended
-log_level: INFO
-```
-
-Then start Gemini:
-```bash
-# Memento automatically reads YAML configuration
-gemini --mcp-servers memento
-```
-
-#### Method 3: CLI Arguments
-```bash
-# Pass arguments directly to Memento server
-gemini --mcp-servers 'memento --profile advanced --log-level DEBUG'
-
-# With custom database path
-gemini --mcp-servers 'memento --sqlite-path ~/custom/path/context.db'
-```
-
-### Basic Integration Examples
-```bash
-# Simple integration (uses defaults or YAML config)
-gemini --mcp-servers memento
-
-# With custom profile via CLI arguments
-gemini --mcp-servers 'memento --profile extended'
-
-# With environment variables for project-specific config
-cd ~/projects/my-app
-MEMENTO_SQLITE_PATH="./.memento/project.db" gemini --mcp-servers memento
-```
-
-### Configuration Script
-Create a wrapper script `~/bin/gemini-with-memory`:
-
-```bash
-#!/bin/bash
-# gemini-with-memory - Gemini CLI with Memento integration
-
-# Set Memento environment variables
-export MEMENTO_SQLITE_PATH="${MEMENTO_SQLITE_PATH:-~/.gemini-memento/context.db}"
-export MEMENTO_TOOL_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
-export MEMENTO_LOG_LEVEL="${MEMENTO_LOG_LEVEL:-INFO}"
-
-# Create directory if it doesn't exist
-mkdir -p "$(dirname "$MEMENTO_SQLITE_PATH")"
-
-# Start Memento server in background
-echo "Starting Memento server..."
-memento --profile "$MEMENTO_TOOL_PROFILE" &
-MEMENTO_PID=$!
-
-# Wait for server to start
-sleep 2
-
-# Check if server started successfully
-if ! kill -0 $MEMENTO_PID 2>/dev/null; then
-    echo "Error: Memento server failed to start"
-    exit 1
-fi
-
-echo "Memento server started (PID: $MEMENTO_PID)"
-
-# Start Gemini CLI with MCP server
-echo "Starting Gemini CLI with Memento integration..."
-gemini --mcp-servers memento "$@"
-
-# Capture exit code
-EXIT_CODE=$?
-
-# Cleanup
-echo "Stopping Memento server..."
-kill $MEMENTO_PID 2>/dev/null || true
-wait $MEMENTO_PID 2>/dev/null || true
-
-exit $EXIT_CODE
-```
-
-Make it executable:
-```bash
-chmod +x ~/bin/gemini-with-memory
-```
+### Where to Save Configuration
+- **User-level**: `~/.gemini/config.json` (affects all Gemini CLI sessions)
+- Gemini CLI will automatically load this configuration on startup
 
 ### Usage Examples
 
-#### 1. Store Solutions from Terminal Output
 ```bash
-# Store a command output as a solution
-gemini-with-memory "Take this Redis configuration and store it in Memento: $(redis-cli info)"
-
-# Store a script output
-gemini-with-memory "Store this database migration script in Memento: $(cat migrate.sql)"
-```
-
-#### 2. Search for Patterns
-```bash
-# Search for authentication patterns
-gemini-with-memory "Search Memento for JWT authentication implementations"
-
-# Search for error solutions
-gemini-with-memory "What solutions do we have for database connection timeouts?"
-```
-
-#### 3. Get Project History
-```bash
-# Get context for current project
-gemini-with-memory "What have we implemented for this API project before?"
-
-# Review past decisions
-gemini-with-memory "Show me architecture decisions for microservices"
-```
-
-#### 4. Interactive Session
-```bash
-# Start interactive session
-gemini-with-memory
-
-# Then in the Gemini interface:
-# "Store this solution: [paste solution]"
-# "Find similar solutions to [current problem]"
-# "Connect this to our previous work on [related topic]"
-```
-
-### Advanced Configuration
-
-#### Configuration Priority in Practice
-Memento applies configuration in this order (highest priority last):
-1. Default values (hardcoded)
-2. Global YAML (`~/.mcp-memento/config.yaml`)
-3. Project YAML (`./memento.yaml`)
-4. Environment variables
-5. CLI arguments
-
-Example with mixed configuration:
-```bash
-# Project has ./memento.yaml with tool_profile: "extended"
-# User sets environment variable: export MEMENTO_TOOL_PROFILE="advanced"
-# CLI argument: --profile core
-
-# Result: tool_profile = "core" (CLI arguments win)
-gemini --mcp-servers 'memento --profile core'
-```
-
-#### Custom Database Location
-```bash
-# Method 1: Environment variable (recommended for scripts)
-MEMENTO_SQLITE_PATH="./.memento/project.db" gemini --mcp-servers memento
-
-# Method 2: Project YAML file (./memento.yaml)
-# sqlite_path: ./.memento/project.db
+# Start Gemini CLI with Memento
 gemini --mcp-servers memento
 
-# Method 3: CLI argument
-gemini --mcp-servers 'memento --sqlite-path ./.memento/project.db'
+# Or let Gemini load from config automatically
+gemini
 ```
 
-#### Profile Selection
-```bash
-# Advanced profile for development
-MEMENTO_TOOL_PROFILE="advanced" gemini --mcp-servers memento
+Once started, you can use Memento through natural language:
 
-# Core profile for simple tasks
-gemini --mcp-servers 'memento --profile core'
-
-# Extended profile with YAML configuration
-# In ./memento.yaml: tool_profile: extended
-gemini --mcp-servers memento
+```
+Store this for later: The database uses PostgreSQL on port 5432
 ```
 
-#### Integration with Shell Aliases
-Add to `~/.bashrc` or `~/.zshrc`:
-```bash
-# Basic alias with default configuration
-alias gemini-mem='gemini --mcp-servers memento'
-
-# Project-specific alias with environment variables
-alias gemini-proj='cd ~/projects/my-app && MEMENTO_SQLITE_PATH="./.memento/project.db" gemini --mcp-servers memento'
-
-# Team shared memory with custom profile
-alias gemini-team='MEMENTO_SQLITE_PATH="~/team/shared-memory.db" MEMENTO_TOOL_PROFILE="advanced" gemini --mcp-servers memento'
-
-# Debug mode alias
-alias gemini-debug='MEMENTO_LOG_LEVEL="DEBUG" gemini --mcp-servers memento'
+```
+What do you remember about the database configuration?
 ```
 
-#### Configuration Script Template
-Create `~/bin/gemini-memento-config.sh`:
+### Troubleshooting
+
+**MCP server not loading:**
+1. Check Gemini CLI version supports MCP
+2. Verify `~/.gemini/config.json` has valid JSON syntax
+3. Test Memento manually: `memento --health`
+
+**Command not found:**
 ```bash
-#!/bin/bash
-# Configuration script for Gemini with Memento
+# Find Memento installation path
+which memento
 
-# Load project-specific configuration
-if [ -f "./memento.yaml" ]; then
-    echo "Using project configuration from ./memento.yaml"
-fi
-
-# Set environment variables (override YAML if needed)
-export MEMENTO_SQLITE_PATH="${MEMENTO_SQLITE_PATH:-~/.gemini-memento/context.db}"
-export MEMENTO_TOOL_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
-export MEMENTO_LOG_LEVEL="${MEMENTO_LOG_LEVEL:-INFO}"
-
-# Create database directory if needed
-mkdir -p "$(dirname "$MEMENTO_SQLITE_PATH")"
-
-# Start Gemini with Memento
-exec gemini --mcp-servers memento "$@"
+# Use full path in config
+{
+  "command": "/Users/yourname/.local/bin/memento"
+}
 ```
 
 ## Claude CLI
 
-### Overview
-Claude CLI is Anthropic's command-line interface for Claude AI. Memento integration provides persistent memory across Claude sessions.
+### Prerequisites
+- **Claude CLI** installed ([Installation Guide](https://github.com/anthropics/claude-cli))
+- Claude CLI version with MCP support
 
-### Basic Integration
+### Configuration
+
+Claude CLI typically accepts MCP servers via command-line arguments. Create a shell script or alias for convenience:
+
+**Option 1: Direct command-line arguments**
 ```bash
-# Start Claude CLI with Memento
 claude --mcp-servers memento
-
-# With custom configuration
-claude --mcp-servers 'memento --profile extended --log-level INFO'
 ```
 
-### Configuration Script
-Create `~/bin/claude-with-memory`:
-
+**Option 2: Create a wrapper script (`~/bin/claude-memento`)**
 ```bash
 #!/bin/bash
-# claude-with-memory - Claude CLI with Memento integration
+# claude-memento - Claude CLI with Memento integration
 
 # Configuration
 export MEMENTO_SQLITE_PATH="${MEMENTO_SQLITE_PATH:-~/.claude-memento/context.db}"
 export MEMENTO_TOOL_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
-export MEMENTO_LOG_LEVEL="${MEMENTO_LOG_LEVEL:-WARNING}"
 
 # Ensure directory exists
 mkdir -p "$(dirname "$MEMENTO_SQLITE_PATH")"
 
-# Start Memento
-memento --profile "$MEMENTO_TOOL_PROFILE" --log-level "$MEMENTO_LOG_LEVEL" &
-MEMENTO_PID=$!
-sleep 1
-
-# Start Claude
-claude --mcp-servers memento "$@"
-CLAUDE_EXIT=$?
-
-# Cleanup
-kill $MEMENTO_PID 2>/dev/null || true
-exit $CLAUDE_EXIT
+# Start Claude with Memento
+exec claude --mcp-servers memento "$@"
 ```
 
-### Usage Patterns
-
-#### 1. Context Loading
+Make it executable:
 ```bash
-# Start with project context
-claude-with-memory "Load context from our e-commerce project"
-
-# Continue previous discussion
-claude-with-memory "Continue our discussion about database sharding"
+chmod +x ~/bin/claude-memento
 ```
 
-#### 2. Solution Storage
+**Option 3: Environment variables in shell profile**
+Add to `~/.bashrc`, `~/.zshrc`, or equivalent:
 ```bash
-# Store code solutions
-claude-with-memory "Store this Python decorator pattern as a memory"
-
-# Store terminal commands
-claude-with-memory "Save these Docker commands for later use"
+export MEMENTO_SQLITE_PATH="~/.claude-memento/context.db"
+alias claude-memento='claude --mcp-servers memento'
 ```
 
-#### 3. Knowledge Retrieval
+### Where to Save Configuration
+- **Shell profile**: `~/.bashrc`, `~/.zshrc`, etc. for environment variables
+- **Custom scripts**: `~/bin/` directory for wrapper scripts
+- Claude CLI doesn't have a persistent config file for MCP servers
+
+### Usage Examples
+
 ```bash
-# Get implementation patterns
-claude-with-memory "Show me how we've implemented rate limiting before"
+# Using wrapper script
+claude-memento "What do you remember about our authentication system?"
 
-# Review best practices
-claude-with-memory "What are our documented security best practices?"
+# Or directly
+claude --mcp-servers memento "Store this solution for later..."
 ```
+
+### Troubleshooting
+
+**Claude CLI doesn't recognize --mcp-servers:**
+1. Update to latest Claude CLI version
+2. Check documentation for correct flag (may be `--mcp` or similar)
+
+**Permission issues:**
+```bash
+# Ensure script is executable
+chmod +x ~/bin/claude-memento
+
+# Ensure ~/bin is in PATH
+export PATH="$HOME/bin:$PATH"
+```
+
+## Claude Desktop
+
+### Prerequisites
+- **Claude Desktop** app installed ([Download](https://claude.ai/desktop))
+- Latest version with MCP support
+
+### Configuration
+
+Claude Desktop configuration varies by operating system:
+
+**macOS:**
+```bash
+# Open configuration file
+open ~/Library/Application\ Support/Claude/claude_desktop_config.json
+```
+
+**Linux:**
+```bash
+nano ~/.config/Claude/claude_desktop_config.json
+```
+
+**Windows:**
+```
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+**Configuration content:**
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": []
+    }
+  }
+}
+```
+
+**Important**: Claude Desktop has a restricted PATH. You may need to use the full path to Memento:
+
+```bash
+# Find Memento installation path
+which memento
+# Returns: /Users/yourname/.local/bin/memento
+```
+
+Then use the full path in configuration:
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "/Users/yourname/.local/bin/memento",
+      "args": []
+    }
+  }
+}
+```
+
+### Where to Save Configuration
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+### Usage Examples
+
+Once configured, restart Claude Desktop completely (not just close the window). Then in a new conversation:
+
+```
+What memory tools do you have available?
+```
+
+```
+Store this for later: Our deployment script is in /scripts/deploy.sh
+```
+
+```
+What do you remember about deployment scripts?
+```
+
+### Troubleshooting
+
+**"spawn memento ENOENT" error:**
+This means Claude Desktop can't find the Memento command. Solutions:
+
+1. **Use full path** (recommended):
+   ```json
+   {
+     "command": "/Users/yourname/.local/bin/memento"
+   }
+   ```
+
+2. **Create symlink** (requires sudo):
+   ```bash
+   sudo ln -s ~/.local/bin/memento /usr/local/bin/memento
+   ```
+   Then use `"command": "memento"` in config.
+
+**Configuration not taking effect:**
+1. Completely quit Claude Desktop (Cmd+Q on macOS, not just close window)
+2. Wait a few seconds
+3. Reopen Claude Desktop
+
+**Tools not appearing:**
+1. Check Claude Desktop logs for MCP errors
+2. Test Memento manually: `memento --health`
+3. Verify JSON syntax in configuration file
 
 ## Custom CLI Agents
 
@@ -449,55 +333,63 @@ class CustomAgent:
         
         memory_type = args[0]
         title = args[1]
-        content = args[2]
-        tags = args[3:] if len(args) > 3 else []
+        content = " ".join(args[2:])
+        tags = ["cli", "custom-agent"]
         
-        memory_id = await self.server.store_memory(
-            type=memory_type,
-            title=title,
-            content=content,
-            tags=tags,
-            importance=0.5
-        )
-        
-        return f"Stored memory with ID: {memory_id}"
+        try:
+            memory_id = await self.server.store_memento(
+                type=memory_type,
+                title=title,
+                content=content,
+                tags=tags,
+                importance=0.7
+            )
+            return f"Memory stored with ID: {memory_id}"
+        except Exception as e:
+            return f"Error storing memory: {str(e)}"
     
     async def _search_memories(self, args: List[str]) -> str:
-        """Search memories from CLI."""
+        """Search memories from CLI arguments."""
         if not args:
             return "Usage: search <query>"
         
         query = " ".join(args)
-        results = await self.server.recall_mementos(
-            query=query,
-            limit=5
-        )
-        
-        if not results:
-            return "No memories found."
-        
-        output = [f"Found {len(results)} memories:"]
-        for i, result in enumerate(results, 1):
-            output.append(
-                f"{i}. {result['title']} "
-                f"(confidence: {result['confidence']:.2f})"
+        try:
+            results = await self.server.recall_mementos(
+                query=query,
+                limit=5
             )
-        
-        return "\n".join(output)
+            
+            if not results:
+                return "No memories found"
+            
+            output = []
+            for i, memory in enumerate(results, 1):
+                output.append(f"{i}. {memory['title']}")
+                output.append(f"   {memory['content'][:100]}...")
+                output.append(f"   Tags: {', '.join(memory.get('tags', []))}")
+                output.append("")
+            
+            return "\n".join(output)
+        except Exception as e:
+            return f"Error searching memories: {str(e)}"
     
     async def _get_statistics(self) -> str:
-        """Get Memento statistics."""
-        stats = await self.server.get_statistics()
-        return json.dumps(stats, indent=2)
+        """Get memory statistics."""
+        try:
+            stats = await self.server.get_memento_statistics()
+            return json.dumps(stats, indent=2)
+        except Exception as e:
+            return f"Error getting statistics: {str(e)}"
     
     def _show_help(self) -> str:
-        """Show help message."""
+        """Show help information."""
         return """
 Available commands:
   store <type> <title> <content> [tags...] - Store a new memory
-  search <query>                          - Search memories
-  stats                                   - Show statistics
-  help                                    - Show this help
+  search <query>                           - Search memories
+  stats                                    - Show memory statistics
+  help                                     - Show this help
         """
     
     async def stop(self):
@@ -506,17 +398,44 @@ Available commands:
             await self.server.cleanup()
 
 async def main():
+    """Main entry point."""
     agent = CustomAgent(profile="extended")
-    await agent.start()
     
     try:
+        await agent.start()
+        
         if len(sys.argv) > 1:
+            # Process single command
             command = sys.argv[1]
-            args = sys.argv[2:]
+            args = sys.argv[2:] if len(sys.argv) > 2 else []
             result = await agent.process_command(command, args)
             print(result)
         else:
-            print(agent._show_help())
+            # Interactive mode
+            print("Custom Memento Agent (type 'exit' to quit)")
+            while True:
+                try:
+                    user_input = input("> ").strip()
+                    if not user_input:
+                        continue
+                    
+                    if user_input.lower() in ['exit', 'quit', 'q']:
+                        break
+                    
+                    parts = user_input.split()
+                    command = parts[0]
+                    args = parts[1:] if len(parts) > 1 else []
+                    
+                    result = await agent.process_command(command, args)
+                    print(result)
+                    
+                except KeyboardInterrupt:
+                    print("\nExiting...")
+                    break
+                except EOFError:
+                    print("\nExiting...")
+                    break
+    
     finally:
         await agent.stop()
 
@@ -524,156 +443,270 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-Make it executable:
-```bash
-chmod +x custom-agent.py
-sudo mv custom-agent.py /usr/local/bin/mem-agent
-```
-
-Usage:
-```bash
-# Store a memory
-mem-agent store solution "Fix Redis timeout" "Increased timeout to 30s" redis timeout
-
-# Search memories
-mem-agent search "Redis timeout"
-
-# Get statistics
-mem-agent stats
-```
-
 ### Shell Script Agent
-Create a simple shell-based agent:
+For simpler integration, create a shell script wrapper:
 
 ```bash
 #!/bin/bash
-# mem-agent.sh - Shell-based Memento agent
+# memento-agent.sh - Shell script agent with Memento integration
 
-MEMENTO_DB="${MEMENTO_SQLITE_PATH:-~/.memento/agent.db}"
-MEMENTO_PROFILE="${MEMENTO_TOOL_PROFILE:-core}"
+set -e
 
-case "$1" in
-    store)
-        if [ $# -lt 4 ]; then
-            echo "Usage: $0 store <type> <title> <content> [tags...]"
-            exit 1
-        fi
-        
-        TYPE="$2"
-        TITLE="$3"
-        CONTENT="$4"
-        shift 4
-        TAGS="$@"
-        
-        # Store using Python one-liner
-        python3 -c "
-import asyncio, sys
+MEMENTO_DB="${MEMENTO_SQLITE_PATH:-~/.mcp-memento/agent.db}"
+MEMENTO_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
+
+# Ensure database directory exists
+mkdir -p "$(dirname "$MEMENTO_DB")"
+
+# Function to store memory
+store_memory() {
+    local type="$1"
+    local title="$2"
+    shift 2
+    local content="$*"
+    
+    echo "Storing memory: $title"
+    
+    # Use Memento Python API or command-line interface
+    python3 -c "
+import asyncio
 from memento import Memento
 
 async def store():
     server = Memento()
     await server.initialize()
-    memory_id = await server.store_memory(
-        type='$TYPE',
-        title='$TITLE',
-        content='''$CONTENT''',
-        tags=[$(
-            for tag in $TAGS; do
-                echo -n "'$tag',"
-            done
-        )],
-        importance=0.5
+    
+    memory_id = await server.store_memento(
+        type='$type',
+        title='$title',
+        content='''$content''',
+        tags=['shell-agent', '$(date +%Y-%m-%d)'],
+        importance=0.7
     )
-    print(f'Stored: {memory_id}')
+    
+    print(f'Memory stored with ID: {memory_id}')
     await server.cleanup()
 
 asyncio.run(store())
-        "
-        ;;
+    " || echo "Error: Make sure memento Python package is installed"
+}
+
+# Function to search memories
+search_memories() {
+    local query="$*"
     
-    search)
-        if [ $# -lt 2 ]; then
-            echo "Usage: $0 search <query>"
-            exit 1
-        fi
-        
-        QUERY="$2"
-        
-        python3 -c "
-import asyncio, sys
+    echo "Searching for: $query"
+    
+    python3 -c "
+import asyncio
 from memento import Memento
 
 async def search():
     server = Memento()
     await server.initialize()
+    
     results = await server.recall_mementos(
-        query='$QUERY',
-        limit=5
+        query='$query',
+        limit=10
     )
-    for i, r in enumerate(results, 1):
-        print(f'{i}. {r[\"title\"]} (confidence: {r[\"confidence\"]:.2f})')
+    
+    if not results:
+        print('No memories found.')
+        return
+    
+    for i, memory in enumerate(results, 1):
+        print(f'{i}. {memory[\"title\"]}')
+        print(f'   {memory[\"content\"][:80]}...')
+        print(f'   Tags: {\", \".join(memory.get(\"tags\", []))}')
+        print()
+
     await server.cleanup()
 
 asyncio.run(search())
-        "
-        ;;
+    " || echo "Error: Make sure memento Python package is installed"
+}
+
+# Function to show statistics
+show_stats() {
+    echo "Memory Statistics:"
+    echo "Database: $MEMENTO_DB"
     
+    if [ -f "$MEMENTO_DB" ]; then
+        db_size=$(du -h "$MEMENTO_DB" | cut -f1)
+        echo "Size: $db_size"
+        
+        # Count memories using sqlite3 if available
+        if command -v sqlite3 >/dev/null 2>&1; then
+            memory_count=$(sqlite3 "$MEMENTO_DB" "SELECT COUNT(*) FROM nodes;" 2>/dev/null || echo "N/A")
+            echo "Total memories: $memory_count"
+        fi
+    else
+        echo "Database file not found"
+    fi
+}
+
+# Main command processing
+case "$1" in
+    store)
+        if [ $# -lt 4 ]; then
+            echo "Usage: $0 store <type> <title> <content>"
+            exit 1
+        fi
+        store_memory "$2" "$3" "${@:4}"
+        ;;
+    search)
+        if [ $# -lt 2 ]; then
+            echo "Usage: $0 search <query>"
+            exit 1
+        fi
+        search_memories "${@:2}"
+        ;;
+    stats)
+        show_stats
+        ;;
+    help|--help|-h)
+        echo "Memento Shell Agent"
+        echo ""
+        echo "Usage:"
+        echo "  $0 store <type> <title> <content>  Store a new memory"
+        echo "  $0 search <query>                  Search memories"
+        echo "  $0 stats                           Show statistics"
+        echo "  $0 help                            Show this help"
+        echo ""
+        echo "Environment variables:"
+        echo "  MEMENTO_SQLITE_PATH    Database location (default: ~/.mcp-memento/agent.db)"
+        echo "  MEMENTO_TOOL_PROFILE   Tool profile (default: extended)"
+        ;;
     *)
-        echo "Usage: $0 {store|search}"
-        echo "  store <type> <title> <content> [tags...]"
-        echo "  search <query>"
+        echo "Unknown command: $1"
+        echo "Use '$0 help' for usage information"
         exit 1
         ;;
 esac
 ```
 
-## API & Programmatic Integration
-
-For HTTP REST API, Node.js integration, Docker deployment, and other programmatic access methods, see the dedicated [API & Programmatic Integration Guide](./API.md).
-
-The API guide covers:
-- **HTTP REST API** - FastAPI wrapper with full endpoint documentation
-- **Node.js SDK** - JavaScript/TypeScript integration
-- **Docker Deployment** - Containerized deployment examples
-- **Python API Reference** - Programmatic Python usage
-- **Cloud Deployment** - AWS, GCP, Kubernetes examples
-- **Best Practices** - Security, performance, monitoring
-
-### Quick API Examples
-
-#### HTTP REST API (FastAPI):
-```python
-# Store memory via HTTP
-curl -X POST http://localhost:8000/memories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "solution",
-    "title": "API Example",
-    "content": "Using Memento HTTP API",
-    "tags": ["api", "example"]
-  }'
-```
-
-#### Node.js Integration:
-```javascript
-const MementoClient = require('./memento-client');
-const client = new MementoClient({ profile: 'extended' });
-await client.start();
-const memoryId = await client.storeMemory({
-  type: 'solution',
-  title: 'Node.js Example',
-  content: 'Using Memento from Node.js'
-});
-```
-
-#### Docker Deployment:
+Make it executable:
 ```bash
-docker run -d \
-  --name memento \
-  -e MEMENTO_SQLITE_PATH=/data/memento.db \
-  -v ./data:/data \
-  -p 8000:8000 \
-  mcp-memento:latest
+chmod +x memento-agent.sh
 ```
 
-For complete documentation, examples, and best practices, see the [API & Programmatic Integration Guide](./API.md).
+Usage:
+```bash
+# Store a memory
+./memento-agent.sh store solution "Fixed API timeout" "Increased timeout to 30 seconds and added retry logic"
+
+# Search memories
+./memento-agent.sh search "API timeout"
+
+# Show statistics
+./memento-agent.sh stats
+```
+
+## Troubleshooting Common Issues
+
+### MCP Server Not Starting
+1. **Verify Memento installation**:
+   ```bash
+   memento --version
+   which memento
+   ```
+
+2. **Test MCP communication**:
+   ```bash
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize"}' | memento
+   ```
+
+3. **Check permissions**:
+   ```bash
+   ls -la ~/.mcp-memento/
+   chmod 755 ~/.mcp-memento/
+   ```
+
+### Configuration File Issues
+1. **JSON syntax errors**:
+   ```bash
+   # Validate JSON
+   python3 -m json.tool < config.json
+   ```
+
+2. **File location incorrect**:
+   - Gemini CLI: `~/.gemini/config.json`
+   - Claude Desktop: OS-specific location (see above)
+   - Verify file exists and is readable
+
+### Path Issues
+1. **Use full paths** in configuration files:
+   ```json
+   {
+     "command": "/Users/yourname/.local/bin/memento"
+   }
+   ```
+
+2. **Add to PATH**:
+   ```bash
+   # Add pipx bin to PATH
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+### Database Issues
+1. **Corrupted database**:
+   ```bash
+   # Backup and recreate
+   cp ~/.mcp-memento/context.db ~/.mcp-memento/context.db.backup
+   rm ~/.mcp-memento/context.db
+   ```
+
+2. **Disk space**:
+   ```bash
+   # Check database size
+   du -h ~/.mcp-memento/context.db
+   ```
+
+## Best Practices
+
+### Configuration Management
+1. **Use environment variables** for sensitive paths
+2. **Version control** your custom scripts
+3. **Document** configurations for team members
+4. **Test** configurations before relying on them
+
+### Memory Management
+1. **Regular maintenance**:
+   ```bash
+   memento --maintenance
+   ```
+
+2. **Backup important memories**:
+   ```bash
+   # Export memories
+   memento export --output memories-backup.json
+   ```
+
+3. **Clean up old memories** periodically
+
+### Performance Optimization
+1. **Use appropriate profile**:
+   - `core`: Basic operations
+   - `extended`: Most users
+   - `advanced`: Power users with large memory databases
+
+2. **Monitor database growth**:
+   ```bash
+   # Check size monthly
+   du -h ~/.mcp-memento/context.db
+   ```
+
+3. **Archive inactive projects**:
+   ```bash
+   # Export project memories
+   memento export --output project-archive.json --filter-tags "project:old-project"
+   ```
+
+## Next Steps
+
+- Explore [IDE Integration Guide](./IDE.md) for editor setups
+- Review [Python API Guide](./PYTHON.md) for programmatic access
+- Check [Tools Reference](../TOOLS.md) for complete tool documentation
+- See [Usage Rules](../RULES.md) for best practices and conventions
+
+Need help? Check the [Memento documentation](../README.md) or open an issue on GitHub.

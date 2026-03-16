@@ -99,7 +99,7 @@ recall_mementos(query="Redis timeout solutions")
 
 Memento is designed to automatically inject its memory management protocol through the `memento_onboarding()` tool. Even without specific configuration protocols (like the examples in [AGENT_CONFIGURATION.md](docs/AGENT_CONFIGURATION.md)), Memento can provide comprehensive onboarding guidance.
 
-While some AI models may automatically call this tool at session start when MCP tools are detected, it's recommended to explicitly instruct models to call `memento_onboarding()` at the beginning of every session for reliable protocol injection.
+While AI models should automatically call this tool at session start when MCP tools are detected, it's recommended to explicitly instruct models to call `memento_onboarding()` at the beginning of every session for reliable protocol injection.
 
 For reliable operation, include the following instruction in your AI assistant protocols:
 
