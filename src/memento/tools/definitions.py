@@ -15,36 +15,52 @@ def get_all_tools() -> List[Tool]:
     """Collect all tool definitions from all modules."""
     return [
         Tool(
-            name="help_memento_tools_usage",
-            description="""Get comprehensive guidance on using memento tools and distinguishing them from session memory tools.
+            name="memento_onboarding",
+            description="""Get comprehensive onboarding protocol for Memento including tool usage guidance, retrieval flow optimization, and best practices.
+
+MEMENTO ONBOARDING PROTOCOL:
+1. INITIALIZATION: Run memento_onboarding() at session start
+2. RETRIEVAL FLOW:
+   - Fact Check: Use search_mementos(tags=[...]) for simple identity/known facts
+   - Complex Tasks: Use recall_mementos(query="...") for dev/architecture context
+   - Fallback: If search fails, fallback to recall
+3. AUTOMATIC STORAGE: Store via store_memento on git commits, bug fixes, version releases
+4. ON-DEMAND TRIGGERS: Store instantly when user says "memento...", "remember...", etc.
+5. MEMORY SCHEMA: Required tags (project, tech, category). Importance: 0.8+ (critical), 0.5 (standard)
+
+OPTIMIZED RETRIEVAL (Avoid 6+ tool calls):
+- Target: 1-3 tool calls for simple info
+- Maximum: 5 tool calls for complex tasks
+- Follow decision tree: Known tags → search_mementos, Conceptual → recall_mementos
 
 CRITICAL DISTINCTION: Memento vs Session memory
+- Memento: Long-term, cross-session, global scope
+- Session Memory: Temporary, project-specific, session-only
 
-MEMENTO (mcp-memento tools):
-- Long-term knowledge that survives across ALL sessions
-- Global scope: accessible from any project or session
-- Use for: solutions, patterns, architecture decisions, reusable code snippets
-- Examples: store_memento, get_memento, search_mementos
-
-SESSION MEMORY (Serena Context Server tools):
-- Temporary context for current project/session
-- Project-scoped: only accessible within current project
-- Use for: current file context, temporary variables, undo/redo history
-- Examples: store_memory, get_memory, search_memories
-
-WHEN TO USE WHICH:
-─────────────────────────────────────────────────────────────
-| Scenario                     | Use Memento | Use Session |
-|──────────────────────────────|─────────────|─────────────|
-| Bug fix solution             | ✅ store_memento | ❌ |
-| Current file context         | ❌ | ✅ store_memory |
-| Architecture decision        | ✅ store_memento | ❌ |
-| Temporary calculation        | ❌ | ✅ store_memory |
-| Reusable code pattern        | ✅ store_memento | ❌ |
-| Project-specific variable    | ❌ | ✅ store_memory |
-
-Note: You can always use search_mementos or recall_mementos to find past knowledge.""",
-            inputSchema={"type": "object", "properties": {}},
+USE memento_onboarding(topic="...") for specific guidance:
+- "protocol": Full onboarding protocol
+- "retrieval_flow": Optimized retrieval guide
+- "distinction": Memento vs Session memory
+- "examples": Practical examples
+- "best_practices": Usage guidelines""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "Specific topic for onboarding guidance",
+                        "enum": [
+                            "onboarding",
+                            "protocol",
+                            "retrieval_flow",
+                            "distinction",
+                            "examples",
+                            "best_practices",
+                        ],
+                        "default": "onboarding",
+                    }
+                },
+            },
         ),
         Tool(
             name="recall_mementos",

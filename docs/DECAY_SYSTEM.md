@@ -240,14 +240,8 @@ confidence_system:
 
 ### Environment Variables
 ```bash
-# Enable/disable confidence system
-MEMENTO_KEEPER_CONFIDENCE_ENABLED=true
-
-# Base decay factor
-MEMENTO_KEEPER_BASE_DECAY=0.95
-
-# Low confidence threshold
-MEMENTO_KEEPER_WARNING_THRESHOLD=0.3
+# Confidence system uses built-in defaults
+# No environment variables required for confidence configuration
 ```
 
 ## Best Practices

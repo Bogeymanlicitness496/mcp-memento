@@ -7,7 +7,7 @@ enabling memento knowledge tracking, relationship mapping, and contextual develo
 Supports SQLite backend only for simplified deployment with Zed editor.
 """
 
-__version__ = "0.1.16"
+__version__ = "0.1.18"
 __author__ = "Hannibal"
 __email__ = "annibale.x@gmail.com"
 

@@ -23,7 +23,7 @@ These tools are available in all profiles and provide the fundamental memory ope
 | `get_memento_statistics` | Get statistics about the memento database | (no parameters) |
 | `get_recent_memento_activity` | Get summary of recent memento activity | `days`, `project` |
 | `search_memento_relationships_by_context` | Search relationships by structured context fields | `scope`, `conditions`, `evidence`, `components` |
-| `help_memento_tools_usage` | Get guidance on using memento tools | (no parameters) |
+| `memento_onboarding` | Get comprehensive onboarding protocol for Memento | `topic` (optional) |
 
 ### 2. Confidence System Tools (Knowledge Quality)
 These tools manage confidence scores and decay for relationship quality maintenance:

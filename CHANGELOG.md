@@ -1,5 +1,20 @@
 # Changelog
 
+* 2026-03-16: v0.1.18 - Memento onboarding protocol enhancement and tool renaming (Hannibal)
+  * Renamed `help_memento_tools_usage` tool to `memento_onboarding` for clearer onboarding purpose
+  * Enhanced tool with comprehensive onboarding protocol including initialization, retrieval flow, and storage triggers
+  * Added optimized retrieval flow guide to prevent inefficient tool usage (6+ tool calls)
+  * Integrated external Memento protocol with automatic storage triggers and on-demand triggers
+  * Added memory schema requirements with mandatory tags (project, tech, category) and importance scoring
+  * Added tool selection decision tree for efficient retrieval (1-3 tools for simple info, max 5 for complex tasks)
+  * Added practical examples showing inefficient vs optimized tool usage patterns
+  * Enhanced topic parameter support: "protocol", "retrieval_flow", "distinction", "examples", "best_practices"
+  * Updated all documentation references to reflect new tool name and enhanced functionality
+  * Maintained backward compatibility through topic-based access to previous guidance content
+  * Updated tool definitions, registry, and imports to reflect new naming convention
+  * Enhanced configuration handling for improved onboarding experience
+  * Fixed test suite to work with renamed tool and updated functionality
+
 * 2026-03-15: v0.1.17 - Complete environment variable renaming and configuration file standardization (Hannibal)
   * Renamed all remaining `CONTEXT_` environment variables to `MEMENTO_` prefix:
     - `CONTEXT_SQLITE_PATH` → `MEMENTO_SQLITE_PATH`
@@ -128,7 +143,7 @@
   * Cleaned up import paths after file reorganization
   * Ensured all tests pass with new file structure
 
-* 2026-03-15: v0.1.6 - Memory tools guidance and usage clarification (Hannibal)
+* 2026-03-14: v0.1.6 - Memory tools guidance and usage clarification (Hannibal)
   * Added `help_memento_tools_usage` tool for comprehensive guidance on memento vs session memory usage
   * Added clear distinction guidance to prevent confusion with Serena Context Server tools
   * Added decision matrices and practical examples for tool selection

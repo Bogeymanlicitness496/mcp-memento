@@ -9,32 +9,37 @@ Ready-to-use snippets for configuring your agent to proactively use Memento.
 Rules for basic memory functionality:
 
 ```markdown
-## Memory Protocol
+## MEMENTO PROTOCOL
 
-### REQUIRED: Before Starting Work
-You MUST use `help_memento_tools_usage` before any task to get comprehensive guidance on using memento tools.
-You MUST use `recall_mementos` before any task. Query by project, tech, or task type.
+### 1. INITIALIZATION & RETRIEVAL LOGIC
+- **Session Start**: Always run `memento_onboarding` first.
+- **Fact Check (Simple/Identity)**: Use `search_mementos(tags=[...])` directly for names, github, or basic facts.
+- **Complex Tasks**: Use `recall_mementos(query="...")` for dev/architecture context.
+- **Fallback**: If `search` fails, fallback to `recall`.
+- **Dev/Complex Tasks**: Always start with `recall_mementos(query="...")`.
+- **Flow**: Simple? → `search`. Complex? → `recall`. If `search` fails → Fallback to `recall`.
+- **Efficiency**: Keep tool calls between 1-3 for simple info, max 5 for complex tasks. Use session cache for repeated info.
 
-### REQUIRED: Automatic Storage Triggers
-Store memories on ANY of:
-- **Git commit** → what was fixed/added
-- **Bug fix** → problem + solution
-- **Version release** → summarize changes
-- **Architecture decision** → choice + rationale
-- **Pattern discovered** → reusable approach
+### 2. STORAGE TRIGGERS (AUTOMATIC & ON-DEMAND)
+Store memories automatically without asking when detecting:
+- **Development**: Git commits, bug fixes, version releases, architecture choices, new patterns.
+- **Explicit Triggers**: Immediately trigger `store_memento` if the user says:
+  - *"memento..."* / *"remember..."* / *"take note..."* / *"keep this in mind..."*
+  - *"ricorda..."* / *"segna questo..."* / *"memorizza..."*
 
-### Timing Mode (default: on-commit)
-`memory_mode: immediate | on-commit | session-end`
+### 3. MEMORY STRUCTURE & SCHEMA
+- **Type**: solution | problem | code_pattern | fix | error | workflow | general
+- **Title**: Specific and searchable (not generic).
+- **Content**: Detailed decisions, accomplishments, or patterns.
+- **Tags (REQUIRED)**: Project, technology, and category.
+- **Importance**: 0.8+ (Critical/Arch), 0.5-0.7 (Standard), 0.3-0.4 (Minor).
+- **Relationships**: Link to existing mementos whenever a connection exists.
 
-### Memory Fields
-- **Type**: solution | problem | code_pattern | fix | error | workflow
-- **Title**: Specific, searchable (not generic)
-- **Content**: Accomplishment, decisions, patterns
-- **Tags**: project, tech, category (REQUIRED)
-- **Importance**: 0.8+ critical, 0.5-0.7 standard, 0.3-0.4 minor
-- **Relationships**: Link related memories when they exist
+### 4. FALLBACK & CACHE
+- If optimized retrieval returns nothing: Log it, fallback to broad `recall_mementos`, and suggest creating the missing entry if relevant.
+- Reuse retrieved info within the same session to save tokens/calls.
 
-Do NOT wait to be asked. Memory storage is automatic.
+DO NOT WAIT FOR PERMISSION. Memory storage is a background autonomous process.
 ```
 
 ---
@@ -47,8 +52,11 @@ Rules for full proactive memory usage:
 ## Memory Protocol
 
 ### REQUIRED: Before Starting Work
-You MUST use `help_memento_tools_usage` before any task to get comprehensive guidance on using memento tools.
-You MUST use `recall_mementos` before any task. Query by project, tech, or task type.
+You MUST use `memento_onboarding` at session start to get comprehensive onboarding protocol for Memento.
+You MUST follow the optimized retrieval flow:
+- **Fact Check**: Use `search_mementos(tags=[...])` for simple identity/known facts.
+- **Complex Tasks**: Use `recall_mementos(query="...")` for dev/architecture context.
+- **Fallback**: If `search` fails, fallback to `recall`.
 
 ### REQUIRED: Automatic Storage Triggers
 Store memories on ANY of:
@@ -96,7 +104,7 @@ Add this to in your project root for project-specific memory:
 ## Project: [Your Project Name]
 
 ### Memory Storage Protocol
-This project uses MemoryGraph for team knowledge sharing.
+This project uses Memento for team knowledge sharing.
 
 When working on this project:
 1. Before starting: "What do you remember about [component]?"
@@ -136,7 +144,7 @@ For teams using shared memory, add this your rules:
 ## Team Memory Protocol
 
 ### Shared Memory Guidelines
-This team uses MemoryGraph for collective knowledge. Follow these practices:
+This team uses Memento for collective knowledge. Follow these practices:
 
 #### Storage Standards
 - **Be descriptive**: Others will search for your memories

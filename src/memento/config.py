@@ -26,7 +26,7 @@ _CORE_TOOLS = [
     "get_related_mementos",
     "recall_mementos",
     "get_recent_memento_activity",
-    "help_memento_tools_usage",
+    "memento_onboarding",
     # Confidence system tools (essential for all users)
     "get_low_confidence_mementos",
     "boost_memento_confidence",
@@ -191,10 +191,6 @@ class YAMLConfig:
     @classmethod
     def _apply_env_overrides(cls, config: Dict[str, Any]) -> Dict[str, Any]:
         """Apply environment variable overrides to configuration."""
-        # Backend configuration
-        if os.getenv("MEMENTO_BACKEND"):
-            config["backend"] = os.getenv("MEMENTO_BACKEND")
-
         # SQLite configuration
         if os.getenv("MEMENTO_SQLITE_PATH"):
             config["sqlite_path"] = os.getenv("MEMENTO_SQLITE_PATH")
@@ -245,12 +241,11 @@ class Config:
     on each access. This makes Config the single source of truth for configuration
     while remaining reactive to runtime env var changes.
 
-    Attributes can be overridden via direct assignment (e.g., Config.BACKEND = "sqlite")
-    for testing or programmatic configuration.
+    Attributes can be overridden via direct assignment for testing or programmatic configuration.
 
     Environment Variables:
-        MEMENTO_SQLITE_PATH or MEMENTO_SQLITE_PATH: Database file path [default: ~/.mcp-memento/context.db]
-        MEMENTO_TOOL_PROFILE or MEMENTO_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
+        MEMENTO_SQLITE_PATH: Database file path [default: ~/.mcp-memento/context.db]
+        MEMENTO_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
         MEMENTO_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
         MEMENTO_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
         MEMENTO_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
@@ -259,13 +254,10 @@ class Config:
     # Load YAML configuration
     _yaml_config = YAMLConfig.load_config()
 
-    # Backend configuration (SQLite only)
+    # Database configuration (SQLite only)
     SQLITE_PATH = _EnvVar(
         "MEMENTO_SQLITE_PATH", default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
     )
-
-    # Backend configuration
-    BACKEND = _EnvVar("MEMENTO_BACKEND", default=_yaml_config.get("backend", "sqlite"))
 
     # Tool configuration
     TOOL_PROFILE = _EnvVar(
@@ -334,8 +326,7 @@ class Config:
     def get_config_summary(cls) -> dict:
         """Get a summary of current configuration (without sensitive data)."""
         return {
-            "backend": cls.BACKEND,
-            "sqlite": {"path": cls.SQLITE_PATH},
+            "database": {"path": cls.SQLITE_PATH},
             "tools": {
                 "profile": cls.TOOL_PROFILE,
                 "enable_advanced": cls.ENABLE_ADVANCED_TOOLS,
@@ -355,7 +346,6 @@ class Config:
                 "env_vars": {
                     attr: cls.is_env_set(attr)
                     for attr in [
-                        "BACKEND",
                         "SQLITE_PATH",
                         "TOOL_PROFILE",
                         "ENABLE_ADVANCED_TOOLS",

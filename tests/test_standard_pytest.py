@@ -84,10 +84,12 @@ class TestConfiguration:
 
     def test_config_defaults(self):
         """Test that Config provides default values when no environment variables are set."""
-        from memento.config import Config
+        from memento.config import Config, YAMLConfig
 
-        # Clear environment variables
+        # Clear environment variables and YAML config cache
         with patch.dict(os.environ, {}, clear=True):
+            # Clear YAML config cache to ensure fresh load
+            YAMLConfig._config_cache.clear()
             Config.reload_config()
 
             assert Config.TOOL_PROFILE == "core"
@@ -147,8 +149,7 @@ class TestConfiguration:
         # Check top-level structure
         assert isinstance(summary, dict)
         required_keys = [
-            "backend",
-            "sqlite",
+            "database",
             "tools",
             "logging",
             "features",
@@ -158,6 +159,9 @@ class TestConfiguration:
             assert key in summary, f"Missing key in config summary: {key}"
 
         # Check nested structure
+        assert isinstance(summary["database"], dict)
+        assert "path" in summary["database"]
+
         assert isinstance(summary["tools"], dict)
         assert "profile" in summary["tools"]
         assert "enable_advanced" in summary["tools"]
@@ -752,7 +756,7 @@ class TestCLI:
                         ]
                     )
                     assert "Current Configuration:" in call_text
-                    assert "Backend:" in call_text
+                    assert "Database:" in call_text
                     assert "Tool Profile:" in call_text
 
     @pytest.mark.asyncio

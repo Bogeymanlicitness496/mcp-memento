@@ -30,7 +30,7 @@ from .confidence_tools import (
     handle_set_memento_decay_factor,
 )
 from .guide_tools import (
-    handle_help_memento_tools_usage,
+    handle_memento_onboarding,
 )
 from .memory_tools import (
     handle_delete_memento,
@@ -63,7 +63,7 @@ TOOL_HANDLERS: Dict[str, ToolHandler] = {
     "create_memento_relationship": handle_create_memento_relationship,
     "get_related_mementos": handle_get_related_mementos,
     "get_memento_statistics": handle_get_memento_statistics,
-    "help_memento_tools_usage": handle_help_memento_tools_usage,
+    "memento_onboarding": handle_memento_onboarding,
     "get_recent_memento_activity": handle_get_recent_memento_activity,
     "search_memento_relationships_by_context": handle_search_memento_relationships_by_context,
     # Confidence system tools

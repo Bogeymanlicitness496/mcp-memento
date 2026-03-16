@@ -16,10 +16,6 @@ logging:
 
 # Feature configuration
 features:
-  auto_extract_entities: true # Automatically extract entities from memory content
-  session_briefing: true # Enable session briefing feature
-  briefing_verbosity: "standard" # Options: minimal, standard, detailed
-  briefing_recency_days: 7 # Number of days to consider for briefing
   allow_relationship_cycles: false # Allow cycles in relationship graph
 
 
@@ -28,10 +24,6 @@ features:
 # MEMENTO_TOOL_PROFILE=advanced
 # MEMENTO_ENABLE_ADVANCED_TOOLS=true
 # MEMENTO_LOG_LEVEL=DEBUG
-# MEMENTO_AUTO_EXTRACT_ENTITIES=false
-# MEMENTO_SESSION_BRIEFING=false
-# MEMENTO_BRIEFING_VERBOSITY=detailed
-# MEMENTO_BRIEFING_RECENCY_DAYS=14
 # MEMENTO_ALLOW_CYCLES=true
 
 # Note: Environment variables take precedence over YAML configuration

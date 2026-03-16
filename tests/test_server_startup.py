@@ -246,14 +246,16 @@ class TestServerStartup:
         summary = Config.get_config_summary()
 
         assert isinstance(summary, dict)
-        assert "backend" in summary
-        assert "sqlite" in summary
+        assert "database" in summary
         assert "tools" in summary
         assert "logging" in summary
         assert "features" in summary
         assert "config_sources" in summary
 
         # Verify structure
+        assert isinstance(summary["database"], dict)
+        assert "path" in summary["database"]
+
         assert isinstance(summary["tools"], dict)
         assert "profile" in summary["tools"]
         assert "enable_advanced" in summary["tools"]

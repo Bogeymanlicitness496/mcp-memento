@@ -23,7 +23,6 @@ from memento.cli import (
     main,
     perform_health_check,
     print_config_summary,
-    validate_backend,
     validate_profile,
 )
 from memento.config import Config
@@ -45,20 +44,6 @@ class TestCLIBasic:
         output = stderr_capture.getvalue()
         assert "Test message\n" in output
         assert "Another message with arg\n" in output
-
-    def test_validate_backend_valid(self):
-        """Test backend validation with valid inputs."""
-        # Should not raise exceptions for valid backends
-        validate_backend("sqlite")
-        validate_backend("auto")
-
-    def test_validate_backend_invalid(self):
-        """Test backend validation with invalid inputs."""
-        with pytest.raises(SystemExit):
-            validate_backend("invalid_backend")
-
-        with pytest.raises(SystemExit):
-            validate_backend("postgres")
 
     def test_validate_profile_valid(self):
         """Test profile validation with valid inputs."""

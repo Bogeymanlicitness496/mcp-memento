@@ -1,8 +1,8 @@
 """
-Guide tools for memento usage guidance and distinction from session memory.
+Guide tools for memento onboarding protocol and usage optimization.
 
-This module provides tools to help users understand the difference between
-memento (cross-session, global) and session memory (project-specific, temporary).
+This module provides tools for Memento onboarding including comprehensive
+protocols for tool usage, retrieval flow optimization, and best practices.
 """
 
 from typing import Any, Dict
@@ -10,45 +10,45 @@ from typing import Any, Dict
 from mcp.types import CallToolResult, TextContent
 
 
-async def handle_help_memento_tools_usage(
+async def handle_memento_onboarding(
     context: Any, arguments: Dict[str, Any]
 ) -> CallToolResult:
     """
-    Handle help_memento_tools_usage tool call.
+    Handle memento_onboarding tool call.
 
-    Provides comprehensive guidance on using memento tools and
-    distinguishing them from session memory tools.
+    Provides comprehensive onboarding protocol for Memento including
+    tool usage guidance, retrieval flow optimization, and best practices.
 
     Args:
         context: Tool context with database and configuration
         arguments: Tool arguments including optional topic
 
     Returns:
-        CallToolResult with guidance content
+        CallToolResult with onboarding content
     """
-    topic = arguments.get("topic", "all")
+    topic = arguments.get("topic", "onboarding")
 
-    guide_content = _generate_guide_content(topic)
+    onboarding_content = _generate_onboarding_content(topic)
 
     return CallToolResult(
         content=[
             TextContent(
                 type="text",
-                text=guide_content,
+                text=onboarding_content,
             )
         ]
     )
 
 
-def _generate_guide_content(topic: str) -> str:
+def _generate_onboarding_content(topic: str) -> str:
     """
-    Generate guide content based on requested topic.
+    Generate onboarding content based on requested topic.
 
     Args:
-        topic: Specific topic to generate guidance for
+        topic: Specific topic to generate onboarding for
 
     Returns:
-        Formatted guide content
+        Formatted onboarding content
     """
     if topic == "distinction":
         return _generate_distinction_guide()
@@ -56,8 +56,12 @@ def _generate_guide_content(topic: str) -> str:
         return _generate_examples_guide()
     elif topic == "best_practices":
         return _generate_best_practices_guide()
-    else:  # "all" or any other value
-        return _generate_comprehensive_guide()
+    elif topic == "protocol":
+        return _generate_onboarding_protocol()
+    elif topic == "retrieval_flow":
+        return _generate_retrieval_flow_guide()
+    else:  # "onboarding" or any other value
+        return _generate_comprehensive_onboarding()
 
 
 def _generate_distinction_guide() -> str:
@@ -238,13 +242,236 @@ For comprehensive confidence system documentation, see docs/DECAY_SYSTEM.md
 - Set appropriate limit parameters to avoid large result sets"""
 
 
-def _generate_comprehensive_guide() -> str:
-    """Generate comprehensive guide covering all topics."""
+def _generate_onboarding_protocol() -> str:
+    """Generate Memento onboarding protocol."""
+    return """# MEMENTO ONBOARDING PROTOCOL
+
+## 1. INITIALIZATION
+- **Session Start**: Always run `memento_onboarding` first to understand the protocol.
+- **Tool Discovery**: Verify available Memento tools and their purposes.
+
+## 2. RETRIEVAL FLOW (OPTIMIZED)
+### A. FACT CHECK (Simple/Identity Queries)
+Use `search_mementos(tags=[...])` for:
+- Names, usernames, GitHub handles
+- Basic facts and identity information
+- Known acronyms and technical terms
+- Exact matches needed
+
+### B. COMPLEX TASKS (Development/Architecture)
+Use `recall_mementos(query="...")` for:
+- Development context and architecture decisions
+- Conceptual queries and patterns
+- Fuzzy matching and natural language
+- General exploration of knowledge
+
+### C. FALLBACK STRATEGY
+If `search_mementos` fails or returns no results:
+1. Fallback to `recall_mementos` with broader query
+2. Check related memories with `get_related_mementos`
+3. Use `get_recent_memento_activity` for context
+
+## 3. AUTOMATIC STORAGE TRIGGERS
+Store via `store_memento` immediately on:
+- Git commits and version releases
+- Bug fixes and solutions
+- Architecture decisions and patterns
+- Technology evaluations
+- Important discoveries
+
+## 4. ON-DEMAND TRIGGERS
+Trigger `store_memento` INSTANTLY when user says:
+- *"memento..."*, *"remember..."*, *"take note..."*
+- *"ricorda..."*, *"segna..."*, *"memorizza..."* (Italian)
+- Any equivalent in other languages
+
+## 5. MEMORY SCHEMA REQUIREMENTS
+### Required Tags (Always include):
+- `project`: Project name or identifier
+- `tech`: Technology or framework
+- `category`: General category (e.g., "auth", "database", "api")
+
+### Importance Scoring:
+- **0.8+ (Critical)**: Security fixes, production issues, architecture decisions
+- **0.5 (Standard)**: Regular solutions, patterns, best practices
+- **0.3 (Reference)**: General knowledge, documentation
+
+### Relationship Building:
+Always link related mementos using `create_memento_relationship`:
+- SOLVES: solution → problem
+- CAUSES: cause → effect
+- ADDRESSES: fix → error
+- REQUIRES: dependent → dependency
+- RELATED_TO: general relationship
+
+## 6. AVOIDING INEFFICIENT TOOL USAGE
+### Common Mistake: Using 6 tools before finding the right one
+**Solution**: Follow this optimized flow:
+1. **Simple facts** → `search_mementos(tags=[...])` (1 tool)
+2. **Complex queries** → `recall_mementos(query="...")` (1 tool)
+3. **Related context** → `get_related_mementos()` (1 tool)
+
+### Tool Selection Matrix:
+| Scenario | Primary Tool | Secondary Tool | Avoid |
+|----------|--------------|----------------|-------|
+| Simple fact | `search_mementos` | - | `recall_mementos` |
+| Conceptual query | `recall_mementos` | `get_related_mementos` | Multiple searches |
+| Related knowledge | `get_related_mementos` | `search_mementos` | Manual browsing |
+| Recent activity | `get_recent_memento_activity` | - | Full database scan |
+
+## 7. INTEGRATION WITH SESSION MEMORY
+### Memento (Long-term):
+- Solutions, patterns, architecture
+- Cross-project knowledge
+- Reusable code snippets
+
+### Session Memory (Temporary):
+- Current file context
+- Temporary calculations
+- Project-specific variables
+- Session undo history
+
+## 8. PERFORMANCE OPTIMIZATION
+- Set appropriate `limit` parameters (default: 20)
+- Use `offset` for pagination
+- Filter by `memory_types` when possible
+- Use `min_importance` for critical knowledge
+- Cache frequently accessed memories"""
+
+
+def _generate_retrieval_flow_guide() -> str:
+    """Generate optimized retrieval flow guide."""
+    return """# OPTIMIZED RETRIEVAL FLOW GUIDE
+
+## PROBLEM: Inefficient Tool Usage
+Memento agents often use 6+ tools before finding the right information.
+This guide provides an optimized flow to reduce tool calls to 1-3.
+
+## SOLUTION: Three-Step Retrieval Flow
+
+### STEP 1: IDENTIFY QUERY TYPE
+**Simple/Identity Query** (Use `search_mementos`):
+- Known facts, names, acronyms
+- Exact matches needed
+- Tags are known
+
+**Complex/Conceptual Query** (Use `recall_mementos`):
+- Development context
+- Architecture decisions
+- Natural language queries
+- Fuzzy matching needed
+
+### STEP 2: SELECT PRIMARY TOOL
+#### For SIMPLE queries:
+```python
+# GOOD: 1 tool call
+search_mementos(tags=["jwt", "auth"], search_tolerance="strict")
+
+# BAD: Multiple unnecessary calls
+recall_mementos(query="jwt authentication")
+get_memento(memory_id="...")
+search_mementos(query="jwt")
+```
+
+#### For COMPLEX queries:
+```python
+# GOOD: 1-2 tool calls
+recall_mementos(query="how to handle authentication timeout")
+get_related_mementos(memory_id="found-memory-id")
+
+# BAD: Sequential guessing
+search_mementos(tags=["auth"])
+search_mementos(tags=["timeout"])
+recall_mementos(query="auth")
+recall_mementos(query="timeout")
+```
+
+### STEP 3: APPLY FALLBACK STRATEGY
+If primary tool returns no results:
+1. **For `search_mementos` failures**:
+   - Broaden tags or remove some
+   - Change `search_tolerance` to "normal" or "fuzzy"
+   - Fallback to `recall_mementos`
+
+2. **For `recall_mementos` failures**:
+   - Simplify query language
+   - Use more specific terms
+   - Try `search_mementos` with key terms as tags
+
+## PRACTICAL EXAMPLES
+
+### Example 1: Finding JWT Authentication Solution
+**Inefficient (4+ tools):**
+1. `recall_mementos(query="authentication")`
+2. `search_mementos(tags=["auth"])`
+3. `recall_mementos(query="jwt token")`
+4. `search_mementos(tags=["jwt"])`
+
+**Optimized (1 tool):**
+```python
+search_mementos(tags=["jwt", "auth", "authentication"])
+```
+
+### Example 2: Understanding Database Architecture
+**Inefficient (5+ tools):**
+1. `search_mementos(tags=["database"])`
+2. `recall_mementos(query="db")`
+3. `search_mementos(tags=["postgres"])`
+4. `recall_mementos(query="postgresql architecture")`
+5. `get_recent_memento_activity()`
+
+**Optimized (2 tools):**
+```python
+# Step 1: Conceptual query
+recall_mementos(query="database architecture patterns")
+
+# Step 2: Get related context (if needed)
+get_related_mementos(memory_id="architecture-memory-id")
+```
+
+## TOOL SELECTION DECISION TREE
+
+1. **Do you know EXACT tags/terms?**
+   - YES → `search_mementos(tags=[...])`
+   - NO → Go to 2
+
+2. **Is this a conceptual/development query?**
+   - YES → `recall_mementos(query="...")`
+   - NO → Go to 3
+
+3. **Do you have a specific memory ID?**
+   - YES → `get_memento(memory_id="...")`
+   - NO → `get_recent_memento_activity()` for context
+
+## PERFORMANCE METRICS
+- **Target**: 1-3 tool calls for simple info
+- **Maximum**: 5 tool calls for complex tasks
+- **Avoid**: Sequential guessing with 6+ tools
+
+## COMMON PITFALLS TO AVOID
+1. **Tag under-specification**: Always include known acronyms as tags
+2. **Query vagueness**: Be specific in `recall_mementos` queries
+3. **Tool hopping**: Stick to primary tool before falling back
+4. **Over-filtering**: Start broad, then narrow down"""
+
+
+def _generate_comprehensive_onboarding() -> str:
+    """Generate comprehensive onboarding covering all topics."""
+    protocol = _generate_onboarding_protocol()
+    retrieval_flow = _generate_retrieval_flow_guide()
     distinction = _generate_distinction_guide()
     examples = _generate_examples_guide()
     best_practices = _generate_best_practices_guide()
 
-    return f"""{distinction}
+    return f"""{protocol}
+
+---
+
+{retrieval_flow}
+
+---
+
+{distinction}
 
 ---
 
@@ -256,32 +483,33 @@ def _generate_comprehensive_guide() -> str:
 
 ---
 
-# QUICK DECISION FLOWCHART
+# QUICK START CHECKLIST
 
-1. Is this knowledge reusable across projects?
-   - YES -> Use _persistent suffix tools
-   - NO -> Use session memory tools (no suffix)
+## Session Start (Mandatory):
+1. Run `memento_onboarding()` to understand protocol
+2. Review available Memento tools
+3. Understand retrieval flow optimization
 
-2. Will you need this tomorrow/next week?
-   - YES -> Use _persistent suffix tools
-   - NO -> Use session memory tools (no suffix)
+## During Work:
+1. Use optimized retrieval flow (1-3 tools max)
+2. Follow automatic storage triggers
+3. Apply memory schema requirements
+4. Link related memories
 
-3. Is this a solution/pattern/architecture decision?
-   - YES -> Use _persistent suffix tools
-   - NO -> Use session memory tools (no suffix)
-
-4. Is this temporary/current work context?
-   - YES -> Use session memory tools (no suffix)
-   - NO -> Use _persistent suffix tools
+## Session End:
+1. Store important discoveries
+2. Verify memory relationships
+3. Clean up session memory
 
 # NEED HELP?
 Use these tools for assistance:
-- get_memento_guide(topic="distinction") - Focus on differences
-- get_memento_guide(topic="examples") - Practical examples
-- get_memento_guide(topic="best_practices") - Usage guidelines
-- get_memento_statistics() - Database health check
-- get_recent_memento_activity() - Usage patterns
-- get_low_confidence_mementos() - Find obsolete knowledge (Advanced)
+- `memento_onboarding(topic="protocol")` - Full onboarding protocol
+- `memento_onboarding(topic="retrieval_flow")` - Optimized retrieval guide
+- `memento_onboarding(topic="distinction")` - Memento vs Session memory
+- `memento_onboarding(topic="examples")` - Practical examples
+- `memento_onboarding(topic="best_practices")` - Usage guidelines
+- `get_recent_memento_activity()` - Recent usage patterns
+- `get_memento_statistics()` - Database health check
 
 # CONFIDENCE SYSTEM QUICK REFERENCE
 
@@ -292,4 +520,5 @@ For complete confidence system documentation, see docs/DECAY_SYSTEM.md
 - No decay tags: security, auth, api_key, password, critical, no_decay
 - Search ordering: confidence * importance
 - Monthly maintenance: apply_memento_confidence_decay()
+- Use `get_low_confidence_mementos()` to find obsolete knowledge
 """

@@ -177,11 +177,11 @@ def print_config_summary() -> None:
     config = Config.get_config_summary()
 
     _eprint("\nCurrent Configuration:")
-    _eprint(f"  Backend: {config['backend']}")
+    _eprint(f"  Database: SQLite")
     _eprint(f"  Tool Profile: {Config.TOOL_PROFILE}")
     _eprint(f"  Enable Advanced Tools: {Config.ENABLE_ADVANCED_TOOLS}")
     _eprint(f"  Log Level: {config['logging']['level']}")
-    _eprint(f"\n  SQLite Path: {config['sqlite']['path']}")
+    _eprint(f"\n  SQLite Path: {config['database']['path']}")
     _eprint()
 
     # Show YAML config sources
@@ -191,15 +191,6 @@ def print_config_summary() -> None:
         for file in yaml_files:
             _eprint(f"  - {file}")
         _eprint()
-
-
-def validate_backend(backend: str) -> None:
-    """Validate backend choice."""
-    valid_backends = ["sqlite", "auto"]
-    if backend not in valid_backends:
-        _eprint(f"Error: Invalid backend '{backend}'")
-        _eprint(f"Valid options: {', '.join(valid_backends)}")
-        sys.exit(1)
 
 
 def validate_profile(profile: str) -> None:

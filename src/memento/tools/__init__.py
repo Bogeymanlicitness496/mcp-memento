@@ -15,7 +15,7 @@ from .activity_tools import (
     handle_search_memento_relationships_by_context,
 )
 from .guide_tools import (
-    handle_help_memento_tools_usage,
+    handle_memento_onboarding,
 )
 from .memory_tools import (
     handle_delete_memento,
@@ -51,5 +51,5 @@ __all__ = [
     "handle_get_recent_memento_activity",
     "handle_search_memento_relationships_by_context",
     # Guide tools
-    "handle_help_memento_tools_usage",
+    "handle_memento_onboarding",
 ]
