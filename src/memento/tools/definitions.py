@@ -24,8 +24,8 @@ MEMENTO ONBOARDING PROTOCOL:
    - Fact Check: Use search_mementos(tags=[...]) for simple identity/known facts
    - Complex Tasks: Use recall_mementos(query="...") for dev/architecture context
    - Fallback: If search fails, fallback to recall
-3. STORAGE GUIDELINES: Use store_memento for git commits, bug fixes, version releases
-4. ON-DEMAND TRIGGERS: Store when user says "memento...", "remember...", etc.
+3. AUTOMATIC STORAGE: Store via store_memento on git commits, bug fixes, version releases
+4. ON-DEMAND TRIGGERS: Store instantly when user says "memento...", "remember...", etc.
 5. MEMORY SCHEMA: Required tags (project, tech, category). Importance: 0.8+ (critical), 0.5 (standard)
 
 OPTIMIZED RETRIEVAL (Avoid 6+ tool calls):

@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: mcp-memento
-Version: 0.1.16
-Summary: MCP Memento per gestione contestuale della memoria
+Version: 0.1.19
+Summary: MCP Memento for contextual memory management
 Author-email: Hannibal <annibale.x@gmail.com>
 Requires-Python: >=3.10
 License-File: LICENSE
