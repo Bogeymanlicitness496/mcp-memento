@@ -225,9 +225,25 @@ User: Remember that the WebSocket fix addresses the memory leak issue
 AI: ✅ Memento stored and relationship created: fix ADDRESSES error
 ```
 
+**Using the "Memento" keyword:**
+You can also start any sentence with "Memento" to store or retrieve information:
+```
+User: Memento I love oranges
+AI: ✅ Memento stored - "You love oranges"
+
+User: Memento what is the Gemini API key for the project?
+AI: Found API key: "AIzaSyD...". Would you like me to store this information securely?
+
+User: Memento the deployment script is in /scripts/deploy.sh
+AI: ✅ Memento stored - "Deployment script location: /scripts/deploy.sh"
+
+User: Memento how do we handle authentication?
+AI: Found 3 authentication patterns: 1) JWT with refresh tokens... 2) OAuth2 integration... 3) API key middleware...
+```
+
 **Multi-language support:**
 Memento understands trigger phrases in multiple languages:
-- **English**: "remember that", "store this", "take note", "keep in mind"
+- **English**: "memento", "remember that", "store this", "take note", "keep in mind"
 - **Italian**: "ricordati che", "memorizza questo", "segna", "tieni presente"
 - **Spanish**: "recuerda que", "guarda esto", "anota", "ten en cuenta"
 - **Automatic storage**: The AI assistant automatically stores important information without explicit commands when configured with proper guidelines
