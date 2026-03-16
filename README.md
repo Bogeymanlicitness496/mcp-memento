@@ -195,7 +195,7 @@ User: Remember that my name is Hannibal
 AI: ✅ Memento stored - "Your name is Hannibal"
 
 User: Remember that I love programming in Rust
-AI: ✅ Memento stored and relationship created: "Hannibal love Rust programming"
+AI: ✅ Memento stored and relationship created: "Hannibal loves Rust programming"
 ```
 
 **Store work-related knowledge:**
@@ -325,7 +325,16 @@ MemoryGraph is a powerful, feature-rich memory system with extensive capabilitie
 - **Removed**: Proactive memory features (now uses guideline-based storage)
 - **Removed**: Multi-tenant architecture (focused on single-user local storage)
 - **Removed**: Heavy dependencies (NetworkX, complex database backends)
-- **Removed**: ~10,000+ lines of backend-specific code
+- **Removed**: Tens of thousands of lines of backend-specific code
+
+### Team Collaboration & Remote Deployment
+While Memento has removed formal multi-tenant architecture, it still supports team collaboration through **shared database access**:
+
+- **Team Collaboration**: Multiple users can share the same SQLite database file (e.g., on network storage). The [Team Collaboration guidelines](docs/AGENT_CONFIGURATION.md#advanced-team-collaboration) provide tagging conventions (`team:[team-name]`, `author:[name]`) for organized shared usage.
+- **Remote MCP Server**: Memento can run as a remote MCP server accessible by multiple clients. However, all clients share the same database without built-in tenant isolation.
+- **Shared Memory Guidelines**: The included team collaboration templates are valid and functional for teams willing to share a common knowledge base with tagging-based organization.
+
+For true multi-tenancy with isolated databases per team/user, consider using the original MemoryGraph project which includes built-in tenant isolation and advanced access controls.
 
 ### When to Choose MemoryGraph vs Memento?
 - **Use Memento**: For lightweight, cross-platform memory management in IDEs and CLI tools
