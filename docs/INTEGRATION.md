@@ -84,7 +84,7 @@ async def main():
     await server.initialize()
     
     # Store a memory
-    memory_id = await server.store_memory(
+    memory_id = await server.store_memento(
         type="solution",
         title="Database optimization",
         content="Optimized queries and added indexes...",
@@ -136,6 +136,13 @@ Memento supports multiple configuration sources (in order of precedence):
    tool_profile: extended
    log_level: INFO
    ```
+   
+   The `memento.yaml` file can be placed in:
+   - **Current working directory**: Used for project-specific configuration
+   - **User home directory** (`~/.memento/memento.yaml`): For user-wide settings
+   - **System configuration directory**: `/etc/memento/memento.yaml` (Linux/macOS)
+   
+   Memento searches for configuration files in this order (first found wins).
 
 3. **Command-Line Arguments**
    ```bash
@@ -179,6 +186,34 @@ memento
 export MEMENTO_TOOL_PROFILE="core"
 memento
 ```
+
+## Concurrency and Locking
+
+Memento uses SQLite with Write-Ahead Logging (WAL) mode enabled by default to support concurrent read and write operations from multiple clients. This allows multiple IDE instances or AI agents to access the same memory database simultaneously.
+
+### Key Features:
+- **WAL Mode**: Enables concurrent reads and writes without locking conflicts
+- **Optimistic Locking**: Memory version tracking prevents overwrite conflicts
+- **Automatic Retry**: Built-in retry logic for transient lock conflicts
+- **Connection Pooling**: Efficient handling of multiple concurrent connections
+
+### Best Practices for Team Usage:
+1. **Shared Network Storage**: When using a shared database on network storage, ensure filesystem supports locking
+2. **Regular Maintenance**: Run `memento --maintenance` periodically to optimize database performance
+3. **Backup Strategy**: Implement regular backups for shared databases
+4. **Monitoring**: Monitor database size and lock contention if experiencing performance issues
+
+### Common Scenarios:
+- **Multiple IDEs**: Different team members can use Memento simultaneously from different IDEs
+- **CI/CD Pipelines**: Automated scripts can access memories while developers work
+- **Cross-Platform**: Windows, macOS, and Linux clients can share the same database file
+
+### Troubleshooting Lock Conflicts:
+If you encounter "database is locked" errors:
+1. Check if multiple processes are writing simultaneously
+2. Verify filesystem permissions support SQLite locking
+3. Consider using separate database files for high-concurrency scenarios
+4. Ensure adequate disk space and I/O performance
 
 ## Getting Help
 

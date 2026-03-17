@@ -1,6 +1,6 @@
 # Configuration Examples for Memento
 
-Ready-to-use snippets for configuring your agent to effectively use Memento.
+Ready-to-use snippets for configuring your agent to effectively use Memento. For detailed human-readable rules and best practices, see [RULES.md](./RULES.md).
 
 **Relationship Types Reference**: Memento supports 35 relationship types for connecting memories. For a complete reference with examples and usage guidelines, see [RELATIONSHIPS.md](./RELATIONSHIPS.md).
 
@@ -27,9 +27,9 @@ Rules for basic memory functionality:
 - **Session Start**: Always run `memento_onboarding` first.
 - **Fact Check (Simple/Identity)**: Use `search_mementos(tags=[...])` directly for names, github, or basic facts.
 - **Complex Tasks**: Use `recall_mementos(query="...")` for dev/architecture context.
-- **Fallback**: If `search` fails, fallback to `recall`.
+- **Fallback**: If `search_mementos` fails, fallback to `recall_mementos`.
 - **Dev/Complex Tasks**: Always start with `recall_mementos(query="...")`.
-- **Flow**: Simple? → `search`. Complex? → `recall`. If `search` fails → Fallback to `recall`.
+- **Flow**: Simple? → `search_mementos`. Complex? → `recall_mementos`. If `search_mementos` fails → Fallback to `recall_mementos`.
 - **Efficiency**: Keep tool calls between 1-3 for simple info, max 5 for complex tasks. Use session cache for repeated info.
 
 ### 2. STORAGE TRIGGERS (GUIDELINES & ON-DEMAND)
@@ -40,10 +40,10 @@ Store memories following these guidelines when detecting:
   - *"ricorda..."* / *"segna questo..."* / *"memorizza..."*
 
 ### 3. MEMORY STRUCTURE & SCHEMA
-- **Type**: solution | problem | code-pattern | fix | error | workflow | general
+- **Type**: solution | problem | code_pattern | fix | error | workflow | general
 - **Title**: Specific and searchable (not generic).
 - **Content**: Detailed decisions, accomplishments, or patterns.
-- **Tags (REQUIRED)**: Project, technology, and category.
+- **Tags (REQUIRED)**: Project, technology, and category. (Technically optional in API but strongly recommended for effective search)
 - **Importance**: 0.8+ (Critical/Arch), 0.5-0.7 (Standard), 0.3-0.4 (Minor).
 - **Relationships**: Link to existing mementos whenever a connection exists.
 
@@ -68,7 +68,7 @@ You MUST use `memento_onboarding` at session start to get comprehensive onboardi
 You MUST follow the optimized retrieval flow:
 - **Fact Check**: Use `search_mementos(tags=[...])` for simple identity/known facts.
 - **Complex Tasks**: Use `recall_mementos(query="...")` for dev/architecture context.
-- **Fallback**: If `search` fails, fallback to `recall`.
+- **Fallback**: If `search_mementos` fails, fallback to `recall_mementos`.
 
 ### RECOMMENDED: Storage Guidelines
 Consider storing memories for:
@@ -85,10 +85,10 @@ Consider storing memories:
 - **Session end**: For session summaries
 
 ### Memory Fields
-- **Type**: solution | problem | code-pattern | fix | error | workflow
+- **Type**: solution | problem | code_pattern | fix | error | workflow
 - **Title**: Specific, searchable (not generic)
 - **Content**: Accomplishment, decisions, patterns
-- **Tags**: project, tech, category (REQUIRED)
+- **Tags**: project, tech, category (REQUIRED - technically optional in API but strongly recommended for effective search)
 - **Importance**: 0.8+ critical, 0.5-0.7 standard, 0.3-0.4 minor
 - **Relationships**: Link related memories when they exist
 
@@ -139,8 +139,8 @@ Always tag memories with:
 ### Memory Types for This Project
 - **solution**: Working implementations (API endpoints, features)
 - **problem**: Issues we encountered (performance, bugs)
-- **code-pattern**: Reusable patterns (error handling, validation)
-- **decision**: Architecture choices (why we chose X over Y)
+- **code_pattern**: Reusable patterns (error handling, validation)
+- **general** (with `decision` tag): Architecture choices (why we chose X over Y)
 - **task**: Sprint work, feature completion
 
 ### Example Memory Flow

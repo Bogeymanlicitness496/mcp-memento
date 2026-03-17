@@ -126,7 +126,7 @@ analytics = analyze_memento_graph()
 - Tag by technology, problem domain, and solution type
 
 ### 2. Memory Organization
-- Use `type` field consistently: `solution`, `problem`, `pattern`, `decision`
+- Use `type` field consistently: `solution`, `problem`, `code_pattern`, `general`
 - Set appropriate `importance` (0.0-1.0) for prioritization
 - Include relevant `context` for better searchability
 
@@ -213,6 +213,47 @@ async def store_test_results(test_name: str, results: dict):
         confidence=0.9
     )
 ```
+
+---
+
+## Parameter Requirements
+
+### Core Memory Tools Required Parameters
+
+| Tool | Required Parameters | Optional Parameters |
+|------|---------------------|---------------------|
+| `store_memento` | `type`, `title`, `content` | `tags`, `importance`, `id` |
+| `get_memento` | `memory_id` | `include_relationships` |
+| `update_memento` | `memory_id` | `title`, `content`, `tags`, `importance` |
+| `delete_memento` | `memory_id` | (none) |
+| `search_mementos` | (none) - at least one of `query`, `tags`, or `memory_types` recommended | `query`, `tags`, `memory_types`, `min_importance`, `limit`, `offset` |
+| `recall_mementos` | `query` | `memory_types`, `project_path`, `limit`, `offset` |
+| `create_memento_relationship` | `from_memory_id`, `to_memory_id`, `relationship_type` | `strength`, `confidence`, `context` |
+| `get_related_mementos` | `memory_id` | `relationship_types`, `max_depth` |
+
+### Confidence System Tools Required Parameters
+
+| Tool | Required Parameters | Optional Parameters |
+|------|---------------------|---------------------|
+| `adjust_memento_confidence` | `relationship_id`, `new_confidence` | `reason` |
+| `get_low_confidence_mementos` | (none) | `threshold`, `limit` |
+| `apply_memento_confidence_decay` | (none) | (none) |
+| `boost_memento_confidence` | `memory_id` | `boost_amount`, `reason` |
+| `set_memento_decay_factor` | `memory_id` | `decay_factor`, `reason` |
+
+### Advanced Relationship Tools Required Parameters
+
+| Tool | Required Parameters | Optional Parameters |
+|------|---------------------|---------------------|
+| `find_path_between_mementos` | `from_memory_id`, `to_memory_id` | `max_depth` |
+| `get_memento_clusters` | (none) | `min_cluster_size`, `min_density` |
+| `get_central_mementos` | (none) | (none) |
+| `suggest_memento_relationships` | `from_memory_id`, `to_memory_id` | (none) |
+| `find_memento_patterns` | (none) | `min_pattern_size`, `min_support` |
+| `analyze_memento_graph` | (none) | (none) |
+| `get_memento_network` | (none) | (none) |
+
+**Note**: Parameters marked as required must be provided for the tool to function. Optional parameters have default values or can be omitted.
 
 ---
 

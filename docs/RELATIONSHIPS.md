@@ -169,7 +169,7 @@ await create_memento_relationship(
 ```python
 # Store the decision
 decision_id = await store_memento(
-    type="decision",
+    type="general",
     title="Chose Redis over Memcached for caching",
     content="Redis chosen for persistence and data structures",
     tags=["architecture", "caching", "redis"]
@@ -252,9 +252,9 @@ Link memories when you create them, not later. This ensures:
 - No forgotten connections
 
 ### 5. Review and Update Periodically
-- Use `get_low_confidence_mementos()` to find relationships needing review
+- Use `get_low_confidence_mementos()` to find low-confidence connections and memories needing review
 - Update confidence based on new evidence
-- Remove obsolete relationships with `delete_memento()`
+- Remove obsolete mementos (and their cascading relationships) with `delete_memento()`
 
 ---
 

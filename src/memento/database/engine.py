@@ -58,6 +58,11 @@ class SQLiteBackend(GraphBackend):
             self.conn.row_factory = aiosqlite.Row  # Enable column access by name
             self._connected = True
 
+            # Enable WAL mode for concurrent access and better performance
+            await self.conn.execute("PRAGMA journal_mode=WAL")
+            await self.conn.execute("PRAGMA synchronous=NORMAL")
+            await self.conn.execute("PRAGMA busy_timeout=5000")
+
             # Check FTS support once
             await self._check_fts_support()
 
@@ -122,50 +127,6 @@ class SQLiteBackend(GraphBackend):
             logger.warning(f"Failed to check FTS support: {e}")
             self._supports_fts = False
 
-    async def execute_query(
-        self,
-        query: str,
-        parameters: Optional[dict[str, Any]] = None,
-        write: bool = False,
-    ) -> list[dict[str, Any]]:
-        """
-        Execute a Cypher-like query translated to SQLite operations.
-
-        Args:
-            query: Cypher-style query string
-            parameters: Query parameters
-            write: Whether this is a write operation
-
-        Returns:
-            List of result records as dictionaries
-
-        Raises:
-            DatabaseConnectionError: If not connected
-            Exception: For query execution errors
-            NotImplementedError: For complex Cypher queries
-
-        Note:
-            This is a simplified implementation that supports basic operations.
-            Complex Cypher queries will raise NotImplementedError.
-        """
-        if not self._connected or not self.conn:
-            raise DatabaseConnectionError(
-                "Connection failed: not connected to SQLite (call connect() first)"
-            )
-
-        params = parameters or {}
-
-        # For schema operations, we can execute directly
-        if query.strip().upper().startswith(("CREATE", "DROP", "ALTER")):
-            return []
-
-        # For data operations, translate to SQLite
-        # This is a simplified implementation - full Cypher translation would be complex
-        logger.warning(
-            "Direct Cypher execution not supported in SQLite backend. Use database.py methods."
-        )
-        return []
-
     async def initialize_schema(self) -> None:
         """
         Initialize database schema including indexes.
@@ -190,7 +151,7 @@ class SQLiteBackend(GraphBackend):
                 )
             """)
 
-            # Create relationships table (with bi-temporal fields)
+            # Create relationships table (with confidence system fields)
             await self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS relationships (
                     id TEXT PRIMARY KEY,
@@ -200,11 +161,6 @@ class SQLiteBackend(GraphBackend):
                     properties TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-                    -- Bi-temporal tracking fields (Phase 2.2)
-                    valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    valid_until TIMESTAMP,
-                    recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    invalidated_by TEXT,
 
                     -- Confidence system fields
                     confidence FLOAT DEFAULT 0.8,
@@ -213,8 +169,7 @@ class SQLiteBackend(GraphBackend):
                     decay_factor FLOAT DEFAULT 0.95,
 
                     FOREIGN KEY (from_id) REFERENCES nodes(id) ON DELETE CASCADE,
-                    FOREIGN KEY (to_id) REFERENCES nodes(id) ON DELETE CASCADE,
-                    FOREIGN KEY (invalidated_by) REFERENCES relationships(id) ON DELETE SET NULL
+                    FOREIGN KEY (to_id) REFERENCES nodes(id) ON DELETE CASCADE
                 )
             """)
 
@@ -235,28 +190,6 @@ class SQLiteBackend(GraphBackend):
                 "CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(rel_type)"
             )
 
-            # Temporal indexes (Phase 2.2)
-            await self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_relationships_temporal
-                ON relationships(valid_from, valid_until)
-            """)
-            await self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_relationships_confidence
-                ON relationships(confidence)
-            """)
-            await self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_relationships_last_accessed
-                ON relationships(last_accessed)
-            """)
-            await self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_relationships_current
-                ON relationships(valid_until)
-                WHERE valid_until IS NULL
-            """)
-            await self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_relationships_recorded
-                ON relationships(recorded_at)
-            """)
 
             # Create FTS5 virtual table for full-text search
             try:
@@ -345,9 +278,6 @@ class SQLiteBackend(GraphBackend):
         """Check if this backend supports ACID transactions."""
         return True  # SQLite supports transactions
 
-    def is_cypher_capable(self) -> bool:
-        """SQLite backend supports Cypher-like query execution."""
-        return True
 
     @classmethod
     async def create(cls, db_path: Optional[str] = None) -> "SQLiteBackend":

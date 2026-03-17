@@ -691,37 +691,20 @@ class SQLiteMemoryDatabase:
             # Prepare properties dict
             props_dict = relationship.properties.model_dump()
 
-            # Handle temporal fields
-            valid_from = (
-                relationship.properties.valid_from.isoformat()
-                if relationship.properties.valid_from
-                else datetime.now(timezone.utc).isoformat()
-            )
-            valid_until = (
-                relationship.properties.valid_until.isoformat()
-                if relationship.properties.valid_until
-                else None
-            )
-            recorded_at = (
-                relationship.properties.recorded_at.isoformat()
-                if relationship.properties.recorded_at
-                else datetime.now(timezone.utc).isoformat()
-            )
             created_at = (
                 relationship.properties.created_at.isoformat()
                 if relationship.properties.created_at
                 else datetime.now(timezone.utc).isoformat()
             )
-            invalidated_by = relationship.properties.invalidated_by
 
             # Insert into relationships table
             query = """
                 INSERT INTO relationships (
                     id, from_id, to_id, rel_type, properties, created_at,
-                    valid_from, valid_until, recorded_at, invalidated_by,
+                    
                     confidence, last_accessed, access_count, decay_factor
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
 
             # Serialize props with correct datetimes
@@ -748,10 +731,6 @@ class SQLiteMemoryDatabase:
                     relationship.type.value,
                     json.dumps(props_dict),
                     created_at,
-                    valid_from,
-                    valid_until,
-                    recorded_at,
-                    invalidated_by,
                     confidence,
                     last_accessed,
                     access_count,
@@ -820,7 +799,7 @@ class SQLiteMemoryDatabase:
         try:
             query = """
                 SELECT id, from_id, to_id, rel_type, properties,
-                       created_at, valid_from, valid_until, recorded_at, invalidated_by,
+                       created_at,
                        confidence, last_accessed, access_count, decay_factor
                 FROM relationships
                 WHERE from_id = ? OR to_id = ?
@@ -842,13 +821,6 @@ class SQLiteMemoryDatabase:
                             return None
 
                     created_at = parse_date(row["created_at"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_from = parse_date(row["valid_from"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_until = parse_date(row["valid_until"])
-                    recorded_at = parse_date(row["recorded_at"]) or datetime.now(
                         timezone.utc
                     )
 
@@ -889,10 +861,6 @@ class SQLiteMemoryDatabase:
                         type=rel_type,
                         properties=RelationshipProperties(**properties),
                         created_at=created_at,
-                        valid_from=valid_from,
-                        valid_until=valid_until,
-                        recorded_at=recorded_at,
-                        invalidated_by=row["invalidated_by"],
                     )
                     relationships.append(relationship)
                 except (KeyError, ValueError, json.JSONDecodeError) as e:
@@ -1127,47 +1095,6 @@ class SQLiteMemoryDatabase:
         """
         logger.debug("Schema already initialized by SQLiteBackend")
 
-    async def invalidate_relationship(
-        self, relationship_id: str, invalidated_by: str = None
-    ) -> None:
-        """
-        Invalidate a relationship by setting valid_until to now.
-
-        Args:
-            relationship_id: ID of the relationship to invalidate
-            invalidated_by: Optional ID of relationship that supersedes this one
-
-        Raises:
-            BackendError: If database operation fails
-        """
-        try:
-            # Check if relationship exists
-            query = "SELECT id FROM relationships WHERE id = ?"
-            result = await self._execute_sql(query, (relationship_id,))
-
-            if not result:
-                raise BackendError(f"Relationship not found: {relationship_id}")
-
-            # Set valid_until to now
-            now = datetime.now(timezone.utc).isoformat()
-            update_query = """
-                UPDATE relationships
-                SET valid_until = ?, invalidated_by = ?
-                WHERE id = ?
-            """
-            await self._execute_write(
-                update_query, (now, invalidated_by, relationship_id)
-            )
-
-            await self.conn.commit()
-            logger.info(f"Invalidated relationship: {relationship_id}")
-
-        except aiosqlite.Error as e:
-            await self.conn.rollback()
-            raise BackendError(f"Failed to invalidate relationship: {e}")
-        except Exception as e:
-            raise BackendError(f"Failed to invalidate relationship: {str(e)}")
-
     async def search_relationships_by_context(
         self,
         scope: Optional[str] = None,
@@ -1200,7 +1127,7 @@ class SQLiteMemoryDatabase:
             # Base query
             query = """
                 SELECT id, from_id, to_id, rel_type, properties,
-                       created_at, valid_from, valid_until, recorded_at, invalidated_by,
+                       created_at,
                        confidence, last_accessed, access_count, decay_factor
                 FROM relationships
                 WHERE properties IS NOT NULL AND properties != ''
@@ -1272,13 +1199,6 @@ class SQLiteMemoryDatabase:
                     created_at = parse_date(row["created_at"]) or datetime.now(
                         timezone.utc
                     )
-                    valid_from = parse_date(row["valid_from"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_until = parse_date(row["valid_until"])
-                    recorded_at = parse_date(row["recorded_at"]) or datetime.now(
-                        timezone.utc
-                    )
 
                     # Parse confidence system fields
                     confidence = (
@@ -1317,10 +1237,6 @@ class SQLiteMemoryDatabase:
                         type=rel_type,
                         properties=RelationshipProperties(**properties),
                         created_at=created_at,
-                        valid_from=valid_from,
-                        valid_until=valid_until,
-                        recorded_at=recorded_at,
-                        invalidated_by=row["invalidated_by"],
                     )
                     relationships.append(relationship)
                 except (KeyError, ValueError, json.JSONDecodeError) as e:
@@ -1331,287 +1247,10 @@ class SQLiteMemoryDatabase:
 
         except Exception as e:
             raise BackendError(f"Failed to search relationships by context: {str(e)}")
-
-    async def get_relationship_history(
-        self,
-        memory_id: str,
-        relationship_types: List[RelationshipType] = None,
-        limit: int = 100,
-        offset: int = 0,
-    ) -> List[Relationship]:
-        """
-        Get full history of relationships for a memory, including invalidated ones.
-
-        Args:
-            memory_id: ID of the memory to get history for
-            relationship_types: Optional filter by relationship types
-            limit: Maximum number of results to return (default: 100)
-            offset: Number of results to skip for pagination (default: 0)
-
-        Returns:
-            List of Relationship objects, ordered chronologically by valid_from
-
-        Raises:
-            BackendError: If database operation fails
-        """
-        try:
-            # Build query
-            where_conditions = ["(from_id = ? OR to_id = ?)"]
-            params = [memory_id, memory_id]
-
-            if relationship_types:
-                type_placeholders = ",".join("?" * len(relationship_types))
-                where_conditions.append(f"rel_type IN ({type_placeholders})")
-                params.extend([rt.value for rt in relationship_types])
-
-            where_clause = " AND ".join(where_conditions)
-
-            query = f"""
-                SELECT
-                    id, from_id, to_id, rel_type, properties,
-                    created_at, valid_from, valid_until, recorded_at, invalidated_by,
-                    confidence, last_accessed, access_count, decay_factor
-                FROM relationships
-                WHERE {where_clause}
-                ORDER BY valid_from ASC
-                LIMIT ? OFFSET ?
-            """
-
-            params.extend([limit, offset])
-            results = await self._execute_sql(query, tuple(params))
-
-            relationships = []
-            for row in results:
-                try:
-                    properties = json.loads(row["properties"])
-                    rel_type = RelationshipType(row["rel_type"])
-
-                    def parse_date(date_str):
-                        if not date_str:
-                            return None
-                        try:
-                            return datetime.fromisoformat(date_str)
-                        except (ValueError, TypeError):
-                            return None
-
-                    created_at = parse_date(row["created_at"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_from = parse_date(row["valid_from"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_until = parse_date(row["valid_until"])
-                    recorded_at = parse_date(row["recorded_at"]) or datetime.now(
-                        timezone.utc
-                    )
-
-                    # Parse confidence system fields from database columns
-                    confidence = (
-                        float(row["confidence"])
-                        if row["confidence"] is not None
-                        else 0.8
-                    )
-                    last_accessed = parse_date(row["last_accessed"]) or datetime.now(
-                        timezone.utc
-                    )
-                    access_count = (
-                        int(row["access_count"])
-                        if row["access_count"] is not None
-                        else 0
-                    )
-                    decay_factor = (
-                        float(row["decay_factor"])
-                        if row["decay_factor"] is not None
-                        else 0.95
-                    )
-
-                    relationship = Relationship(
-                        id=row["id"],
-                        from_memory_id=row["from_id"],
-                        to_memory_id=row["to_id"],
-                        type=rel_type,
-                        properties=RelationshipProperties(
-                            strength=properties.get("strength", 0.5),
-                            confidence=confidence,
-                            context=properties.get("context", ""),
-                            evidence_count=properties.get("evidence_count", 1),
-                            success_rate=properties.get("success_rate", None),
-                            validation_count=properties.get("validation_count", 0),
-                            counter_evidence_count=properties.get(
-                                "counter_evidence_count", 0
-                            ),
-                            created_at=created_at,
-                            valid_from=valid_from,
-                            valid_until=valid_until,
-                            recorded_at=recorded_at,
-                            last_validated=parse_date(properties.get("last_validated"))
-                            or datetime.now(timezone.utc),
-                            invalidated_by=row["invalidated_by"],
-                            last_accessed=last_accessed,
-                            access_count=access_count,
-                            decay_factor=decay_factor,
-                        ),
-                    )
-                    relationships.append(relationship)
-                except Exception as e:
-                    logger.warning(f"Failed to parse relationship {row['id']}: {e}")
-
-            logger.info(
-                f"Found {len(relationships)} relationships for memory {memory_id}"
-            )
-
-            # Update confidence for accessed relationships
-            for relationship in relationships:
-                try:
-                    await self.update_confidence_on_access(relationship.id)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to update confidence for relationship {relationship.id}: {e}"
-                    )
-
-            return relationships
-
         except aiosqlite.Error as e:
             raise BackendError(f"Failed to get relationship history: {e}")
         except Exception as e:
             raise BackendError(f"Failed to get relationship history: {str(e)}")
-
-    async def what_changed(self, since: datetime) -> Dict[str, List[Relationship]]:
-        """
-        Get all relationship changes since a given time.
-
-        Args:
-            since: DateTime to query changes from
-
-        Returns:
-            Dictionary with "new_relationships" and "invalidated_relationships" lists
-
-        Raises:
-            BackendError: If database operation fails
-        """
-        try:
-            since_str = since.isoformat()
-
-            # Query for new relationships (recorded_at >= since)
-            new_query = """
-                SELECT
-                    id, from_id, to_id, rel_type, properties,
-                    created_at, valid_from, valid_until, recorded_at, invalidated_by,
-                    confidence, last_accessed, access_count, decay_factor
-                FROM relationships
-                WHERE recorded_at >= ?
-                ORDER BY recorded_at DESC
-            """
-            new_results = await self._execute_sql(new_query, (since_str,))
-
-            # Query for invalidated relationships (valid_until set since)
-            invalidated_query = """
-                SELECT
-                    id, from_id, to_id, rel_type, properties,
-                    created_at, valid_from, valid_until, recorded_at, invalidated_by,
-                    confidence, last_accessed, access_count, decay_factor
-                FROM relationships
-                WHERE valid_until IS NOT NULL AND valid_until >= ?
-                ORDER BY valid_until DESC
-            """
-            invalidated_results = await self._execute_sql(
-                invalidated_query, (since_str,)
-            )
-
-            def _parse_relationships(results):
-                relationships = []
-                for row in results:
-                    try:
-                        properties = json.loads(row["properties"])
-                        rel_type = RelationshipType(row["rel_type"])
-
-                        def parse_date(date_str):
-                            if not date_str:
-                                return None
-                            try:
-                                return datetime.fromisoformat(date_str)
-                            except (ValueError, TypeError):
-                                return None
-
-                        created_at = parse_date(row["created_at"]) or datetime.now(
-                            timezone.utc
-                        )
-                        valid_from = parse_date(row["valid_from"]) or datetime.now(
-                            timezone.utc
-                        )
-                        valid_until = parse_date(row["valid_until"])
-                        recorded_at = parse_date(row["recorded_at"]) or datetime.now(
-                            timezone.utc
-                        )
-
-                        # Parse confidence system fields
-                        confidence = (
-                            float(row["confidence"])
-                            if row["confidence"] is not None
-                            else 0.8
-                        )
-                        last_accessed = parse_date(
-                            row["last_accessed"]
-                        ) or datetime.now(timezone.utc)
-                        access_count = (
-                            int(row["access_count"])
-                            if row["access_count"] is not None
-                            else 0
-                        )
-                        decay_factor = (
-                            float(row["decay_factor"])
-                            if row["decay_factor"] is not None
-                            else 0.95
-                        )
-
-                        relationship = Relationship(
-                            id=row["id"],
-                            from_memory_id=row["from_id"],
-                            to_memory_id=row["to_id"],
-                            type=rel_type,
-                            strength=properties.get("strength", 0.5),
-                            confidence=confidence,
-                            context=properties.get("context", ""),
-                            created_at=created_at,
-                            valid_from=valid_from,
-                            valid_until=valid_until,
-                            recorded_at=recorded_at,
-                            invalidated_by=row["invalidated_by"],
-                            last_accessed=last_accessed,
-                            access_count=access_count,
-                            decay_factor=decay_factor,
-                        )
-                        relationships.append(relationship)
-                    except Exception as e:
-                        logger.warning(f"Failed to parse relationship {row['id']}: {e}")
-                return relationships
-
-            new_relationships = _parse_relationships(new_results)
-            invalidated_relationships = _parse_relationships(invalidated_results)
-
-            logger.info(
-                f"Found {len(new_relationships)} new and {len(invalidated_relationships)} invalidated relationships since {since}"
-            )
-
-            # Update confidence for accessed relationships
-            all_relationships = new_relationships + invalidated_relationships
-            for relationship in all_relationships:
-                try:
-                    await self.update_confidence_on_access(relationship.id)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to update confidence for relationship {relationship.id}: {e}"
-                    )
-
-            return {
-                "new_relationships": new_relationships,
-                "invalidated_relationships": invalidated_relationships,
-            }
-
-        except aiosqlite.Error as e:
-            raise BackendError(f"Failed to get changes: {e}")
-        except Exception as e:
-            raise BackendError(f"Failed to get changes: {str(e)}")
 
     async def get_recent_activity(
         self, days: int = 7, project: Optional[str] = None
@@ -1700,7 +1339,6 @@ class SQLiteMemoryDatabase:
                         FROM relationships r
                         WHERE r.to_id = n.id
                             AND r.rel_type IN ('SOLVES', 'FIXES', 'ADDRESSES')
-                            AND (r.valid_until IS NULL OR r.valid_until > CURRENT_TIMESTAMP)
                     )
                 ORDER BY CAST(json_extract(n.properties, '$.importance') AS REAL) DESC
                 LIMIT 10
@@ -1840,7 +1478,6 @@ class SQLiteMemoryDatabase:
                 )
                 WHERE last_accessed IS NOT NULL
                   AND confidence > 0.1  -- Don't decay below 0.1
-                  AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
             """
 
             if memory_id:
@@ -1925,11 +1562,10 @@ class SQLiteMemoryDatabase:
         try:
             query = """
                 SELECT id, from_id, to_id, rel_type, properties,
-                       created_at, valid_from, valid_until, recorded_at, invalidated_by,
+                       created_at,
                        confidence, last_accessed, access_count, decay_factor
                 FROM relationships
                 WHERE confidence < ?
-                  AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
                 ORDER BY confidence ASC, last_accessed ASC
                 LIMIT ?
             """
@@ -1951,13 +1587,6 @@ class SQLiteMemoryDatabase:
                             return None
 
                     created_at = parse_date(row["created_at"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_from = parse_date(row["valid_from"]) or datetime.now(
-                        timezone.utc
-                    )
-                    valid_until = parse_date(row["valid_until"])
-                    recorded_at = parse_date(row["recorded_at"]) or datetime.now(
                         timezone.utc
                     )
 
@@ -1998,10 +1627,6 @@ class SQLiteMemoryDatabase:
                         type=rel_type,
                         properties=RelationshipProperties(**properties),
                         created_at=created_at,
-                        valid_from=valid_from,
-                        valid_until=valid_until,
-                        recorded_at=recorded_at,
-                        invalidated_by=row["invalidated_by"],
                     )
                     relationships.append(relationship)
                 except Exception as e:

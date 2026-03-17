@@ -68,7 +68,7 @@ async def shutdown_event():
 async def create_memory(memory: MemoryCreate):
     """Create a new memory."""
     try:
-        memory_id = await server.store_memory(
+        memory_id = await server.store_memento(
             type=memory.type,
             title=memory.title,
             content=memory.content,
@@ -80,10 +80,10 @@ async def create_memory(memory: MemoryCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/memories/{memory_id}")
-async def get_memory(memory_id: str):
+async def get_memento(memory_id: str):
     """Get a specific memory."""
     try:
-        memory = await server.get_memory(memory_id)
+        memory = await server.get_memento(memory_id)
         return {
             "id": memory.id,
             "type": memory.type,
@@ -97,10 +97,10 @@ async def get_memory(memory_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 @app.post("/search")
-async def search_memories(query: SearchQuery):
+async def search_mementos(query: SearchQuery):
     """Search memories."""
     try:
-        results = await server.recall_memories(
+        results = await server.recall_mementos(
             query=query.query,
             limit=query.limit,
             memory_types=query.memory_types
@@ -261,126 +261,107 @@ async def create_memory(memory: MemoryCreate, _ = Depends(verify_api_key)):
 ## Node.js Integration
 
 ### Overview
-The Node.js integration allows you to use Memento directly from JavaScript/TypeScript applications. There are two approaches:
-1. **Child Process**: Direct MCP protocol communication (recommended)
-2. **HTTP Client**: Use the REST API via HTTP
+The Node.js integration allows you to use Memento directly from JavaScript/TypeScript applications using the official [Model Context Protocol (MCP) SDK](https://github.com/modelcontextprotocol/sdk). This is the recommended approach for reliable, production-ready integration.
 
-### Child Process Integration (Recommended)
+### Using the Official MCP SDK (Recommended)
 
 #### Installation:
 ```bash
-npm install child_process  # Built-in, no extra installation needed
+npm install @modelcontextprotocol/sdk
 ```
 
-#### MementoClient Class:
+#### MementoClient Class with MCP SDK:
 ```javascript
 // memento-client.js
-const { spawn } = require('child_process');
-const { Readable, Writable } = require('stream');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
 
 class MementoClient {
   constructor(options = {}) {
     this.options = {
       profile: options.profile || 'core',
-      dbPath: options.dbPath || '~/.memento/context.db',
       ...options
     };
     
-    this.server = null;
-    this.requestId = 1;
+    this.client = null;
+    this.transport = null;
   }
 
-  start() {
-    return new Promise((resolve, reject) => {
-      this.server = spawn('memento', [
-        '--profile', this.options.profile,
-        '--log-level', 'ERROR'
-      ]);
-      
-      this.server.stdout.on('data', (data) => {
-        console.log(`Memento: ${data.toString().trim()}`);
-      });
-      
-      this.server.stderr.on('data', (data) => {
-        console.error(`Memento error: ${data.toString().trim()}`);
-      });
-      
-      this.server.on('close', (code) => {
-        console.log(`Memento exited with code ${code}`);
-      });
-      
-      // Wait for server to be ready
-      setTimeout(resolve, 2000);
+  async start() {
+    // Create MCP client
+    this.client = new Client(
+      {
+        name: 'memento-client',
+        version: '1.0.0'
+      },
+      {
+        capabilities: {
+          tools: {}
+        }
+      }
+    );
+
+    // Create stdio transport to connect to Memento server
+    this.transport = new StdioClientTransport({
+      command: 'python',
+      args: ['-m', 'memento', '--profile', this.options.profile]
     });
+
+    await this.client.connect(this.transport);
   }
 
-  stop() {
-    if (this.server) {
-      this.server.kill();
+  async stop() {
+    if (this.client) {
+      await this.client.close();
     }
   }
 
-  async sendRequest(method, params) {
-    return new Promise((resolve, reject) => {
-      const request = {
-        jsonrpc: '2.0',
-        id: this.requestId++,
-        method,
-        params
-      };
+  async callTool(toolName, arguments) {
+    if (!this.client) {
+      throw new Error('Client not started. Call start() first.');
+    }
 
-      this.server.stdin.write(JSON.stringify(request) + '\n');
-      
-      const listener = (data) => {
-        try {
-          const response = JSON.parse(data.toString());
-          if (response.id === request.id) {
-            this.server.stdout.removeListener('data', listener);
-            resolve(response.result);
-          }
-        } catch (error) {
-          // Not JSON, continue listening
-        }
-      };
-      
-      this.server.stdout.on('data', listener);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        this.server.stdout.removeListener('data', listener);
-        reject(new Error('Request timeout'));
-      }, 10000);
+    const result = await this.client.request('tools/call', {
+      name: toolName,
+      arguments
     });
+
+    return result;
   }
 
   async searchMemories(query, limit = 10) {
-    return this.sendRequest('tools/call', {
-      name: 'recall_mementos',
-      arguments: {
-        query,
-        limit
-      }
+    return this.callTool('recall_mementos', {
+      query,
+      limit
     });
   }
 
   async storeMemory(memoryData) {
-    return this.sendRequest('tools/call', {
-      name: 'store_memento',
-      arguments: memoryData
-    });
+    return this.callTool('store_memento', memoryData);
   }
 
   async getMemory(memoryId) {
-    return this.sendRequest('tools/call', {
-      name: 'get_memento',
-      arguments: { memory_id: memoryId }
+    return this.callTool('get_memento', {
+      memory_id: memoryId
     });
   }
 
   async getStatistics() {
-    return this.sendRequest('tools/call', {
-      name: 'get_memento_statistics',
-      arguments: {}
+    return this.callTool('get_memento_statistics', {});
+  }
+
+  async boostConfidence(memoryId, boostAmount = 0.05, reason = '') {
+    return this.callTool('boost_memento_confidence', {
+      memory_id: memoryId,
+      boost_amount: boostAmount,
+      reason
+    });
+  }
+
+  async searchByTags(tags, limit = 10) {
+    return this.callTool('search_mementos', {
+      tags,
+      limit
     });
   }
 }
@@ -403,8 +384,8 @@ async function main() {
     const memoryId = await client.storeMemory({
       type: 'solution',
       title: 'Node.js Integration Example',
-      content: 'Example of integrating Memento with Node.js',
-      tags: ['nodejs', 'integration', 'example'],
+      content: 'Example of integrating Memento with Node.js using MCP SDK',
+      tags: ['nodejs', 'integration', 'example', 'mcp'],
       importance: 0.6
     });
     
@@ -414,6 +395,10 @@ async function main() {
     const results = await client.searchMemories('Node.js integration', 5);
     console.log(`Found ${results.length} memories`);
     
+    // Search by tags
+    const tagResults = await client.searchByTags(['nodejs', 'integration']);
+    console.log(`Found ${tagResults.length} memories by tags`);
+    
     // Get statistics
     const stats = await client.getStatistics();
     console.log('Database statistics:', stats);
@@ -421,7 +406,7 @@ async function main() {
   } catch (error) {
     console.error('Error:', error);
   } finally {
-    client.stop();
+    await client.stop();
   }
 }
 
@@ -433,9 +418,11 @@ if (require.main === module) {
 #### TypeScript Support:
 ```typescript
 // memento-client.d.ts
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
 interface MementoOptions {
   profile?: 'core' | 'extended' | 'advanced';
-  dbPath?: string;
 }
 
 interface MemoryData {
@@ -449,17 +436,21 @@ interface MemoryData {
 declare class MementoClient {
   constructor(options?: MementoOptions);
   start(): Promise<void>;
-  stop(): void;
+  stop(): Promise<void>;
   searchMemories(query: string, limit?: number): Promise<any[]>;
   storeMemory(memoryData: MemoryData): Promise<string>;
   getMemory(memoryId: string): Promise<any>;
   getStatistics(): Promise<any>;
+  boostConfidence(memoryId: string, boostAmount?: number, reason?: string): Promise<any>;
+  searchByTags(tags: string[], limit?: number): Promise<any[]>;
 }
 
 export default MementoClient;
 ```
 
 ### HTTP Client Integration (Alternative)
+
+If you need to use Memento's HTTP REST API instead of MCP protocol:
 
 ```javascript
 // Using the HTTP REST API from Node.js
@@ -503,8 +494,6 @@ const memoryId = await client.storeMemory({
   tags: ['nodejs', 'http', 'axios']
 });
 ```
-
-## Docker Deployment
 
 ### Overview
 Docker provides a consistent environment for running Memento in production, development, or testing scenarios. The official Docker image includes all dependencies and can be easily configured.
@@ -765,7 +754,7 @@ server = memento.Memento()
 await server.initialize()
 
 # Use MCP tools directly
-memory_id = await server.store_memory(
+memory_id = await server.store_memento(
     type="solution",
     title="Python API Example",
     content="Direct Python integration",
@@ -774,7 +763,7 @@ memory_id = await server.store_memory(
 )
 
 # Search memories
-results = await server.recall_memories(query="python api")
+results = await server.recall_mementos(query="python api")
 ```
 
 ### Integration with Existing Applications:
@@ -789,7 +778,7 @@ class MyApplication:
         await self.memento.initialize()
     
     async def store_solution(self, title, content):
-        return await self.memento.store_memory(
+        return await self.memento.store_memento(
             type="solution",
             title=title,
             content=content,

@@ -241,22 +241,6 @@ class RelationshipProperties(BaseModel):
     access_count: int = Field(default=0, ge=0)
     decay_factor: float = Field(default=0.95, ge=0.0, le=1.0)
 
-    # Bi-temporal tracking fields
-    valid_from: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="When the fact became true (validity time)",
-    )
-    valid_until: Optional[datetime] = Field(
-        None, description="When the fact stopped being true (None = still valid)"
-    )
-    recorded_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="When we learned this fact (transaction time)",
-    )
-    invalidated_by: Optional[str] = Field(
-        None, description="ID of relationship that superseded this one"
-    )
-
 
 class Relationship(BaseModel):
     """Relationship between two memories."""

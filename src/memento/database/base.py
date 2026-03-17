@@ -39,29 +39,6 @@ class GraphBackend(ABC):
         """
         pass
 
-    @abstractmethod
-    async def execute_query(
-        self,
-        query: str,
-        parameters: Optional[dict[str, Any]] = None,
-        write: bool = False,
-    ) -> list[dict[str, Any]]:
-        """
-        Execute a Cypher query and return results.
-
-        Args:
-            query: The Cypher query string
-            parameters: Query parameters for parameterized queries
-            write: Whether this is a write operation (default: False)
-
-        Returns:
-            List of result records as dictionaries
-
-        Raises:
-            DatabaseConnectionError: If not connected
-            Exception: For query execution errors
-        """
-        pass
 
     @abstractmethod
     async def initialize_schema(self) -> None:
@@ -119,23 +96,6 @@ class GraphBackend(ABC):
         """
         pass
 
-    @abstractmethod
-    def is_cypher_capable(self) -> bool:
-        """
-        Check if this backend supports Cypher query execution.
-
-        Returns:
-            True if execute_query() can be used for Cypher queries.
-            False if backend uses a different query mechanism (e.g., REST API).
-
-        Example:
-            if backend.is_cypher_capable():
-                results = await backend.execute_query("MATCH (m:Memory) RETURN m")
-            else:
-                # Use specific memory operations instead
-                results = await backend.search_memories(query)
-        """
-        pass
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -147,45 +107,3 @@ class GraphBackend(ABC):
         await self.disconnect()
         return False
 
-    # Compatibility methods for legacy interface
-    async def execute_write_query(
-        self, query: str, parameters: Optional[dict[str, Any]] = None
-    ) -> list[dict[str, Any]]:
-        """
-        Execute a write query (compatibility wrapper for execute_query).
-
-        This method provides compatibility with legacy interfaces.
-
-        Args:
-            query: The SQL query string
-            parameters: Query parameters for parameterized queries
-
-        Returns:
-            List of result records as dictionaries
-        """
-        return await self.execute_query(query, parameters, write=True)
-
-    async def execute_read_query(
-        self, query: str, parameters: Optional[dict[str, Any]] = None
-    ) -> list[dict[str, Any]]:
-        """
-        Execute a read query (compatibility wrapper for execute_query).
-
-        This method provides compatibility with legacy interfaces.
-
-        Args:
-            query: The SQL query string
-            parameters: Query parameters for parameterized queries
-
-        Returns:
-            List of result records as dictionaries
-        """
-        return await self.execute_query(query, parameters, write=False)
-
-    async def close(self) -> None:
-        """
-        Close the connection (compatibility wrapper for disconnect).
-
-        This method provides compatibility with legacy interfaces.
-        """
-        await self.disconnect()

@@ -34,7 +34,7 @@ async def main():
     await server.initialize()
     
     # Store a memory
-    memory_id = await server.store_memory(
+    memory_id = await server.store_memento(
         type="solution",
         title="Fixed database connection timeout",
         content="Increased timeout to 30s and added connection pooling...",
@@ -98,7 +98,7 @@ async def initialize_memento():
 ```python
 async def store_examples(server):
     # Basic memory storage
-    memory_id = await server.store_memory(
+    memory_id = await server.store_memento(
         type="solution",
         title="API rate limiting implementation",
         content="Implemented token bucket algorithm with Redis...",
@@ -107,7 +107,7 @@ async def store_examples(server):
     )
     
     # With custom ID
-    custom_id = await server.store_memory(
+    custom_id = await server.store_memento(
         id="custom-auth-pattern-001",
         type="pattern",
         title="JWT authentication pattern",
@@ -117,7 +117,7 @@ async def store_examples(server):
     )
     
     # Error memory
-    error_id = await server.store_memory(
+    error_id = await server.store_memento(
         type="error",
         title="Database deadlock in transaction",
         content="Occurs when multiple transactions access same rows...",
@@ -132,7 +132,7 @@ async def store_examples(server):
 ```python
 async def retrieve_examples(server):
     # Get specific memory
-    memory = await server.get_memory("memory-id-here")
+    memory = await server.get_memento("memory-id-here")
     print(f"Title: {memory.title}")
     print(f"Content: {memory.content[:100]}...")
     
@@ -158,7 +158,7 @@ async def retrieve_examples(server):
 ```python
 async def update_examples(server, memory_id):
     # Update memory
-    await server.update_memory(
+    await server.update_memento(
         memory_id=memory_id,
         title="Updated: API rate limiting with distributed Redis",
         content="Enhanced implementation with cluster support...",
@@ -167,12 +167,12 @@ async def update_examples(server, memory_id):
     )
     
     # Delete memory
-    await server.delete_memory(memory_id)
+    await server.delete_memento(memory_id)
     
     # Batch operations
     memories_to_delete = ["id1", "id2", "id3"]
     for memory_id in memories_to_delete:
-        await server.delete_memory(memory_id)
+        await server.delete_memento(memory_id)
 ```
 
 ### Relationship Management
@@ -229,7 +229,7 @@ class Memento:
 
 #### Memory Operations
 ```python
-async def store_memory(
+async def store_memento(
     self,
     type: str,
     title: str,
@@ -253,7 +253,7 @@ async def store_memory(
         Memory ID
     """
 
-async def get_memory(self, memory_id: str) -> Memory:
+async def get_memento(self, memory_id: str) -> Memory:
     """
     Retrieve a specific memory.
     
@@ -264,7 +264,7 @@ async def get_memory(self, memory_id: str) -> Memory:
         Memory object
     """
 
-async def update_memory(
+async def update_memento(
     self,
     memory_id: str,
     title: Optional[str] = None,
@@ -283,7 +283,7 @@ async def update_memory(
         importance: New importance (optional)
     """
 
-async def delete_memory(self, memory_id: str) -> None:
+async def delete_memento(self, memory_id: str) -> None:
     """
     Delete a memory.
     
@@ -554,7 +554,7 @@ class MementoAgent:
     
     async def _store_interaction(self, query: str, response: str, context: List[Dict]):
         """Store the interaction in Memento."""
-        interaction_id = await self.server.store_memory(
+        interaction_id = await self.server.store_memento(
             type="conversation",
             title=f"Query: {query[:50]}...",
             content=f"Q: {query}\n\nA: {response}",
@@ -665,7 +665,7 @@ async def batch_operations(server):
     
     stored_ids = []
     for memory_data in memories_to_store:
-        memory_id = await server.store_memory(**memory_data)
+        memory_id = await server.store_memento(**memory_data)
         stored_ids.append(memory_id)
     
     # Batch search with pagination

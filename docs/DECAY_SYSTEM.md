@@ -95,6 +95,136 @@ new_confidence = 0.8 × (0.95^3) ≈ 0.8 × 0.857 = 0.686
 new_confidence = 0.8 × (1.0^3) = 0.8  # No change
 ```
 
+## How Decay is Applied
+
+The confidence decay system is applied automatically through multiple mechanisms:
+
+### 1. Automatic On-Access Decay
+- **When**: Every time a memory is accessed via `get_memento` or `recall_mementos`
+- **How**: The system checks the last access time and applies appropriate decay
+- **Efficiency**: Only decays relationships accessed during the current operation
+- **Real-time**: Users see updated confidence scores immediately
+
+### 2. Manual Decay Application
+- **Tool**: `apply_memento_confidence_decay` MCP tool
+- **When**: Can be triggered by:
+  - Scheduled maintenance (cron jobs, scheduled tasks)
+  - Manual intervention by developers
+  - CI/CD pipeline steps
+- **Batch Processing**: Applies decay to all relationships efficiently in SQL batches
+
+### 3. Maintenance Script
+For production deployments, we recommend setting up a monthly maintenance script:
+
+```bash
+#!/bin/bash
+# monthly-decay-apply.sh
+# Run via cron: 0 0 1 * * /path/to/monthly-decay-apply.sh
+
+# Activate Python environment if needed
+# source /path/to/venv/bin/activate
+
+# Run decay application via MCP tool
+python -c "
+import asyncio
+from memento import Memento
+
+async def apply_decay():
+    server = Memento()
+    await server.initialize()
+    # This calls the apply_memento_confidence_decay tool
+    await server.apply_memento_confidence_decay()
+    await server.disconnect()
+
+asyncio.run(apply_decay())
+"
+```
+
+### 4. Integration with CI/CD
+```yaml
+# .github/workflows/monthly-decay.yml
+name: Monthly Confidence Decay
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # First day of every month at midnight
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  apply-decay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      
+      - name: Apply confidence decay
+        run: |
+          python -c "
+          import asyncio
+          from memento import Memento
+          
+          async def apply():
+              server = Memento()
+              await server.initialize()
+              result = await server.apply_memento_confidence_decay()
+              print(f'Decay applied: {result}')
+              await server.disconnect()
+          
+          asyncio.run(apply())
+          "
+```
+
+### 5. Real-time vs Batch Processing
+| Aspect | Real-time (On-Access) | Batch (Monthly) |
+|--------|----------------------|-----------------|
+| **Scope** | Only accessed memories | All memories |
+| **Performance** | Minimal overhead | Higher resource usage |
+| **Freshness** | Always up-to-date | May lag up to 1 month |
+| **Use Case** | User-facing queries | Maintenance & cleanup |
+
+### 6. Configuration Options
+The decay behavior can be configured in `memento.yaml`:
+```yaml
+confidence:
+  # Base monthly decay rate (default: 0.95 = 5% decay per month)
+  base_monthly_decay: 0.95
+  
+  # Enable/disable automatic on-access decay
+  enable_on_access_decay: true
+  
+  # Minimum confidence threshold (memories below this are flagged)
+  minimum_confidence_threshold: 0.2
+  
+  # Protected memory types (no decay)
+  protected_types:
+    - security
+    - auth
+    - api_key
+    - credential
+```
+
+### 7. Monitoring Decay Application
+Check if decay is working properly:
+```sql
+-- Check average confidence over time
+SELECT 
+  strftime('%Y-%m', recorded_at) as month,
+  COUNT(*) as relationships,
+  AVG(confidence) as avg_confidence,
+  MIN(confidence) as min_confidence,
+  MAX(confidence) as max_confidence
+FROM relationships 
+GROUP BY strftime('%Y-%m', recorded_at)
+ORDER BY month DESC
+LIMIT 12;
+```
+
+The system is designed to be **self-maintaining** - regular use automatically keeps confidence scores updated, while batch processing ensures comprehensive coverage.
+
 ## Confidence Boosting
 
 ### Automatic Boost on Usage

@@ -1,6 +1,6 @@
 # Usage Rules and Best Practices
 
-This document outlines the rules, conventions, and best practices for using Memento effectively.
+This document outlines the rules, conventions, and best practices for using Memento effectively. For ready-to-use configuration snippets for AI agents, see [AGENT_CONFIGURATION.md](./AGENT_CONFIGURATION.md).
 
 ## Table of Contents
 - [Memory Creation Rules](#memory-creation-rules)
@@ -77,6 +77,8 @@ Every memory should have at least:
 - One technology tag
 - One domain tag
 - One solution type tag
+
+*Note: While tags are technically optional in the API, they are strongly recommended for effective search and organization. Memories without tags may be difficult to find later.*
 
 ### 4. Special Tags
 - `no_decay`: Prevents confidence decay (use sparingly)
@@ -254,7 +256,7 @@ When using a shared database:
 
 ### 3. Monthly
 - **Apply confidence decay**: `apply_memento_confidence_decay()`
-- **Export backup**: `export_mementos()`
+- **Export backup**: `memento --export`
 - **Database maintenance**: `memento --maintenance`
 - **Review tags**: Clean up unused or inconsistent tags
 
