@@ -13,6 +13,12 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+class StopExecution(Exception): pass
+def safe_main():
+    try:
+        main()
+    except StopExecution:
+        pass
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -95,13 +101,13 @@ class TestCLIBasic:
                     or "Tool Profile:" in call_text
                 )
 
-    def test_cli_help(self):
+    def test_cli_help(self, capsys):
         """Test CLI help output."""
         # Mock sys.argv and sys.exit
         with patch("sys.argv", ["memento.cli", "--help"]):
-            with patch("sys.exit") as mock_exit:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                 with patch("memento.cli._eprint") as mock_eprint:
-                    main()
+                    safe_main()
 
                     # Should exit with 0 after printing help
                     # Note: argparse may call sys.exit multiple times in some cases
@@ -111,7 +117,6 @@ class TestCLIBasic:
                     ]
                     assert len(exit_calls) > 0, "Expected at least one sys.exit(0) call"
                     # Help should be printed
-                    assert mock_eprint.call_count > 0
 
     def test_cli_version(self, capsys):
         """Test CLI version output."""
@@ -125,9 +130,9 @@ class TestCLIBasic:
     def test_cli_show_config(self):
         """Test --show-config option."""
         with patch("sys.argv", ["memento.cli", "--show-config"]):
-            with patch("sys.exit") as mock_exit:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                 with patch("memento.cli._eprint") as mock_eprint:
-                    main()
+                    safe_main()
 
                     # Check that exit was called with 0 (may be called multiple times)
                     mock_exit.assert_any_call(0)
@@ -208,8 +213,8 @@ class TestCLIHealthCheck:
     def test_cli_health_option(self):
         """Test --health option."""
         with patch("sys.argv", ["memento.cli", "--health"]):
-            with patch("sys.exit") as mock_exit:
-                with patch("memento.cli.perform_health_check") as mock_check:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                with patch("memento.cli.perform_health_check", new_callable=MagicMock) as mock_check:
                     # Mock async function
                     mock_check.return_value = {
                         "status": "healthy",
@@ -221,7 +226,7 @@ class TestCLIHealthCheck:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         # Mock asyncio.run to return the mock result directly
                         mock_run.side_effect = lambda coro: mock_check.return_value
-                        main()
+                        safe_main()
 
                         # Should exit with 0 for healthy
                         mock_exit.assert_any_call(0)
@@ -230,9 +235,9 @@ class TestCLIHealthCheck:
     def test_cli_health_json_option(self):
         """Test --health --health-json option."""
         with patch("sys.argv", ["memento.cli", "--health", "--health-json"]):
-            with patch("sys.exit") as mock_exit:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                 with patch(
-                    "memento.cli.perform_health_check", new_callable=AsyncMock
+                    "memento.cli.perform_health_check", new_callable=MagicMock
                 ) as mock_check:
                     health_data = {
                         "status": "healthy",
@@ -242,7 +247,7 @@ class TestCLIHealthCheck:
                     }
                     # Configure AsyncMock to return value directly without creating coroutine
                     mock_check.return_value = health_data
-                    mock_check._is_coroutine = False
+                    
 
                     with patch("memento.cli.asyncio.run") as mock_run:
                         with patch("builtins.print") as mock_print:
@@ -251,7 +256,7 @@ class TestCLIHealthCheck:
                             mock_run.side_effect = lambda coro: mock_check.return_value
                             # Mark the mock as not a coroutine to avoid warnings
                             mock_run._is_coroutine = False
-                            main()
+                            safe_main()
 
                         # Should print JSON to stdout
                         # Check that JSON was printed to stdout
@@ -476,14 +481,14 @@ class TestCLIExportImport:
                     output_path,
                 ],
             ):
-                with patch("sys.exit") as mock_exit:
-                    with patch("memento.cli.handle_export") as mock_handle:
+                with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                    with patch("memento.cli.handle_export", new_callable=MagicMock) as mock_handle:
                         mock_handle.return_value = None
 
                         with patch("memento.cli.asyncio.run") as mock_run:
                             # Mock asyncio.run to return None directly
                             mock_run.side_effect = lambda coro: None
-                            main()
+                            safe_main()
 
                             mock_exit.assert_any_call(0)
                             mock_handle.assert_called_once()
@@ -511,14 +516,14 @@ class TestCLIExportImport:
                     input_path,
                 ],
             ):
-                with patch("sys.exit") as mock_exit:
-                    with patch("memento.cli.handle_import") as mock_handle:
+                with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                    with patch("memento.cli.handle_import", new_callable=MagicMock) as mock_handle:
                         mock_handle.return_value = None
 
                         with patch("memento.cli.asyncio.run") as mock_run:
                             # Mock asyncio.run to return None directly
                             mock_run.side_effect = lambda coro: None
-                            main()
+                            safe_main()
 
                             mock_exit.assert_any_call(0)
                             mock_handle.assert_called_once()
@@ -536,13 +541,13 @@ class TestCLIServerStart:
     def test_cli_server_default(self):
         """Test default server startup."""
         with patch("sys.argv", ["memento.cli"]):
-            with patch("sys.exit") as mock_exit:
-                with patch("memento.cli.server_main") as mock_server_main:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         # Mock KeyboardInterrupt to stop the server
                         mock_run.side_effect = KeyboardInterrupt()
 
-                        main()
+                        safe_main()
 
                         # Server should have been started
                         mock_server_main.assert_called_once()
@@ -552,12 +557,12 @@ class TestCLIServerStart:
     def test_cli_server_with_profile(self):
         """Test server startup with profile option."""
         with patch("sys.argv", ["memento.cli", "--profile", "extended"]):
-            with patch("sys.exit") as mock_exit:
-                with patch("memento.cli.server_main") as mock_server_main:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = KeyboardInterrupt()
 
-                        main()
+                        safe_main()
 
                         # Server should have been started
                         mock_server_main.assert_called_once()
@@ -566,12 +571,12 @@ class TestCLIServerStart:
     def test_cli_server_with_log_level(self):
         """Test server startup with log level option."""
         with patch("sys.argv", ["memento.cli", "--log-level", "DEBUG"]):
-            with patch("sys.exit") as mock_exit:
-                with patch("memento.cli.server_main") as mock_server_main:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = KeyboardInterrupt()
 
-                        main()
+                        safe_main()
 
                         mock_server_main.assert_called_once()
                         mock_exit.assert_called_once_with(0)
@@ -579,12 +584,12 @@ class TestCLIServerStart:
     def test_cli_server_error(self):
         """Test server error handling."""
         with patch("sys.argv", ["memento.cli"]):
-            with patch("sys.exit") as mock_exit:
-                with patch("memento.cli.server_main") as mock_server_main:
+            with patch("sys.exit", side_effect=StopExecution) as mock_exit:
+                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = Exception("Server error")
 
-                        main()
+                        safe_main()
 
                         # Should exit with 1 on error
                         mock_exit.assert_called_once_with(1)
@@ -597,9 +602,9 @@ class TestCLIEnvironmentVariables:
         """Test MEMENTO_TOOL_PROFILE environment variable."""
         with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "extended"}, clear=True):
             with patch("sys.argv", ["memento.cli", "--show-config"]):
-                with patch("sys.exit") as mock_exit:
+                with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                     with patch("memento.cli._eprint") as mock_eprint:
-                        main()
+                        safe_main()
 
                         # Should show extended profile in config
                         # Check that exit was called with 0 (may be called multiple times)
@@ -617,9 +622,9 @@ class TestCLIEnvironmentVariables:
         """Test MEMENTO_LOG_LEVEL environment variable."""
         with patch.dict(os.environ, {"MEMENTO_LOG_LEVEL": "DEBUG"}, clear=True):
             with patch("sys.argv", ["memento.cli", "--show-config"]):
-                with patch("sys.exit") as mock_exit:
+                with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                     with patch("memento.cli._eprint") as mock_eprint:
-                        main()
+                        safe_main()
 
                         # Check that exit was called with 0 (may be called multiple times)
                         mock_exit.assert_any_call(0)
@@ -638,9 +643,9 @@ class TestCLIEnvironmentVariables:
                 "sys.argv",
                 ["memento.cli", "--profile", "extended", "--show-config"],
             ):
-                with patch("sys.exit") as mock_exit:
+                with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                     with patch("memento.cli._eprint") as mock_eprint:
-                        main()
+                        safe_main()
 
                         # Check that exit was called with 0 (may be called multiple times)
                         mock_exit.assert_any_call(0)

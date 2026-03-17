@@ -69,7 +69,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 norecursedirs = [".agent", ".data", ".pytest_cache", ".serena", "docs", "utils"]
 addopts = "--asyncio-mode=auto"
-filterwarnings = [
-    "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
-    "ignore:coroutine 'main' was never awaited:RuntimeWarning",
-]
+# filterwarnings = [
+#     "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
+#     "ignore:coroutine 'main' was never awaited:RuntimeWarning",
+# ]

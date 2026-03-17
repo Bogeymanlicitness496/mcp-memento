@@ -422,6 +422,7 @@ class TestToolRegistry:
         # Test calling the handler
         result = retrieved_handler(None, {"param": "value"})
         assert result is not None
+        result.close()  # Prevent unawaited coroutine warning
 
     def test_get_nonexistent_handler(self):
         """Test getting a handler that doesn't exist."""
