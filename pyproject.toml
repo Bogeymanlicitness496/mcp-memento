@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-memento"
-version = "0.2.4"
+version = "0.2.5"
 description = "Intelligent persistent memory for AI agents and IDEs via Model Context Protocol (MCP)."
 readme = "README.md"
 authors = [
@@ -69,7 +69,3 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 norecursedirs = [".agent", ".data", ".pytest_cache", ".serena", "docs", "utils"]
 addopts = "--asyncio-mode=auto"
-# filterwarnings = [
-#     "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
-#     "ignore:coroutine 'main' was never awaited:RuntimeWarning",
-# ]
