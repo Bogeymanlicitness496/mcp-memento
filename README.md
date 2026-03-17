@@ -15,6 +15,21 @@ Memento is an MCP server that provides persistent memory capabilities across mul
 
 Build a personal or team knowledge base that grows smarter over time, accessible from all your development tools.
 
+## 👶 Memento for Dummies
+
+**What is Memento?**  
+Imagine you're solving a complex bug, figuring out a tricky configuration, or establishing a new coding pattern. Usually, you'd forget the details in a few weeks. Memento is a "long-term memory drive" for your AI assistant. It allows your AI to save these solutions, decisions, and facts so it can recall them instantly across different projects, even months later.
+
+**How does it work in practice?**  
+Memento is **not an autonomous agent**. It sits quietly in the background, providing a set of "memory tools" to whatever AI assistant you are using (like Claude, Cursor, or Gemini). When you interact with your AI, it can use these tools to save information to a local database (a simple SQLite file on your computer) or search that database to answer your questions.
+
+**Does it remember everything automatically?**  
+**No.** By default, AI assistants don't know what is important enough to save for the long term. You have to train them or explicitly tell them. You can say things like:
+- *"Memento: save this database connection string."*
+- *"Remember that we solved the Redis timeout using connection pooling."*
+
+Alternatively, you can add custom instructions to your AI (see our [Agent Configuration Guide](docs/AGENT_CONFIGURATION.md)) to make it automatically save bug fixes or architectural decisions without you having to ask every time.
+
 ## ✨ Key Features
 
 ### 🧠 Intelligent Confidence System
