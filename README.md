@@ -3,6 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.0-purple.svg)](https://github.com/annibale-x/memento-mcp-server/releases/tag/v0.2.0)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
@@ -97,36 +98,11 @@ recall_mementos(query="Redis timeout solutions")
 
 ## 🔄 Memento Auto-Onboarding Protocol
 
-Memento is designed to automatically inject its memory management protocol through the `memento_onboarding()` tool. Even without specific configuration protocols (like the examples in [AGENT_CONFIGURATION.md](docs/AGENT_CONFIGURATION.md)), Memento can provide comprehensive onboarding guidance.
-
-While AI models should automatically call this tool at session start when MCP tools are detected, it's recommended to explicitly instruct models to call `memento_onboarding()` at the beginning of every session for reliable protocol injection.
-
-For reliable operation, include the following instruction in your AI assistant protocols:
-
-```markdown
-- **Memento Module**: If Memento tools are available, you MUST execute `memento_onboarding()` at the start of every session to inject the memory management protocol.
-```
-
-This ensures proper guidance for memory operations, optimized retrieval flow (1-3 tool calls for simple info, max 5 for complex tasks), and adherence to best practices.
-
+Memento injects its memory management protocol into AI agents automatically via the `memento_onboarding()` tool. For detailed agent configurations and copy-paste prompt templates, refer to [AGENT_CONFIGURATION.md](./docs/AGENT_CONFIGURATION.md).
 
 ## 📖 Core Concepts
 
-### Confidence System
-Memento automatically tracks the reliability of knowledge over time. Unused memories gradually lose confidence, while validated solutions gain confidence. Critical information (security/auth/API keys) is protected from decay.
-
-**Learn more**: [Confidence System Documentation](docs/DECAY_SYSTEM.md)
-
-### Relationship Types
-Memories can be connected using semantic relationships like `SOLVES`, `CAUSES`, `APPLIES_TO`, and 32 others. These relationships create a knowledge graph that enables intelligent navigation and pattern discovery.
-
-**Complete reference**: [Relationship Types Documentation](docs/RELATIONSHIPS.md)
-
-### Tool Profiles
-Three profiles provide different capabilities:
-- **Core**: Essential operations for all users
-- **Extended**: Additional analytics and contextual search
-- **Advanced**: Full graph analysis and pattern detection
+For a deep dive into Memento's concepts (Confidence System, Tagging, Relationships), please read the comprehensive [RULES.md](./docs/RULES.md) and [RELATIONSHIPS.md](./docs/RELATIONSHIPS.md) documentation.
 
 ## 🔗 Integrations
 

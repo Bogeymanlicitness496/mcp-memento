@@ -1,6 +1,36 @@
 # Changelog
 
-* 2026-03-16: v0.1.20 - Codebase consistency restoration and documentation enhancement (Hannibal)
+## Unreleased
+
+### Added
+- Initial public release with comprehensive MCP integration and memory management capabilities
+
+### Changed
+- **Breaking changes**: Removed deprecated Bi-temporal tracking system (replaced with confidence-based decay)
+- **Breaking changes**: Eliminated fake Cypher query support, keeping only native SQLite backend
+- **Breaking changes**: Updated tool names to follow MCP conventions (`search_mementos`, `recall_mementos`)
+- Updated test suite: expanded from 157 to 168 tests, coverage improved from ~46% to 51%
+
+### Fixed
+- Resolved critical documentation inconsistencies (invalid "decision" memory type replaced with "general")
+- Fixed agent configuration protocols to use exact MCP tool names
+- Updated database engine initialization with WAL mode for multi-user concurrency support
+- Corrected all naming conflicts (removed legacy "Context Keeper", "MemoryGraph" references)
+
+### Security
+- Enabled SQLite WAL mode (`PRAGMA journal_mode=WAL`, `busy_timeout=5000`) for safe team collaboration
+- Verified proper database locking configuration for concurrent access scenarios
+
+* 2026-03-16: v0.2.0 - Major release with comprehensive audit and refactoring (Hannibal)
+  * **Legacy code elimination**: Removed Bi-temporal tracking and fake Cypher support completely
+  * **Concurrency verification**: Verified and enabled WAL mode for true multi-user SQLite access
+  * **Documentation alignment**: Fixed all type/description mismatches between docs and actual API
+  * **Test suite expansion**: Created new tests for `context_extractor`, `pagination`, `project_detection` (168 total, 51% coverage)
+  * **Agent protocol standardization**: Corrected tool names to match MCP specifications exactly
+  * **CLI command corrections**: Fixed export commands and other CLI inconsistencies
+  * **Comprehensive cleanup**: Removed all ghost implementations and logical contradictions
+
+* 2026-03-16: v0.1.20 - Codebase consistency restoration and documentation enhancement (Hannibal) - Codebase consistency restoration and documentation enhancement (Hannibal)
   * **Legacy code cleanup**: Removed mcp_context_keeper module, example.py, setup.py, and test_basic.py to restore consistent codebase
   * **Version bump**: Updated to v0.1.20 in __init__.py and pyproject.toml
   * **Project memory updates**: Corrected test count (157 tests) and removed references to legacy code
@@ -16,6 +46,7 @@
   * **Configuration hierarchy clarification**: Environment variables → YAML files → CLI args → defaults
   * **Tool profile explanation**: Core (13), Extended (17), Advanced (25) tools
   * **Architecture overview**: Simplified explanation of consistent behavior across platforms
+  * **Documentation bug fixes**: Addressed nomenclatura inconsistencies, clarified decay triggers, added parameter requirements, resolved Node.js antipattern references
 
 * 2026-03-16: v0.1.19 - Test suite fixes and warning resolution (Hannibal)
   * Fixed 2 failing tests in server startup and initialization flow
