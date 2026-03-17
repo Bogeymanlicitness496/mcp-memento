@@ -54,6 +54,57 @@ def run_command(cmd, cwd=None, capture_output=False):
         sys.exit(1)
 
 
+def prepare_pypi_readme():
+    """Create a PyPI-friendly README with absolute links."""
+    readme_path = PROJECT_ROOT / "README.md"
+    backup_path = PROJECT_ROOT / "README.md.bak"
+
+    if not readme_path.exists():
+        return False
+
+    print("📝 Preparing PyPI-friendly README...")
+
+    shutil.copy2(readme_path, backup_path)
+
+    with open(readme_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    github_base_url = "https://github.com/annibale-x/memento-mcp-server/blob/main/"
+    github_tree_url = "https://github.com/annibale-x/memento-mcp-server/tree/main/"
+
+    # Replace directory links to use tree
+    content = content.replace("](docs/)", f"]({github_tree_url}docs/)")
+    content = content.replace("](./docs/)", f"]({github_tree_url}docs/)")
+
+    # Replace file links to use blob
+    content = content.replace("](docs/", f"]({github_base_url}docs/")
+    content = content.replace("](./docs/", f"]({github_base_url}docs/")
+    content = content.replace(
+        "](CONTRIBUTING.md)", f"]({github_base_url}CONTRIBUTING.md)"
+    )
+    content = content.replace(
+        "](./CONTRIBUTING.md)", f"]({github_base_url}CONTRIBUTING.md)"
+    )
+    content = content.replace("](LICENSE)", f"]({github_base_url}LICENSE)")
+    content = content.replace("](./LICENSE)", f"]({github_base_url}LICENSE)")
+
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    return True
+
+
+def restore_readme():
+    """Restore the original README.md."""
+    readme_path = PROJECT_ROOT / "README.md"
+    backup_path = PROJECT_ROOT / "README.md.bak"
+
+    if backup_path.exists():
+        print("📝 Restoring original README.md...")
+        shutil.copy2(backup_path, readme_path)
+        backup_path.unlink()
+
+
 def clean():
     """Clean build artifacts."""
     print("🧹 Cleaning build artifacts...")
@@ -84,6 +135,9 @@ def clean():
         print(f"  Removing {cf}")
         cf.unlink()
 
+    # Restore README if build was interrupted
+    restore_readme()
+
     print("✅ Clean completed")
 
 
@@ -94,8 +148,14 @@ def build():
     # Ensure dist directory exists
     DIST_DIR.mkdir(exist_ok=True)
 
-    # Build package
-    run_command("python -m build")
+    readme_modified = prepare_pypi_readme()
+
+    try:
+        # Build package
+        run_command("python -m build")
+    finally:
+        if readme_modified:
+            restore_readme()
 
     # List generated files
     dist_files = list(DIST_DIR.glob("*"))
