@@ -29,6 +29,8 @@ import queue
 import subprocess
 import sys
 import threading
+from datetime import datetime
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,6 +38,9 @@ import threading
 
 PACKAGE_NAME = "mcp-memento"
 LOG_PREFIX = "[MEMENTO-BOOTSTRAP]"
+
+# Log file written to user home so it survives across Zed restarts.
+_LOG_FILE = Path.home() / ".mcp-memento" / "bootstrap.log"
 
 # Minimum stub capabilities – zero tools, but the schema is correct.
 _STUB_SERVER_INFO = {
@@ -53,11 +58,21 @@ _STUB_CAPABILITIES = {
 # Logging helpers (all to stderr so stdout stays clean for JSON-RPC)
 # ---------------------------------------------------------------------------
 
-
 def _log(msg: str) -> None:
 
-    sys.stderr.write(f"{LOG_PREFIX} {msg}\n")
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    line = f"{ts} {LOG_PREFIX} {msg}\n"
+
+    sys.stderr.write(line)
     sys.stderr.flush()
+
+    try:
+        _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with _LOG_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +123,7 @@ def _is_installed() -> bool:
     try:
         import importlib.util
 
-        return importlib.util.find_spec("mcp_memento") is not None
+        return importlib.util.find_spec("memento") is not None
 
     except Exception:
         return False
@@ -156,7 +171,7 @@ def _launch_real_server() -> subprocess.Popen:
 
     env = os.environ.copy()
 
-    cmd = [sys.executable, "-u", "-m", "mcp_memento"]
+    cmd = [sys.executable, "-u", "-m", "memento"]
     _log(f"Launching real server: {' '.join(cmd)}")
 
     return subprocess.Popen(
