@@ -455,7 +455,14 @@ def git_current_branch(dry: bool = False) -> str:
 
 def git_is_clean(dry: bool = False) -> bool:
     out = run("git status --porcelain", capture=True, dry=False)
-    return out.strip() == ""
+    # Ignore untracked files (lines starting with "??") — only staged/modified
+    # files should block a release. On Windows, git sometimes reports a phantom
+    # "NUL" untracked entry that must not abort the bump.
+    tracked_changes = [
+        line for line in out.splitlines()
+        if line and not line.startswith("??")
+    ]
+    return len(tracked_changes) == 0
 
 
 def git_add_all(dry: bool) -> None:
