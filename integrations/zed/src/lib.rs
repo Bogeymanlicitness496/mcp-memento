@@ -50,10 +50,12 @@ impl MementoExtension {
                 .map_err(|e| format!("Failed to download mcp-memento bootstrap: {e}"))?;
         }
 
-        // Return the absolute path so Zed's shell wrapper can find the file
-        // regardless of what CWD it uses when spawning the process.
-        let abs_path = std::fs::canonicalize(&local_name)
-            .map(|p| p.to_string_lossy().into_owned())
+        // Build an absolute path so Zed's shell wrapper (pwsh on Windows) can
+        // find the file regardless of the CWD it uses when spawning the process.
+        // std::fs::canonicalize() fails in the WASM sandbox; current_dir() works
+        // because the WASI runtime sets $PWD to the extension working directory.
+        let abs_path = std::env::current_dir()
+            .map(|cwd| cwd.join(&local_name).to_string_lossy().into_owned())
             .unwrap_or(local_name.clone());
 
         self.cached_script = Some(abs_path.clone());
