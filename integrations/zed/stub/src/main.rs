@@ -216,6 +216,41 @@ fn find_python() -> Option<PathBuf> {
     None
 }
 
+/// Check whether `python -m memento --version` succeeds.
+/// Returns true if the package is importable.
+fn memento_is_installed(python: &Path) -> bool {
+    Command::new(python)
+        .args(["-m", "memento", "--version"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Install mcp-memento via `python -m pip install --upgrade mcp-memento`.
+/// Returns Ok(()) on success, Err(message) on failure.
+fn install_memento(python: &Path) -> Result<(), String> {
+    log!("mcp-memento not found — installing via pip...");
+
+    let status = Command::new(python)
+        .args(["-m", "pip", "install", "--upgrade", "mcp-memento"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|e| format!("pip install failed to launch: {e}"))?;
+
+    if status.success() {
+        log!("mcp-memento installed successfully.");
+        Ok(())
+    } else {
+        Err(format!(
+            "pip install mcp-memento exited with status: {}",
+            status
+        ))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Real server proxy
 // ---------------------------------------------------------------------------
@@ -507,6 +542,22 @@ fn main() {
         }
     };
 
-    // Phase 3: proxy — reuse the stdin receiver from stub phase.
+    // Phase 3: ensure mcp-memento is installed; auto-install if missing.
+    if !memento_is_installed(&python) {
+        if let Err(e) = install_memento(&python) {
+            log!("Auto-install failed: {}", e);
+            send(&format!(
+                concat!(
+                    r#"{{"jsonrpc":"2.0","method":"$/logMessage","params":{{"#,
+                    r#""type":1,"message":"mcp-memento: auto-install failed: {msg}. "#,
+                    r#"Run `pip install mcp-memento` manually."}}}}"#
+                ),
+                msg = e
+            ));
+            return;
+        }
+    }
+
+    // Phase 4: proxy — reuse the stdin receiver from stub phase.
     run_proxy(&python, buffered, stdin_rx);
 }
