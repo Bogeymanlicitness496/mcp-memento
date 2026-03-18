@@ -215,6 +215,6 @@ gh auth login
 
 ## Related Documentation
 
-- **[docs/dev/DEV.md](../docs/dev/DEV.md)** — Full developer guide
+- **[docs/dev/README.md](../docs/dev/README.md)** — Full developer guide
 - **[CHANGELOG.md](../CHANGELOG.md)** — Release history
 - **[Main README](../README.md)** — Project overview and quick start

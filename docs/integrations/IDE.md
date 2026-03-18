@@ -32,7 +32,7 @@ Memento uses SQLite for local storage by default. The database is automatically 
 ### Overview
 Zed is a high-performance, multiplayer code editor with native MCP support. Memento integrates seamlessly to provide contextual memory across your coding sessions.
 
-> **Full Zed extension guide**: [integrations/zed/README.md](../../integrations/zed/README.md)
+> **Full Zed extension guide**: [docs/extensions/ZED.md](../extensions/ZED.md)
 
 ### Two Integration Modes
 

@@ -2,6 +2,7 @@
 .agent
 .data
 db
+.mcp-memento/
 __pycache__/
 *.pyc
 *.pyo
