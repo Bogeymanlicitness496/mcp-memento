@@ -569,6 +569,26 @@ def publish(target: str, dry: bool) -> None:
         else:
             info("main is already up-to-date with dev — skipping merge.")
 
+        # Push the release tag if it exists locally but not on origin yet.
+        # This happens when the bump was done with --dev (tag kept local).
+        ver = read_pyproject_version()
+        py_tag = f"v{ver}"
+
+        if git_tag_exists_local(py_tag):
+            remote_tag = run(
+                f"git ls-remote --tags origin refs/tags/{py_tag}",
+                capture=True,
+                dry=False,
+                check=False,
+            ).strip()
+
+            if not remote_tag:
+                step(f"Pushing release tag {py_tag} to origin (triggers CI)")
+                git_push_tag(py_tag, dry)
+                ok(f"Tag {py_tag} pushed")
+            else:
+                info(f"Tag {py_tag} already on origin.")
+
     step(f"Publishing to {target.upper()}")
 
     if not DIST_DIR.exists() or not any(DIST_DIR.glob("*.whl")):
@@ -806,7 +826,10 @@ def cmd_bump(
     ok("dev branch updated and pushed")
 
     # 6. Python release tag
-    step(f"Tagging v{new_ver}")
+    # With --dev: tag locally only — do NOT push to origin.
+    # Pushing a vX.Y.Z tag triggers CI workflows (stub build + GitHub Release
+    # creation), which must only happen on a full official release.
+    step(f"Tagging v{new_ver}" + (" (local only — not pushed)" if dev_only else ""))
     py_tag = f"v{new_ver}"
 
     if not dry and git_tag_exists_local(py_tag):
@@ -814,8 +837,7 @@ def cmd_bump(
             warn(f"Tag {py_tag} already exists locally.")
             if confirm(f"Move tag {py_tag} to current HEAD (retag)?", yes):
                 git_retag(py_tag, dry)
-                git_force_push_tag(py_tag, dry)
-                ok(f"Tag {py_tag} moved to HEAD and force-pushed")
+                ok(f"Tag {py_tag} moved to HEAD (local only, not pushed)")
             else:
                 info(f"Tag {py_tag} left unchanged.")
         else:
@@ -825,8 +847,11 @@ def cmd_bump(
             )
     else:
         git_tag(py_tag, dry)
-        git_push_tag(py_tag, dry)
-        ok(f"Tag {py_tag} pushed")
+        if dev_only:
+            ok(f"Tag {py_tag} created locally (not pushed)")
+        else:
+            git_push_tag(py_tag, dry)
+            ok(f"Tag {py_tag} pushed")
 
     # 7. Merge dev → main (skipped with --dev)
     if not dev_only:
@@ -845,10 +870,12 @@ def cmd_bump(
     ok(f"Release v{new_ver} complete!")
 
     if dev_only:
-        info("Merge skipped (--dev). When ready:")
-        info("  git checkout main && git merge dev --no-ff && git push origin main")
-
-    info("Publish to PyPI with:  python scripts/deploy.py publish --target pypi")
+        info("Dev-only release complete. Tag is local only — CI was NOT triggered.")
+        info("When ready for the full release:")
+        info("  python scripts/deploy.py publish --target pypi")
+        info("  (publish will merge dev→main and push the tag automatically)")
+    else:
+        info("Publish to PyPI with:  python scripts/deploy.py publish --target pypi")
 
 
 # ---------------------------------------------------------------------------
