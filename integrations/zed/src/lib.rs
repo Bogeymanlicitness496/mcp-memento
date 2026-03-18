@@ -4,82 +4,92 @@ use zed_extension_api::{
     self as zed, Command, ContextServerId, DownloadedFileType, Os, Project, Result,
 };
 
-/// Version of the bootstrap script to download from GitHub Releases.
-const BOOTSTRAP_VERSION: &str = "0.2.0";
+/// Version of the native stub binary to download from GitHub Releases.
+const STUB_VERSION: &str = "0.1.0";
 
-/// GitHub asset name (fixed, as published in every release).
-const BOOTSTRAP_ASSET_NAME: &str = "mcp_memento_bootstrap.py";
-
-/// GitHub Releases base URL for the bootstrap script.
-/// Tag convention: bootstrap-v{BOOTSTRAP_VERSION}
-/// Asset: mcp_memento_bootstrap.py
-const BOOTSTRAP_BASE_URL: &str = "https://github.com/annibale-x/mcp-memento/releases/download";
+/// GitHub Releases base URL for the stub binary.
+/// Tag convention: stub-v{STUB_VERSION}
+const STUB_BASE_URL: &str = "https://github.com/annibale-x/mcp-memento/releases/download";
 
 struct MementoExtension {
-    cached_script: Option<String>,
+    cached_stub: Option<String>,
 }
 
 impl MementoExtension {
-    /// Downloads the bootstrap script into the extension working directory
-    /// if it is not already present, then returns its filename.
-    /// Zed sets the extension working directory as the cwd for child processes,
-    /// so the bare filename is enough for Python to find the script.
-    fn ensure_bootstrap_script(&mut self, version: &str) -> Result<String> {
-        // If we already resolved it during this session, skip everything.
-        if let Some(ref cached) = self.cached_script {
+    /// Returns the platform-specific asset name for the stub binary.
+    fn stub_asset_name(os: Os, arch: zed_extension_api::Architecture) -> &'static str {
+        match (os, arch) {
+            (Os::Windows, _) => "memento-stub-x86_64-pc-windows-msvc.exe",
+            (Os::Mac, zed_extension_api::Architecture::Aarch64) => {
+                "memento-stub-aarch64-apple-darwin"
+            }
+            (Os::Mac, _) => "memento-stub-x86_64-apple-darwin",
+            (Os::Linux, zed_extension_api::Architecture::Aarch64) => {
+                "memento-stub-aarch64-unknown-linux-gnu"
+            }
+            (Os::Linux, _) => "memento-stub-x86_64-unknown-linux-gnu",
+        }
+    }
+
+    /// Returns the local filename for the versioned stub binary.
+    /// Embedding the version ensures a fresh download whenever STUB_VERSION changes.
+    fn stub_local_name(os: Os, arch: zed_extension_api::Architecture, version: &str) -> String {
+        let asset = Self::stub_asset_name(os, arch);
+
+        // Strip the extension suffix so we can insert the version cleanly,
+        // then re-attach it.
+        if let Some(stem) = asset.strip_suffix(".exe") {
+            format!("{}-v{}.exe", stem, version)
+        } else {
+            format!("{}-v{}", asset, version)
+        }
+    }
+
+    /// Downloads the stub binary into the extension working directory if not
+    /// already present, marks it executable on Unix, and returns its absolute path.
+    fn ensure_stub(
+        &mut self,
+        os: Os,
+        arch: zed_extension_api::Architecture,
+        version: &str,
+    ) -> Result<String> {
+        if let Some(ref cached) = self.cached_stub {
             return Ok(cached.clone());
         }
 
-        // Embed the version in the local filename so that upgrading BOOTSTRAP_VERSION
-        // always triggers a fresh download (zed::download_file never overwrites).
-        let local_name = format!("mcp_memento_bootstrap_v{}.py", version);
+        let local_name = Self::stub_local_name(os, arch, version);
+        let asset_name = Self::stub_asset_name(os, arch);
 
-        // Check if the versioned file already exists on disk — if so, skip the
-        // network call entirely.  zed::download_file returns an error when the
-        // destination file already exists, which would cause context_server_command
-        // to fail and Zed to report "Context server stopped running".
-        let file_exists = std::fs::metadata(&local_name).is_ok();
+        // Skip the network call if the file is already on disk.
+        let already_exists = std::fs::metadata(&local_name).is_ok();
 
-        if !file_exists {
-            let url = format!(
-                "{}/bootstrap-v{}/{}",
-                BOOTSTRAP_BASE_URL, version, BOOTSTRAP_ASSET_NAME
-            );
+        if !already_exists {
+            let url = format!("{}/stub-v{}/{}", STUB_BASE_URL, version, asset_name);
 
             zed::download_file(&url, &local_name, DownloadedFileType::Uncompressed)
-                .map_err(|e| format!("Failed to download mcp-memento bootstrap: {e}"))?;
+                .map_err(|e| format!("Failed to download memento stub: {e}"))?;
         }
 
-        // Build an absolute path so Zed's shell wrapper (pwsh on Windows) can
-        // find the file regardless of the CWD it uses when spawning the process.
-        // std::fs::canonicalize() fails in the WASM sandbox; current_dir() works
-        // because the WASI runtime sets $PWD to the extension working directory.
+        // On Unix the file must be executable.
+        zed::make_file_executable(&local_name)
+            .map_err(|e| format!("Failed to make stub executable: {e}"))?;
+
+        // Build an absolute path using the WASM working directory ($PWD).
+        // Passing an absolute path avoids problems when Zed's ShellBuilder
+        // changes the CWD before spawning the process.
         let abs_path = std::env::current_dir()
             .map(|cwd| cwd.join(&local_name).to_string_lossy().into_owned())
             .unwrap_or(local_name.clone());
 
-        self.cached_script = Some(abs_path.clone());
+        self.cached_stub = Some(abs_path.clone());
 
         Ok(abs_path)
-    }
-
-    /// Returns ordered Python executable candidates for the current platform.
-    /// The caller will try them in order; Zed uses the first `command` string
-    /// directly, so we just return the best single candidate we can determine
-    /// without a live `which()` call.
-    fn default_python_candidates(os: Os) -> Vec<&'static str> {
-        match os {
-            Os::Windows => vec!["py", "python", "python3"],
-            Os::Mac | Os::Linux => vec!["python3", "python"],
-        }
     }
 }
 
 impl zed::Extension for MementoExtension {
     fn new() -> Self {
-        Self {
-            cached_script: None,
-        }
+        Self { cached_stub: None }
     }
 
     fn context_server_command(
@@ -87,26 +97,25 @@ impl zed::Extension for MementoExtension {
         context_server_id: &ContextServerId,
         project: &Project,
     ) -> Result<Command> {
-        let (os, _arch) = zed::current_platform();
+        let (os, arch) = zed::current_platform();
 
         // --- Read settings ---
-        let mut python_command: Option<String> = None;
-        let mut bootstrap_version = BOOTSTRAP_VERSION.to_string();
+        let mut stub_version = STUB_VERSION.to_string();
         let mut env_vars = vec![("PYTHONUNBUFFERED".to_string(), "1".to_string())];
 
         if let Ok(settings) =
             ContextServerSettings::for_project(context_server_id.as_ref(), project)
         {
             if let Some(zed_extension_api::serde_json::Value::Object(map)) = settings.settings {
-                if let Some(cmd) = map.get("PYTHON_COMMAND").and_then(|v| v.as_str()) {
-                    if !cmd.is_empty() && cmd != "auto" {
-                        python_command = Some(cmd.to_string());
+                if let Some(ver) = map.get("STUB_VERSION").and_then(|v| v.as_str()) {
+                    if !ver.is_empty() {
+                        stub_version = ver.to_string();
                     }
                 }
 
-                if let Some(ver) = map.get("BOOTSTRAP_VERSION").and_then(|v| v.as_str()) {
-                    if !ver.is_empty() {
-                        bootstrap_version = ver.to_string();
+                if let Some(cmd) = map.get("PYTHON_COMMAND").and_then(|v| v.as_str()) {
+                    if !cmd.is_empty() && cmd != "auto" {
+                        env_vars.push(("PYTHON_COMMAND".to_string(), cmd.to_string()));
                     }
                 }
 
@@ -120,30 +129,12 @@ impl zed::Extension for MementoExtension {
             }
         }
 
-        // --- Resolve Python executable ---
-        // If the user provided an explicit command, honour it.
-        // Otherwise pick the best default for the current OS.
-        let python_bin = match python_command {
-            Some(cmd) => cmd,
-
-            None => {
-                let candidates = Self::default_python_candidates(os);
-                // We cannot call `which()` here (no Worktree handle), so we
-                // return the first/best candidate and let Zed (and the OS)
-                // resolve it via the process PATH at spawn time.
-                candidates
-                    .first()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "python".to_string())
-            }
-        };
-
-        // --- Ensure bootstrap script is present ---
-        let script_name = self.ensure_bootstrap_script(&bootstrap_version)?;
+        // --- Ensure stub binary is present ---
+        let stub_path = self.ensure_stub(os, arch, &stub_version)?;
 
         Ok(Command {
-            command: python_bin,
-            args: vec!["-u".to_string(), script_name],
+            command: stub_path,
+            args: vec![],
             env: env_vars,
         })
     }
@@ -169,12 +160,12 @@ impl zed::Extension for MementoExtension {
                 },
                 "PYTHON_COMMAND": {
                     "type": "string",
-                    "description": "Python executable to use. Set to 'auto' (or leave empty) for OS-based defaults, or specify an absolute path (e.g. C:\\Python312\\python.exe).",
+                    "description": "Python executable override. Leave empty for automatic discovery, or set to an absolute path (e.g. C:\\Python312\\python.exe).",
                     "default": "auto"
                 },
-                "BOOTSTRAP_VERSION": {
+                "STUB_VERSION": {
                     "type": "string",
-                    "description": "Version of the mcp-memento bootstrap script to download.",
+                    "description": "Version of the memento-stub binary to download.",
                     "default": "0.1.0"
                 }
             }
@@ -185,15 +176,16 @@ impl zed::Extension for MementoExtension {
             "  \"MEMENTO_SQLITE_PATH\": \"~/.mcp-memento/context.db\",\n",
             "  \"MEMENTO_TOOL_PROFILE\": \"core\",\n",
             "  \"PYTHON_COMMAND\": \"auto\",\n",
-            "  \"BOOTSTRAP_VERSION\": \"0.2.0\"\n",
+            "  \"STUB_VERSION\": \"0.1.0\"\n",
             "}"
         );
 
         Ok(Some(ContextServerConfiguration {
             installation_instructions: concat!(
                 "Memento requires Python 3.8+ installed on your system.\n\n",
-                "On first use the extension downloads a small bootstrap script from GitHub\n",
-                "Releases and installs mcp-memento via pip automatically.\n\n",
+                "The extension downloads a small native launcher (memento-stub) from\n",
+                "GitHub Releases. The launcher discovers Python automatically and starts\n",
+                "the mcp-memento server.\n\n",
                 "If Python is not found automatically, set PYTHON_COMMAND to the full\n",
                 "path of your Python executable\n",
                 "(e.g. \"C:\\\\Users\\\\you\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\")."
