@@ -189,9 +189,11 @@ On an official release:
 
 | Setting | Default | Description |
 |---|---|---|
-| `PYTHON_COMMAND` | `auto` | Python executable. `auto` uses `py` on Windows, `python3` on Unix. Set to an absolute path to override. |
-| `MEMENTO_DB_PATH` | *(empty)* | Path to the SQLite database. Empty = OS default (`%USERPROFILE%\.mcp-memento\context.db` on Windows, `~/.mcp-memento/context.db` on macOS/Linux). |
+| `MEMENTO_DB_PATH` | `default` | Path to the SQLite database. `default` = OS native path (`%USERPROFILE%\.mcp-memento\context.db` on Windows, `~/.mcp-memento/context.db` on macOS/Linux). Set to an absolute path to override. |
 | `MEMENTO_PROFILE` | `core` | Tool profile: `core`, `extended`, or `advanced`. |
+| `PYTHON_COMMAND` | `default` | Python executable. `default` = automatic discovery (`py.exe` → `python.exe` on Windows, `python3` → `python` on Unix). Set to an absolute path to override. |
+
+> User-facing documentation: [README.md](README.md)
 
 ---
 

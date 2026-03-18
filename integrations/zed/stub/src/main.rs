@@ -47,7 +47,7 @@ fn python_candidates() -> Vec<PathBuf> {
 
     // 1. Explicit override from the WASM extension settings.
     if let Ok(cmd) = env::var("PYTHON_COMMAND") {
-        if !cmd.is_empty() && cmd != "auto" {
+        if !cmd.is_empty() && cmd != "default" {
             candidates.push(PathBuf::from(cmd));
         }
     }
@@ -83,7 +83,7 @@ fn python_candidates() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(cmd) = env::var("PYTHON_COMMAND") {
-        if !cmd.is_empty() && cmd != "auto" {
+        if !cmd.is_empty() && cmd != "default" {
             candidates.push(PathBuf::from(cmd));
         }
     }

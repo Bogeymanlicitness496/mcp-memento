@@ -162,13 +162,13 @@ impl zed::Extension for MementoExtension {
         {
             if let Some(zed_extension_api::serde_json::Value::Object(map)) = settings.settings {
                 if let Some(cmd) = map.get("PYTHON_COMMAND").and_then(|v| v.as_str()) {
-                    if !cmd.is_empty() && cmd != "auto" {
+                    if !cmd.is_empty() && cmd != "default" {
                         env_vars.push(("PYTHON_COMMAND".to_string(), cmd.to_string()));
                     }
                 }
 
                 if let Some(path) = map.get("MEMENTO_DB_PATH").and_then(|v| v.as_str()) {
-                    if !path.is_empty() && path != "auto" {
+                    if !path.is_empty() && path != "default" {
                         env_vars.push(("MEMENTO_DB_PATH".to_string(), path.to_string()));
                     }
                 }
@@ -208,10 +208,10 @@ impl zed::Extension for MementoExtension {
                     "type": "string",
                     "description": format!(
                         "Path to the Memento SQLite database file. \
-                         Use 'auto' to let the server choose the OS default ({}).",
+                         Use 'default' to let the server choose the OS default ({}).",
                         db_path_default_hint
                     ),
-                    "default": "auto"
+                    "default": "default"
                 },
                 "MEMENTO_PROFILE": {
                     "type": "string",
@@ -221,17 +221,17 @@ impl zed::Extension for MementoExtension {
                 },
                 "PYTHON_COMMAND": {
                     "type": "string",
-                    "description": "Python executable. Use 'auto' for automatic discovery, or set an absolute path (e.g. C:/Users/you/AppData/Local/Programs/Python/Python312/python.exe).",
-                    "default": "auto"
+                    "description": "Python executable. Use 'default' for automatic discovery, or set an absolute path (e.g. C:/Users/you/AppData/Local/Programs/Python/Python312/python.exe).",
+                    "default": "default"
                 }
             }
         });
 
         let default_settings = concat!(
             "{\n",
-            "  \"MEMENTO_DB_PATH\": \"auto\",\n",
+            "  \"MEMENTO_DB_PATH\": \"default\",\n",
             "  \"MEMENTO_PROFILE\": \"core\",\n",
-            "  \"PYTHON_COMMAND\": \"auto\"\n",
+            "  \"PYTHON_COMMAND\": \"default\"\n",
             "}"
         );
 
@@ -242,14 +242,14 @@ impl zed::Extension for MementoExtension {
              Settings\n\
              --------\n\
              MEMENTO_DB_PATH  Path to the SQLite database.\n\
-             \t'auto' uses the OS default: {}\n\
+             \t'default' uses the OS default: {}\n\
              \tSet a custom absolute path to override.\n\n\
              MEMENTO_PROFILE  Tool set exposed to the AI agent.\n\
              \tcore     — basic memory operations (default)\n\
              \textended — + statistics and confidence decay\n\
              \tadvanced — + graph analytics\n\n\
              PYTHON_COMMAND   Python executable to use.\n\
-             \t'auto' tries py / python3 / python and common install paths.\n\
+             \t'default' tries py / python3 / python and common install paths.\n\
              \tSet an absolute path if your Python is not on the system PATH.",
             db_path_default_hint
         );
