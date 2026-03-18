@@ -277,15 +277,23 @@ def bump_init(new_ver: str, dry: bool) -> None:
 def bump_zed_cargo(new_ver: str, dry: bool) -> None:
     # Only bump [package] version, not workspace resolver line
     text = ZED_CARGO.read_text(encoding="utf-8")
+    pattern = r'(\[package\].*?^version\s*=\s*)"[^"]+"'
+
+    if not re.search(pattern, text, flags=re.DOTALL | re.MULTILINE):
+        warn(f"[package] version not found in {ZED_CARGO.relative_to(ROOT)}")
+        return
+
     new_text = re.sub(
-        r'(\[package\].*?^version\s*=\s*)"[^"]+"',
+        pattern,
         rf'\g<1>"{new_ver}"',
         text,
         flags=re.DOTALL | re.MULTILINE,
     )
+
     if new_text == text:
-        warn(f"[package] version not found in {ZED_CARGO.relative_to(ROOT)}")
+        info(f"Already at {new_ver} in {ZED_CARGO.relative_to(ROOT)}")
         return
+
     if not dry:
         ZED_CARGO.write_text(new_text, encoding="utf-8")
     info(f"Updated {ZED_CARGO.relative_to(ROOT)}")
