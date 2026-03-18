@@ -288,8 +288,8 @@ def bump_extension_toml(new_ver: str, dry: bool) -> None:
     )
 
 
-def bump_lib_rs_stub_release(new_ver: str, ext_n: int, dry: bool) -> None:
-    tag = f"v{new_ver}-ext.{ext_n}"
+def bump_lib_rs_stub_release(new_ver: str, dry: bool) -> None:
+    tag = f"v{new_ver}"
     _replace_in_file(
         ZED_LIB_RS,
         r'(STUB_EXT_RELEASE:\s*&str\s*=\s*)"[^"]+"',
@@ -520,35 +520,34 @@ def publish(target: str, dry: bool) -> None:
 # ---------------------------------------------------------------------------
 
 
-def zed_stub_release(python_ver: str, ext_n: int, dry: bool) -> None:
-    step(f"Pushing Zed stub release tag v{python_ver}-ext.{ext_n}")
-    tag = f"v{python_ver}-ext.{ext_n}"
+def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
+    """Upload the bundled stub binaries from stub/bin/ to the GitHub release vX.Y.Z."""
+    step(f"Uploading stub binaries to GitHub release v{python_ver}")
+    tag = f"v{python_ver}"
+    files = sorted(ZED_STUB_BIN.glob("memento-stub-*"))
 
-    # Check tag doesn't already exist
-    existing = run("git tag --list", capture=True, dry=False)
-    if tag in existing.split():
-        if not confirm(f"Tag {tag} already exists. Delete and recreate?", yes=False):
-            die("Aborted.")
-        run(f"git tag -d {tag}", dry=dry)
-        run(f"git push origin :refs/tags/{tag}", dry=dry)
+    if not files:
+        die(f"No stub binaries found in {ZED_STUB_BIN}. Build them first.")
 
-    git_tag(tag, dry)
-    git_push_tag(tag, dry)
-    ok(f"Tag {tag} pushed — GitHub Actions CI will build all 5 platform binaries.")
-    info("Monitor at: https://github.com/annibale-x/mcp-memento/actions")
+    for f in files:
+        cmd = f"gh release upload {tag} {f} --repo {GITHUB_REPO} --clobber"
+        run(cmd, dry=dry)
+        ok(f"Uploaded: {f.name}")
 
 
-def download_stub_binaries(python_ver: str, ext_n: int, dry: bool) -> None:
+def download_stub_binaries(python_ver: str, dry: bool) -> None:
     """Download built stub binaries from GitHub Release into stub/bin/."""
     step("Downloading stub binaries from GitHub Release")
-    tag = f"v{python_ver}-ext.{ext_n}"
+    tag = f"v{python_ver}"
     cmd = (
         f"gh release download {tag} --repo {GITHUB_REPO} --dir {ZED_STUB_BIN} --clobber"
+        " --pattern 'memento-stub-*'"
     )
     run(cmd, dry=dry)
 
     if not dry:
         files = sorted(ZED_STUB_BIN.glob("memento-stub-*"))
+
         for f in files:
             ok(f"Downloaded: {f.name}  ({f.stat().st_size / 1024:.0f} KB)")
 
@@ -585,10 +584,17 @@ def cmd_status() -> None:
         ("lib.rs STUB_EXT_RELEASE", stub_r),
     ]
 
+    expected_stub = f"v{py_ver}"
     col = max(len(r[0]) for r in rows) + 2
+
     for label, value in rows:
         pad = " " * (col - len(label))
-        match = py_ver == value or label.startswith("lib.rs")
+
+        if label.startswith("lib.rs"):
+            match = value == expected_stub
+        else:
+            match = value == py_ver
+
         color = Color.GREEN if match else Color.YELLOW
         print(f"  {label}{pad}{color}{value}{Color.RESET}")
 
@@ -611,7 +617,6 @@ def cmd_status() -> None:
 
 def cmd_bump(
     new_ver: str,
-    ext_n: int | None,
     skip_tests: bool,
     skip_merge: bool,
     dry: bool,
@@ -619,7 +624,7 @@ def cmd_bump(
 ) -> None:
     old_ver = read_pyproject_version()
 
-    step(f"Bump {old_ver} → {new_ver}" + (f"  (Zed ext.{ext_n})" if ext_n else ""))
+    step(f"Bump {old_ver} → {new_ver}")
 
     if not confirm(
         f"Proceed with full release of v{new_ver}?",
@@ -629,12 +634,14 @@ def cmd_bump(
 
     # 0. Ensure we are on dev branch
     branch = git_current_branch()
+
     if branch != "dev" and not dry:
         die(f"Must be on 'dev' branch (currently on '{branch}'). Checkout dev first.")
 
     # 0b. Ensure working tree is clean
     if not git_is_clean() and not dry:
         warn("Working tree has uncommitted changes.")
+
         if not confirm("Stash them and continue?", yes=yes):
             die("Aborted. Please commit or stash changes first.")
         run("git stash", dry=dry)
@@ -643,16 +650,14 @@ def cmd_bump(
     if not skip_tests:
         run_tests(dry)
 
-    # 2. Bump version in all manifests
+    # 2. Bump version in all manifests (including STUB_EXT_RELEASE in lib.rs)
     step("Bumping versions")
     bump_pyproject(new_ver, dry)
     bump_init(new_ver, dry)
     bump_zed_cargo(new_ver, dry)
     bump_extension_toml(new_ver, dry)
+    bump_lib_rs_stub_release(new_ver, dry)
     bump_readme_badge(new_ver, dry)
-
-    if ext_n is not None:
-        bump_lib_rs_stub_release(new_ver, ext_n, dry)
 
     # 3. Changelog
     step("Updating CHANGELOG")
@@ -679,28 +684,12 @@ def cmd_bump(
     if not skip_merge:
         git_merge_to_main(dry)
 
-    # 8. Extension stub release tag (triggers CI)
-    if ext_n is not None:
-        zed_stub_release(new_ver, ext_n, dry)
-        info(
-            "Wait for CI to complete, then run:\n"
-            f"  python scripts/deploy.py ext-binaries --version {new_ver} --ext {ext_n}\n"
-            "to download built binaries into stub/bin/ and commit them."
-        )
+    # 8. Upload stub binaries to the GitHub release
+    upload_stub_binaries_to_release(new_ver, dry)
 
     print()
     ok(f"Release v{new_ver} complete!")
-    if ext_n is not None:
-        info(
-            f"Next: publish to PyPI with:  python scripts/deploy.py publish --target pypi"
-        )
-        info(
-            f"      then download binaries: python scripts/deploy.py ext-binaries --version {new_ver} --ext {ext_n}"
-        )
-    else:
-        info(
-            "Next: publish to PyPI with:  python scripts/deploy.py publish --target pypi"
-        )
+    info("Next: publish to PyPI with:  python scripts/deploy.py publish --target pypi")
 
 
 # ---------------------------------------------------------------------------
@@ -708,24 +697,25 @@ def cmd_bump(
 # ---------------------------------------------------------------------------
 
 
-def cmd_zed_binaries(python_ver: str, ext_n: int, dry: bool, yes: bool) -> None:
-    tag = f"v{python_ver}-ext.{ext_n}"
+def cmd_zed_binaries(python_ver: str, dry: bool, yes: bool) -> None:
+    tag = f"v{python_ver}"
     step(f"Downloading stub binaries from release {tag} and committing to repo")
 
-    # Check release exists
+    # Check release exists and has the expected assets
     result = run(
         f"gh release view {tag} --repo {GITHUB_REPO} --json assets -q '.assets | length'",
         capture=True,
         dry=dry,
         check=False,
     )
+
     if not dry and (not result or int(result) < 5):
         die(
-            f"Release {tag} not found or has fewer than 5 assets. "
+            f"Release {tag} not found or has fewer than 5 stub assets. "
             "Wait for CI to finish and try again."
         )
 
-    download_stub_binaries(python_ver, ext_n, dry)
+    download_stub_binaries(python_ver, dry)
 
     git_add_all(dry)
     git_commit(
@@ -755,12 +745,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_bump = sub.add_parser("bump", help="Full release cycle: bump, build, tag, push.")
     p_bump.add_argument("version", help="New version string (e.g. 0.3.0)")
     p_bump.add_argument(
-        "--ext",
-        type=int,
-        metavar="N",
-        help="Extension release counter; triggers IDE extension stub CI.",
-    )
-    p_bump.add_argument(
         "--dry-run", action="store_true", help="Preview actions without executing."
     )
     p_bump.add_argument(
@@ -787,31 +771,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_pub.add_argument("--dry-run", action="store_true")
 
-    # ── ext-release (alias: zed-release) ─────────────────────────────────
-    def _add_ext_release_args(p: argparse.ArgumentParser) -> None:
-        p.add_argument(
-            "--ext", type=int, required=True, metavar="N", help="Extension release counter."
-        )
-        p.add_argument(
-            "--version",
-            metavar="X.Y.Z",
-            help="Python version override (default: read from pyproject.toml).",
-        )
-        p.add_argument("--dry-run", action="store_true")
-
-    _add_ext_release_args(
-        sub.add_parser("ext-release", help="Push IDE extension stub tag to trigger CI.")
-    )
-    # backward-compat alias
-    _add_ext_release_args(
-        sub.add_parser("zed-release", help="Alias for ext-release (kept for compatibility).")
-    )
-
     # ── ext-binaries (alias: zed-binaries) ───────────────────────────────
+    # Downloads CI-built stub binaries from the GitHub release vX.Y.Z and
+    # commits them into stub/bin/ for the bundle-first lookup.
     def _add_ext_binaries_args(p: argparse.ArgumentParser) -> None:
-        p.add_argument(
-            "--ext", type=int, required=True, metavar="N", help="Extension release counter."
-        )
         p.add_argument(
             "--version",
             metavar="X.Y.Z",
@@ -852,7 +815,6 @@ def main() -> None:
             die(f"Invalid version format: {args.version!r}. Expected X.Y.Z")
         cmd_bump(
             new_ver=args.version,
-            ext_n=args.ext,
             skip_tests=args.skip_tests,
             skip_merge=args.skip_merge,
             dry=args.dry_run,
@@ -865,17 +827,10 @@ def main() -> None:
     elif args.command == "publish":
         publish(target=args.target, dry=args.dry_run)
 
-    elif args.command in ("ext-release", "zed-release"):
-        ver = args.version or read_pyproject_version()
-        if args.ext is None:
-            die("--ext N is required for ext-release.")
-        zed_stub_release(python_ver=ver, ext_n=args.ext, dry=args.dry_run)
-
     elif args.command in ("ext-binaries", "zed-binaries"):
         ver = args.version or read_pyproject_version()
         cmd_zed_binaries(
             python_ver=ver,
-            ext_n=args.ext,
             dry=args.dry_run,
             yes=args.yes,
         )

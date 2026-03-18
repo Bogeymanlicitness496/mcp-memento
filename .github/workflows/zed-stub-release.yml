@@ -1,17 +1,11 @@
 # Builds the memento-stub native binary for all supported platforms and
-# uploads the artefacts to a GitHub Release.
+# uploads the artefacts to the existing GitHub Release for the Python package.
 #
-# Trigger: push of a tag matching "v*-ext.*"  (e.g. "v0.2.6-ext.1")
+# Trigger: push of a tag matching "v[0-9]*"  (e.g. "v0.2.8")
 #
-# Release naming convention:
-#   v{python_version}-ext.{N}
-#   - python_version  : mcp-memento Python package version  (e.g. 0.2.6)
-#   - N               : monotonically increasing extension release counter
-#
-# Example tag:  v0.2.6-ext.1
-#
-# The release title will read:
-#   "Zed Extension ext.N  (mcp-memento v0.2.6)"
+# The workflow compiles the stub for all 5 supported targets and then uploads
+# the resulting binaries as assets to the GitHub Release that was created by
+# the Python release process (same tag).
 #
 # Assets published:
 #   memento-stub-x86_64-pc-windows-msvc.exe
@@ -25,10 +19,10 @@ name: Zed Stub Release
 on:
   push:
     tags:
-      - "v*-ext.*"
+      - "v[0-9]*"
 
 permissions:
-  contents: write   # needed to create releases and upload assets
+  contents: write # needed to upload assets to an existing release
 
 # ---------------------------------------------------------------------------
 # Matrix build — one job per target platform
@@ -49,7 +43,7 @@ jobs:
             exe_suffix: .exe
             use_cross: false
 
-          # ── macOS Intel ────────────────────────────────────────────────────────
+          # ── macOS Intel ────────────────────────────────────────────────────
           # macos-13 (Intel) was removed — cross-compile from Apple Silicon runner.
           - target: x86_64-apple-darwin
             os: macos-latest
@@ -57,7 +51,7 @@ jobs:
             exe_suffix: ""
             use_cross: false
 
-          # ── macOS Apple Silicon ────────────────────────────────────────────────
+          # ── macOS Apple Silicon ────────────────────────────────────────────
           - target: aarch64-apple-darwin
             os: macos-latest
             asset: memento-stub-aarch64-apple-darwin
@@ -76,7 +70,7 @@ jobs:
             os: ubuntu-latest
             asset: memento-stub-aarch64-unknown-linux-gnu
             exe_suffix: ""
-            use_cross: true       # cross-compiled via the `cross` tool
+            use_cross: true # cross-compiled via the `cross` tool
 
     steps:
       # ── Checkout ─────────────────────────────────────────────────────────
@@ -127,15 +121,15 @@ jobs:
           retention-days: 1
 
   # ---------------------------------------------------------------------------
-  # Release job — runs after all builds succeed
+  # Upload job — attaches binaries to the existing Python release
   # ---------------------------------------------------------------------------
-  release:
-    name: Create GitHub Release
+  upload:
+    name: Upload stub binaries to GitHub Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      # ── Checkout (needed for tag metadata) ───────────────────────────────
+      # ── Checkout (needed for gh cli context) ─────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -149,62 +143,21 @@ jobs:
       - name: List artefacts
         run: ls -lh dist/
 
-      # ── Derive release title from tag ─────────────────────────────────────
-      # Tag format:  v0.2.6-ext.1
-      # Title:       Zed Extension ext.1  (mcp-memento v0.2.6)
-      - name: Derive release metadata
-        id: meta
-        shell: bash
+      # ── Upload assets to the existing release ────────────────────────────
+      # The Python release (same tag) must already exist before this runs.
+      # deploy.py creates it via `git tag vX.Y.Z && git push origin vX.Y.Z`
+      # followed by the GitHub release created in the bump workflow.
+      - name: Upload assets to existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"          # e.g. v0.2.6-ext.1
-          # Strip leading 'v' → 0.2.6-ext.1
-          BARE="${TAG#v}"
-          # Split on '-ext.'
-          PYTHON_VER="${BARE%%-ext.*}"      # 0.2.6
-          EXT_NUM="${BARE##*-ext.}"         # 1
-          echo "tag=$TAG"             >> "$GITHUB_OUTPUT"
-          echo "python_ver=$PYTHON_VER" >> "$GITHUB_OUTPUT"
-          echo "ext_num=$EXT_NUM"     >> "$GITHUB_OUTPUT"
-          echo "title=Zed Extension ext.${EXT_NUM}  (mcp-memento v${PYTHON_VER})" >> "$GITHUB_OUTPUT"
-
-      # ── Create release and upload assets ─────────────────────────────────
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.title }}
-          draft: false
-          prerelease: false
-          body: |
-            ## Zed Extension ext.${{ steps.meta.outputs.ext_num }}
-
-            Compatible with **mcp-memento v${{ steps.meta.outputs.python_ver }}**.
-
-            ### Stub binaries included
-
-            | Platform | Asset |
-            |---|---|
-            | Windows x86-64 | `memento-stub-x86_64-pc-windows-msvc.exe` |
-            | macOS Intel    | `memento-stub-x86_64-apple-darwin` |
-            | macOS Apple Silicon | `memento-stub-aarch64-apple-darwin` |
-            | Linux x86-64   | `memento-stub-x86_64-unknown-linux-gnu` |
-            | Linux ARM64    | `memento-stub-aarch64-unknown-linux-gnu` |
-
-            ### Installation
-
-            The Zed extension downloads the correct binary automatically on first launch.
-            No manual action required.
-
-            ### Python requirement
-
-            Install [mcp-memento](https://pypi.org/project/mcp-memento/) v${{ steps.meta.outputs.python_ver }}:
-
-            ```
-            pip install mcp-memento==${{ steps.meta.outputs.python_ver }}
-            ```
-          files: |
-            dist/memento-stub-x86_64-pc-windows-msvc.exe
-            dist/memento-stub-x86_64-apple-darwin
-            dist/memento-stub-aarch64-apple-darwin
-            dist/memento-stub-x86_64-unknown-linux-gnu
-            dist/memento-stub-aarch64-unknown-linux-gnu
+          TAG="${GITHUB_REF_NAME}"
+          echo "Uploading stub binaries to release ${TAG}"
+          gh release upload "${TAG}" \
+            dist/memento-stub-x86_64-pc-windows-msvc.exe \
+            dist/memento-stub-x86_64-apple-darwin \
+            dist/memento-stub-aarch64-apple-darwin \
+            dist/memento-stub-x86_64-unknown-linux-gnu \
+            dist/memento-stub-aarch64-unknown-linux-gnu \
+            --clobber
+          echo "Done."

@@ -5,28 +5,18 @@ use zed_extension_api::{
 };
 
 // ---------------------------------------------------------------------------
-// Release naming convention
+// The STUB_EXT_RELEASE constant is the GitHub release tag from which the
+// stub binary is downloaded as a fallback (steps 2-3 of bundle-first).
 //
-// GitHub releases for this repo follow the scheme:
+// It tracks the mcp-memento Python package version: every Python release
+// publishes the stub binaries as assets on the same release tag (vX.Y.Z).
 //
-//   v{python_version}-ext.{N}
-//
-// where:
-//   - python_version  is the mcp-memento Python package version (e.g. 0.2.6)
-//   - N               is a monotonically increasing extension release counter
-//
-// Example: "v0.2.6-ext.1"
-//
-// This keeps Python package releases and extension releases clearly separated
-// while tying each extension release to the Python version it ships with.
-//
-// The STUB_EXT_RELEASE constant below encodes the full tag.  Changing it
-// forces all clients to re-download the stub binary on the next launch.
+// Changing this value forces all clients that lack a bundled binary to
+// re-download the stub on the next launch.
 // ---------------------------------------------------------------------------
 
-/// Full GitHub release tag for the current stub binaries.
-/// Format: "v{python_version}-ext.{N}"
-const STUB_EXT_RELEASE: &str = "v0.2.6-ext.1";
+/// GitHub release tag for the current stub binaries (matches Python version tag).
+const STUB_EXT_RELEASE: &str = "v0.2.7";
 
 /// GitHub repository (owner/name) hosting the releases.
 const REPO: &str = "annibale-x/mcp-memento";
