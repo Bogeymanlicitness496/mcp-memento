@@ -49,16 +49,17 @@ jobs:
             exe_suffix: .exe
             use_cross: false
 
-          # ── macOS Intel ────────────────────────────────────────────────────
+          # ── macOS Intel ────────────────────────────────────────────────────────
+          # macos-13 (Intel) was removed — cross-compile from Apple Silicon runner.
           - target: x86_64-apple-darwin
-            os: macos-13          # last Intel runner
+            os: macos-latest
             asset: memento-stub-x86_64-apple-darwin
             exe_suffix: ""
             use_cross: false
 
-          # ── macOS Apple Silicon ────────────────────────────────────────────
+          # ── macOS Apple Silicon ────────────────────────────────────────────────
           - target: aarch64-apple-darwin
-            os: macos-latest      # M-series runner
+            os: macos-latest
             asset: memento-stub-aarch64-apple-darwin
             exe_suffix: ""
             use_cross: false
