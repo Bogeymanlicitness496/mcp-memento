@@ -182,13 +182,20 @@ impl zed::Extension for MementoExtension {
         _context_server_id: &ContextServerId,
         _project: &Project,
     ) -> Result<Option<ContextServerConfiguration>> {
+        let (os, _arch) = zed::current_platform();
+
+        let default_db_path = match os {
+            Os::Windows => "%USERPROFILE%\\.mcp-memento\\context.db",
+            _ => "~/.mcp-memento/context.db",
+        };
+
         let settings_schema = zed_extension_api::serde_json::json!({
             "type": "object",
             "properties": {
                 "MEMENTO_DB_PATH": {
                     "type": "string",
-                    "description": "Path to the Memento SQLite database file. Leave empty to use the OS default (%USERPROFILE%\\.mcp-memento\\context.db on Windows, ~/.mcp-memento/context.db on macOS/Linux).",
-                    "default": ""
+                    "description": "Path to the Memento SQLite database file.",
+                    "default": default_db_path
                 },
                 "MEMENTO_PROFILE": {
                     "type": "string",
@@ -204,12 +211,9 @@ impl zed::Extension for MementoExtension {
             }
         });
 
-        let default_settings = concat!(
-            "{\n",
-            "  \"MEMENTO_DB_PATH\": \"\",\n",
-            "  \"MEMENTO_PROFILE\": \"core\",\n",
-            "  \"PYTHON_COMMAND\": \"auto\"\n",
-            "}"
+        let default_settings = format!(
+            "{{\n  \"MEMENTO_DB_PATH\": \"{}\",\n  \"MEMENTO_PROFILE\": \"core\",\n  \"PYTHON_COMMAND\": \"auto\"\n}}",
+            default_db_path
         );
 
         Ok(Some(ContextServerConfiguration {
