@@ -73,6 +73,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import re
 import shutil
 import subprocess
@@ -623,13 +624,55 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
         ok(f"Uploaded: {f.name}")
 
 
+
+def _zed_work_dir() -> "Path | None":
+    """Return the Zed extension work directory for mcp-memento, or None if not found.
+
+    Zed stores per-extension working files at:
+      - Windows : %LOCALAPPDATA%/Zed/extensions/work/mcp-memento
+      - macOS   : ~/Library/Application Support/Zed/extensions/work/mcp-memento
+      - Linux   : ~/.local/share/zed/extensions/work/mcp-memento  (XDG)
+    """
+    import platform as _platform
+
+    system = _platform.system().lower()
+
+    if system == "windows":
+        base = os.environ.get("LOCALAPPDATA")
+
+        if base:
+            return Path(base) / "Zed" / "extensions" / "work" / "mcp-memento"
+
+    elif system == "darwin":
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Zed"
+            / "extensions"
+            / "work"
+            / "mcp-memento"
+        )
+
+    else:
+        xdg = os.environ.get("XDG_DATA_HOME")
+        base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+        return base / "zed" / "extensions" / "work" / "mcp-memento"
+
+    return None
+
+
 def build_stub_local(dry: bool) -> None:
     """Build the stub binary for the current platform and copy it into stub/bin/.
 
     This is a local-only build (cargo release) for the host platform.
     Cross-compiled binaries for other platforms are produced by CI.
+
+    Also copies the binary into the Zed extension work directory so that
+    'Install Dev Extension' picks it up without needing a GitHub Release.
     """
     import platform
+    import shutil as _shutil
 
     step("Building stub binary for current platform")
 
@@ -673,11 +716,35 @@ def build_stub_local(dry: bool) -> None:
         if not src.exists():
             die(f"Expected stub binary not found: {src}")
         ZED_STUB_BIN.mkdir(parents=True, exist_ok=True)
-        import shutil as _shutil
-
         _shutil.copy2(src, dst)
 
     ok(f"Stub built and copied to {dst.relative_to(ROOT)}")
+
+    # ------------------------------------------------------------------
+    # Also copy into the Zed extension work directory so that dev extensions
+    # loaded via 'Install Dev Extension' can find the stub without needing a
+    # published GitHub Release.
+    #
+    # Zed uses <data_dir>/extensions/work/<ext-id>/ as the CWD for the WASM
+    # sandbox — it does NOT copy the repo source files there.  The WASM looks
+    # for stub/bin/<asset> relative to that CWD, so we mirror the layout.
+    # ------------------------------------------------------------------
+    step("Copying stub into Zed dev-extension work dir")
+
+    zed_work_dir = _zed_work_dir()
+
+    if zed_work_dir is None:
+        warn("Could not locate Zed data directory; skipping work-dir copy.")
+        warn("Run 'python scripts/deploy.py dev-stub' again after installing Zed.")
+        return
+
+    zed_stub_dst_dir = zed_work_dir / "stub" / "bin"
+
+    if not dry:
+        zed_stub_dst_dir.mkdir(parents=True, exist_ok=True)
+        _shutil.copy2(src, zed_stub_dst_dir / dst_name)
+
+    ok(f"Stub copied to Zed work dir: {zed_stub_dst_dir / dst_name}")
 
 
 def cmd_dev_stub(dry: bool) -> None:

@@ -80,27 +80,19 @@ impl MementoExtension {
         let asset_name = Self::stub_asset_name(os, arch);
 
         // ------------------------------------------------------------------
-        // Step 1: bundled binary committed to the repository.
+        // Step 1: bundled binary in the Zed extension work directory.
+        //
+        // Zed uses  <data>/extensions/work/<ext-id>/  as the WASM sandbox CWD.
+        // It does NOT copy repo source files there.  The binary is placed here
+        // by running:  python scripts/deploy.py dev-stub
         // ------------------------------------------------------------------
-        let cwd_info = std::env::current_dir()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| "<unknown>".to_owned());
-
         let bundled_path = format!("{}/{}", BUNDLED_BIN_DIR, asset_name);
 
-        // Also try one level up (covers some Zed dev-extension CWD layouts).
-        let bundled_path_alt = format!("../{}/{}", BUNDLED_BIN_DIR, asset_name);
-
-        let found_bundled = [bundled_path.as_str(), bundled_path_alt.as_str()]
-            .iter()
-            .find(|p| std::fs::metadata(p).is_ok())
-            .map(|p| p.to_string());
-
-        if let Some(path) = found_bundled {
-            zed::make_file_executable(&path)
+        if std::fs::metadata(&bundled_path).is_ok() {
+            zed::make_file_executable(&bundled_path)
                 .map_err(|e| format!("Failed to make bundled stub executable: {e}"))?;
 
-            let abs = self.to_abs_path(&path);
+            let abs = self.to_abs_path(&bundled_path);
             self.cached_stub = Some(abs.clone());
             return Ok(abs);
         }
@@ -118,10 +110,7 @@ impl MementoExtension {
             );
 
             zed::download_file(&url, &download_name, DownloadedFileType::Uncompressed)
-                .map_err(|e| format!(
-                    "Failed to download memento stub from {url}: {e} \
-                     [cwd={cwd_info}, bundled_path={bundled_path}, bundled_path_alt={bundled_path_alt}]"
-                ))?;
+                .map_err(|e| format!("Failed to download memento stub from {url}: {e}"))?;
         }
 
         zed::make_file_executable(&download_name)
