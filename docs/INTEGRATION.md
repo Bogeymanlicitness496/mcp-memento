@@ -50,16 +50,63 @@ For CLI tools and custom applications.
 
 ## Quick Start Examples
 
-### IDE Example (Zed Editor)
+### Configuration Methods
+Memento supports multiple configuration approaches. For clarity, we recommend choosing **one method consistently**:
+
+**Method A: CLI Arguments** (recommended - most explicit)
 ```json
 {
   "context_servers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
+      "args": ["--profile", "extended", "--db", "~/.mcp-memento/context.db"]
+    }
+  }
+}
+```
+
+**Method B: Environment Variables**
+```json
+{
+  "context_servers": {
+    "memento": {
+      "command": "memento",
+      "args": [],
       "env": {
-        "MEMENTO_SQLITE_PATH": "~/.mcp-memento/context.db"
+        "MEMENTO_PROFILE": "extended",
+        "MEMENTO_DB_PATH": "~/.mcp-memento/context.db"
       }
+    }
+  }
+}
+```
+
+**Method C: YAML Configuration File**
+Create `~/.mcp-memento/config.yaml`:
+```yaml
+profile: extended
+db_path: ~/.mcp-memento/context.db
+```
+Then use minimal JSON config:
+```json
+{
+  "context_servers": {
+    "memento": {
+      "command": "memento",
+      "args": []
+    }
+  }
+}
+```
+
+### IDE Example (Zed Editor)
+Using **Method A: CLI Arguments** (recommended):
+```json
+{
+  "context_servers": {
+    "memento": {
+      "command": "memento",
+      "args": ["--profile", "extended", "--db", "~/.mcp-memento/context.db"]
     }
   }
 }
@@ -125,8 +172,8 @@ Memento supports multiple configuration sources (in order of precedence):
 
 1. **Environment Variables** (highest priority)
    ```bash
-   export MEMENTO_SQLITE_PATH="~/custom/path/memento.db"
-   export MEMENTO_TOOL_PROFILE="advanced"
+   export MEMENTO_DB_PATH="~/custom/path/memento.db"
+   export MEMENTO_PROFILE="advanced"
    ```
 
 2. **YAML Configuration Files**
@@ -146,7 +193,7 @@ Memento supports multiple configuration sources (in order of precedence):
 
 3. **Command-Line Arguments**
    ```bash
-   memento --profile extended --sqlite-path ~/my-context.db
+   memento --profile extended --db ~/my-context.db
    ```
 
 4. **Default Values** (lowest priority)
@@ -158,12 +205,12 @@ Use different databases for different projects:
 ```bash
 # Project A
 cd ~/projects/project-a
-export MEMENTO_SQLITE_PATH="./.memento/project-a.db"
+export MEMENTO_DB_PATH="./.memento/project-a.db"
 memento --profile extended
 
 # Project B  
 cd ~/projects/project-b
-export MEMENTO_SQLITE_PATH="./.memento/project-b.db"
+export MEMENTO_DB_PATH="./.memento/project-b.db"
 memento --profile extended
 ```
 
@@ -171,7 +218,7 @@ memento --profile extended
 Share a database across team members:
 ```bash
 # Use shared network location
-export MEMENTO_SQLITE_PATH="/mnt/shared/team-memory.db"
+export MEMENTO_DB_PATH="/mnt/shared/team-memory.db"
 memento --profile extended
 ```
 
@@ -179,11 +226,11 @@ memento --profile extended
 Different profiles for different environments:
 ```bash
 # Development - full toolset
-export MEMENTO_TOOL_PROFILE="advanced"
+export MEMENTO_PROFILE="advanced"
 memento
 
 # Production - minimal tools
-export MEMENTO_TOOL_PROFILE="core"
+export MEMENTO_PROFILE="core"
 memento
 ```
 

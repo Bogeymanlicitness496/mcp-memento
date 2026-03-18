@@ -1,5 +1,21 @@
 # Changelog
 
+* 2026-03-17: v0.2.6 - Environment variable standardization and CLI option cleanup (Hannibal)
+  * Renamed environment variables for consistency:
+    - `MEMENTO_SQLITE_PATH` → `MEMENTO_DB_PATH`
+    - `MEMENTO_TOOL_PROFILE` → `MEMENTO_PROFILE`
+  * Updated configuration file keys:
+    - `sqlite_path` → `db_path`
+    - `tool_profile` → `profile`
+  * Enhanced CLI options:
+    - Added `--db` option as primary database path argument
+    - Removed deprecated profile aliases: `advanced`, `lite`, `standard`, `full`
+    - Kept `--profile` option with values: `core`, `extended`, `advanced`
+  * Documentation updates: Updated all README, integration guides, and examples
+  * Configuration files: Updated `memento.yaml` and `~/.mcp-memento/config.yaml`
+  * Backward compatibility: Maintained support for old variable names with deprecation warnings
+  * Test suite validation: All 167 tests passing with updated configuration
+
 * 2026-03-17: v0.2.5 - Test suite stabilization and documentation enhancement (Hannibal)
   * Test warnings resolution: Eliminated RuntimeWarning for unawaited coroutines in test suite (MagicMock → proper async mock handling)
   * CLI test reliability: Wrapped main() calls in try/except to handle SystemExit gracefully during testing

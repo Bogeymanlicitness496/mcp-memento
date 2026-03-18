@@ -226,7 +226,7 @@ const searchData = await searchResponse.json();
 #### Environment Variables for HTTP Server:
 ```bash
 # Database configuration
-export MEMENTO_SQLITE_PATH="/data/memento.db"
+export MEMENTO_DB_PATH="/data/memento.db"
 
 # Server configuration
 export MEMENTO_HTTP_HOST="0.0.0.0"
@@ -544,8 +544,8 @@ services:
       dockerfile: Dockerfile
     container_name: memento
     environment:
-      - MEMENTO_SQLITE_PATH=/app/data/memento.db
-      - MEMENTO_TOOL_PROFILE=extended
+      - MEMENTO_DB_PATH=/app/data/memento.db
+      - MEMENTO_PROFILE=extended
       - MEMENTO_LOG_LEVEL=INFO
     volumes:
       - memento_data:/app/data
@@ -585,8 +585,8 @@ docker-compose up -d
 ```bash
 docker run -d \
   --name memento \
-  -e MEMENTO_SQLITE_PATH=/data/memento.db \
-  -e MEMENTO_TOOL_PROFILE=extended \
+  -e MEMENTO_DB_PATH=/data/memento.db \
+  -e MEMENTO_PROFILE=extended \
   -v ./memento-data:/data \
   -p 8000:8000 \
   mcp-memento:latest
@@ -597,10 +597,10 @@ docker run -d \
 #### Environment Variables in Docker:
 ```bash
 # Database configuration
-MEMENTO_SQLITE_PATH=/data/memento.db
+MEMENTO_DB_PATH=/data/memento.db
 
 # Tool configuration
-MEMENTO_TOOL_PROFILE=extended
+MEMENTO_PROFILE=extended
 MEMENTO_ENABLE_ADVANCED_TOOLS=false
 
 # Logging
@@ -647,9 +647,9 @@ spec:
       - name: memento
         image: mcp-memento:latest
         env:
-        - name: MEMENTO_SQLITE_PATH
+        - name: MEMENTO_DB_PATH
           value: "/data/memento.db"
-        - name: MEMENTO_TOOL_PROFILE
+        - name: MEMENTO_PROFILE
           value: "extended"
         - name: MEMENTO_LOG_LEVEL
           value: "INFO"
@@ -708,8 +708,8 @@ spec:
       "image": "mcp-memento:latest",
       "essential": true,
       "environment": [
-        {"name": "MEMENTO_SQLITE_PATH", "value": "/data/memento.db"},
-        {"name": "MEMENTO_TOOL_PROFILE", "value": "extended"}
+        {"name": "MEMENTO_DB_PATH", "value": "/data/memento.db"},
+        {"name": "MEMENTO_PROFILE", "value": "extended"}
       ],
       "portMappings": [
         {"containerPort": 8000, "protocol": "tcp"}
@@ -735,7 +735,7 @@ gcloud run deploy memento \
   --image gcr.io/PROJECT_ID/memento \
   --platform managed \
   --region us-central1 \
-  --set-env-vars="MEMENTO_SQLITE_PATH=/tmp/memento.db" \
+  --set-env-vars="MEMENTO_DB_PATH=/tmp/memento.db" \
   --memory 512Mi
 ```
 

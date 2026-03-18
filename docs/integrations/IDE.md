@@ -47,22 +47,66 @@ Add to `~/.config/zed/settings.json`:
 }
 ```
 
-### Advanced Configuration
+### Configuration Methods
+Memento supports multiple configuration approaches. For clarity, we recommend choosing **one method consistently**:
 
+**Method A: CLI Arguments** (recommended - most explicit)
 ```json
 {
   "context_servers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
+      "args": ["--profile", "extended", "--db", "~/.zed-memento/context.db", "--log-level", "INFO"]
+    }
+  }
+}
+```
+
+**Method B: Environment Variables**
+```json
+{
+  "context_servers": {
+    "memento": {
+      "command": "memento",
+      "args": [],
       "env": {
-        "MEMENTO_SQLITE_PATH": "~/.zed-memento/context.db",
+        "MEMENTO_PROFILE": "extended",
+        "MEMENTO_DB_PATH": "~/.zed-memento/context.db",
         "MEMENTO_LOG_LEVEL": "INFO"
       }
     }
   }
 }
 ```
+
+**Method C: YAML Configuration File**
+Create `~/.mcp-memento/config.yaml`:
+```yaml
+profile: extended
+db_path: ~/.zed-memento/context.db
+logging:
+  level: INFO
+```
+Then use minimal JSON config:
+```json
+{
+  "context_servers": {
+    "memento": {
+      "command": "memento",
+      "args": []
+    }
+  }
+}
+```
+
+### Configuration Priority
+When using mixed approaches, remember the priority order (highest to lowest):
+1. **CLI Arguments** (`--profile`, `--db`, `--log-level`)
+2. **Environment Variables** (`MEMENTO_PROFILE`, `MEMENTO_DB_PATH`, `MEMENTO_LOG_LEVEL`)
+3. **YAML Configuration Files** (`~/.mcp-memento/config.yaml`, `./memento.yaml`)
+4. **Default Values**
+
+**Recommendation**: For clarity and maintainability, choose **one method consistently** across your configuration.
 
 ### Where to Save Configuration
 - **User-level**: `~/.config/zed/settings.json` (affects all projects)
@@ -152,11 +196,8 @@ MCP tools only work in **Agent mode**:
   "mcpServers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
-      "env": {
-        "MEMENTO_SQLITE_PATH": "./.cursor/memento.db",
-        "MEMENTO_LOG_LEVEL": "WARNING"
-      }
+      "args": ["--profile", "extended", "--db", "./.cursor/memento.db", "--log-level", "WARNING"],
+      "env": {}
     }
   }
 }
@@ -206,9 +247,8 @@ Create `.windsurf/mcp.json` in your project root:
   "mcpServers": {
     "memento": {
       "command": "memento",
-      "env": {
-        "MEMENTO_SQLITE_PATH": "./.windsurf/memento.db"
-      }
+      "args": ["--db", "./.windsurf/memento.db"],
+      "env": {}
     }
   }
 }
@@ -241,11 +281,8 @@ What coding standards should I follow for this project?
   "mcpServers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
-      "env": {
-        "MEMENTO_SQLITE_PATH": "~/.windsurf-memento/context.db",
-        "MEMENTO_TOOL_PROFILE": "extended"
-      }
+      "args": ["--profile", "extended", "--db", "~/.windsurf-memento/context.db"],
+      "env": {}
     }
   }
 }
@@ -327,10 +364,8 @@ MCP tools work with GitHub Copilot in **Agent mode**:
   "mcpServers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
-      "env": {
-        "MEMENTO_SQLITE_PATH": "${workspaceFolder}/.vscode/memento.db"
-      }
+      "args": ["--profile", "extended", "--db", "${workspaceFolder}/.vscode/memento.db"],
+      "env": {}
     }
   }
 }
@@ -441,11 +476,8 @@ What's our deployment approval process?
   "mcpServers": {
     "memento": {
       "command": "/Users/yourname/.local/bin/memento",
-      "args": ["--profile", "extended"],
-      "env": {
-        "MEMENTO_SQLITE_PATH": "~/Claude/memento.db",
-        "MEMENTO_LOG_LEVEL": "INFO"
-      }
+      "args": ["--profile", "extended", "--db", "~/Claude/memento.db", "--log-level", "INFO"],
+      "env": {}
     }
   }
 }

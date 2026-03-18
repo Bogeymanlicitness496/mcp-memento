@@ -13,7 +13,7 @@
 # ----------------------
 # SQLite database file path
 # Default: ~/.mcp-memento/context.db
-sqlite_path: ".data/memento.db"
+db_path: ".data/memento.db"
 
 # Tool Configuration
 # ------------------
@@ -21,7 +21,7 @@ sqlite_path: ".data/memento.db"
 # - core: 13 essential tools for all users
 # - extended: 17 tools including analytics (recommended)
 # - advanced: 25 tools with graph analysis
-tool_profile: "extended"
+profile: "extended"
 
 # Enable advanced tools even with core/extended profile
 # Default: false
@@ -144,8 +144,8 @@ performance:
 # --------------------------------------
 # Uncomment and set environment variables to override YAML configuration:
 #
-# export MEMENTO_SQLITE_PATH="/custom/path/context.db"
-# export MEMENTO_TOOL_PROFILE="advanced"
+# export MEMENTO_DB_PATH="/custom/path/context.db"
+# export MEMENTO_PROFILE="advanced"
 # export MEMENTO_ENABLE_ADVANCED_TOOLS="true"
 # export MEMENTO_LOG_LEVEL="DEBUG"
 # export MEMENTO_ALLOW_CYCLES="false"
@@ -154,7 +154,7 @@ performance:
 # gemini --mcp-servers 'memento --profile extended --log-level INFO'
 #
 # Or with environment variables:
-# MEMENTO_TOOL_PROFILE="advanced" gemini --mcp-servers memento
+# MEMENTO_PROFILE="advanced" gemini --mcp-servers memento
 
 # Example Project-Specific Configuration
 # --------------------------------------
@@ -200,21 +200,21 @@ project:
 # Quick Reference - Common Configurations
 # ---------------------------------------
 # Development:
-#   tool_profile: "advanced"
+#   profile: "advanced"
 #   log_level: "DEBUG"
-#   sqlite_path: ".data/dev.db"
+#   db_path: ".data/dev.db"
 #
 # Production:
-#   tool_profile: "extended"
+#   profile: "extended"
 #   log_level: "INFO"
-#   sqlite_path: "/var/lib/memento/production.db"
+#   db_path: "/var/lib/memento/production.db"
 #
 # Testing:
-#   tool_profile: "core"
+#   profile: "core"
 #   log_level: "WARNING"
-#   sqlite_path: ":memory:"  # In-memory database
+#   db_path: ":memory:"  # In-memory database
 #
 # Team Shared:
-#   tool_profile: "extended"
-#   sqlite_path: "~/team/shared-memory.db"
+#   profile: "extended"
+#   db_path: "~/team/shared-memory.db"
 #   features.allow_relationship_cycles: false

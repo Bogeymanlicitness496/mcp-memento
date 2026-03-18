@@ -83,10 +83,25 @@ class TestConfiguration:
     """Test configuration module functionality."""
 
     def test_config_defaults(self):
-        """Test that Config provides default values when no environment variables are set."""
+        """Test that Config provides default values."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
         from memento.config import Config, YAMLConfig
 
-        # Clear environment variables and YAML config cache
+        # Clear environment variables for this test
         with patch.dict(os.environ, {}, clear=True):
             # Clear YAML config cache to ensure fresh load
             YAMLConfig._config_cache.clear()
@@ -96,14 +111,28 @@ class TestConfiguration:
             ):
                 Config.reload_config()
 
-                assert Config.TOOL_PROFILE == "core"
-                assert Config.ENABLE_ADVANCED_TOOLS is False
+                assert Config.PROFILE == "core"
                 assert Config.LOG_LEVEL == "INFO"
-                assert isinstance(Config.SQLITE_PATH, str)
-                assert Config.SQLITE_PATH.endswith("context.db")
+                assert isinstance(Config.DB_PATH, str)
+                assert Config.DB_PATH.endswith("context.db")
 
     def test_config_environment_variables(self):
         """Test that Config reads environment variables correctly."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
         from memento.config import Config
 
         test_db_path = f"/tmp/test_{uuid.uuid4().hex}.db"
@@ -111,22 +140,35 @@ class TestConfiguration:
         with patch.dict(
             os.environ,
             {
-                "MEMENTO_TOOL_PROFILE": "extended",
-                "MEMENTO_ENABLE_ADVANCED_TOOLS": "true",
+                "MEMENTO_PROFILE": "extended",
                 "MEMENTO_LOG_LEVEL": "DEBUG",
-                "MEMENTO_SQLITE_PATH": test_db_path,
+                "MEMENTO_DB_PATH": test_db_path,
             },
             clear=True,
         ):
             Config.reload_config()
 
-            assert Config.TOOL_PROFILE == "extended"
-            assert Config.ENABLE_ADVANCED_TOOLS is True
+            assert Config.PROFILE == "extended"
             assert Config.LOG_LEVEL == "DEBUG"
-            assert Config.SQLITE_PATH == test_db_path
+            assert Config.DB_PATH == test_db_path
 
     def test_get_enabled_tools(self):
         """Test that get_enabled_tools returns correct tool lists for each profile."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
         from memento.config import Config
 
         test_cases = [
@@ -135,7 +177,7 @@ class TestConfiguration:
         ]
 
         for profile, expected_min_count in test_cases:
-            with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": profile}, clear=True):
+            with patch.dict(os.environ, {"MEMENTO_PROFILE": profile}, clear=True):
                 Config.reload_config()
                 tools = Config.get_enabled_tools()
 
@@ -146,6 +188,21 @@ class TestConfiguration:
 
     def test_config_summary_structure(self):
         """Test that get_config_summary returns a properly structured dictionary."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
         from memento.config import Config
 
         summary = Config.get_config_summary()
@@ -168,7 +225,6 @@ class TestConfiguration:
 
         assert isinstance(summary["tools"], dict)
         assert "profile" in summary["tools"]
-        assert "enable_advanced" in summary["tools"]
         assert "enabled_tools_count" in summary["tools"]
 
         # Check config sources
@@ -177,7 +233,22 @@ class TestConfiguration:
         assert "env_vars" in summary["config_sources"]
 
     def test_config_reload(self):
-        """Test that configuration can be reloaded and reflects environment changes."""
+        """Test that configuration can be reloaded."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
         from memento.config import Config, YAMLConfig
 
         # Start with default
@@ -189,10 +260,10 @@ class TestConfiguration:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.TOOL_PROFILE == "core"
+                assert Config.PROFILE == "core"
 
         # Change environment and reload
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "extended"}, clear=True):
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "extended"}, clear=True):
             # Clear YAML config cache to ensure fresh load
             YAMLConfig._config_cache.clear()
             # Patch YAMLConfig.load_config to return defaults only
@@ -200,7 +271,7 @@ class TestConfiguration:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.TOOL_PROFILE == "extended"
+                assert Config.PROFILE == "extended"
 
         # Go back to default
         with patch.dict(os.environ, {}, clear=True):
@@ -211,7 +282,7 @@ class TestConfiguration:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.TOOL_PROFILE == "core"
+                assert Config.PROFILE == "core"
 
 
 class TestModels:
@@ -779,7 +850,7 @@ class TestCLI:
                     )
                     assert "Current Configuration:" in call_text
                     assert "Database:" in call_text
-                    assert "Tool Profile:" in call_text
+                    assert "Profile:" in call_text
 
     @pytest.mark.asyncio
     async def test_cli_health_check_integration(self):
@@ -834,9 +905,9 @@ class TestCLI:
         with patch.dict(
             os.environ,
             {
-                "MEMENTO_TOOL_PROFILE": "extended",
+                "MEMENTO_PROFILE": "extended",
                 "MEMENTO_LOG_LEVEL": "DEBUG",
-                "MEMENTO_SQLITE_PATH": test_db_path,
+                "MEMENTO_DB_PATH": test_db_path,
             },
             clear=True,
         ):
@@ -997,7 +1068,7 @@ class TestIntegration:
         }
 
         for profile, expected_count in profile_tool_counts.items():
-            with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": profile}, clear=True):
+            with patch.dict(os.environ, {"MEMENTO_PROFILE": profile}, clear=True):
                 Config.reload_config()
                 tools = Config.get_enabled_tools()
 

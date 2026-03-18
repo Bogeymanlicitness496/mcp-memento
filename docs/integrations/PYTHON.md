@@ -83,8 +83,8 @@ async def initialize_memento():
     
     # Method 3: With environment variables
     import os
-    os.environ["MEMENTO_SQLITE_PATH"] = "~/env/path/memento.db"
-    os.environ["MEMENTO_TOOL_PROFILE"] = "advanced"
+    os.environ["MEMENTO_DB_PATH"] = "~/env/path/memento.db"
+    os.environ["MEMENTO_PROFILE"] = "advanced"
     
     server3 = Memento()
     await server3.initialize()
