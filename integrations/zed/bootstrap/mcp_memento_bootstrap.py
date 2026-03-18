@@ -16,60 +16,92 @@ Zed expects the MCP handshake (initialize request/response) to complete within
 Solution: answer the initialize request IMMEDIATELY with a stub response that
 advertises zero tools, then install in the background.  Once installation is
 done, replace the stub response loop with the real mcp-memento process by
-exec()-ing into it (Unix) or launching it as a sub-process and proxying
-stdin/stdout (Windows/all platforms).
+launching it as a sub-process and proxying stdin/stdout.
 
 Protocol: JSON-RPC 2.0, one message per line, UTF-8, no Content-Length header
 (stdio transport as used by Zed's context servers).
+
+WINDOWS NOTES
+-------------
+- stdout must be in binary mode or line-buffered mode to avoid buffering issues.
+- sys.stdin.readline() can block indefinitely; we use a reader thread + queue.
+- The process may be launched through a shell wrapper by Zed (PowerShell/cmd),
+  which can affect stdin/stdout encoding — we force UTF-8 everywhere.
 """
 
+import io
 import json
 import os
 import queue
 import subprocess
 import sys
 import threading
-from datetime import datetime
-from pathlib import Path
+import time
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 PACKAGE_NAME = "mcp-memento"
+MODULE_NAME = "memento"  # importable name: PyPI package installs as `memento`
 LOG_PREFIX = "[MEMENTO-BOOTSTRAP]"
 
-# Log file written to user home so it survives across Zed restarts.
-_LOG_FILE = Path.home() / ".mcp-memento" / "bootstrap.log"
-
-# Minimum stub capabilities – zero tools, but the schema is correct.
 _STUB_SERVER_INFO = {
     "name": "memento-bootstrap",
     "version": "0.0.0",
 }
 
 _STUB_CAPABILITIES = {
-    "tools": {"listChanged": False},
+    "tools": {"listChanged": True},
     "experimental": {},
 }
+
+# ---------------------------------------------------------------------------
+# stdout / stderr setup  (must happen before any I/O)
+# ---------------------------------------------------------------------------
+
+
+def _setup_streams() -> None:
+    """
+    Force stdout to binary-passthrough mode and stderr to line-buffered UTF-8.
+    On Windows the default mode is text with CRLF translation and a large
+    buffer — both of which break the MCP newline protocol.
+    """
+
+    # stderr: always UTF-8, line-buffered for real-time log visibility
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
+
+    except Exception:
+        pass
+
+    # stdout: we will write exclusively via _raw_stdout (bytes) so that we
+    # never lose data to codec errors or buffering.  Wrap the underlying
+    # binary buffer in an explicit UTF-8 writer only as a fallback.
+    global _raw_stdout
+
+    try:
+        # Python 3.x: sys.stdout.buffer is the raw binary stream
+        _raw_stdout = sys.stdout.buffer
+
+    except AttributeError:
+        # Fallback (should not happen in CPython)
+        _raw_stdout = sys.stdout  # type: ignore[assignment]
+
+
+_raw_stdout: io.RawIOBase  # set by _setup_streams()
 
 
 # ---------------------------------------------------------------------------
 # Logging helpers (all to stderr so stdout stays clean for JSON-RPC)
 # ---------------------------------------------------------------------------
 
+
 def _log(msg: str) -> None:
 
-    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    line = f"{ts} {LOG_PREFIX} {msg}\n"
-
-    sys.stderr.write(line)
-    sys.stderr.flush()
-
     try:
-        _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with _LOG_FILE.open("a", encoding="utf-8") as fh:
-            fh.write(line)
+        sys.stderr.write(f"{LOG_PREFIX} {msg}\n")
+        sys.stderr.flush()
 
     except Exception:
         pass
@@ -81,10 +113,15 @@ def _log(msg: str) -> None:
 
 
 def _send(obj: dict) -> None:
+    """Serialise *obj* as a single JSON line and write it to stdout."""
 
-    line = json.dumps(obj, separators=(",", ":"))
-    sys.stdout.write(line + "\n")
-    sys.stdout.flush()
+    try:
+        line = json.dumps(obj, separators=(",", ":")) + "\n"
+        _raw_stdout.write(line.encode("utf-8"))
+        _raw_stdout.flush()
+
+    except Exception as exc:
+        _log(f"_send error: {exc}")
 
 
 def _send_error(request_id, code: int, message: str) -> None:
@@ -98,19 +135,69 @@ def _send_error(request_id, code: int, message: str) -> None:
     )
 
 
-def _read_line() -> str | None:
-    """Read one line from stdin.  Returns None on EOF."""
+# ---------------------------------------------------------------------------
+# Non-blocking stdin reader (thread + queue)
+# ---------------------------------------------------------------------------
+#
+# On Windows, sys.stdin.readline() can block forever even when the peer has
+# closed the connection.  Running the read in a daemon thread + draining via
+# a queue allows the main thread to poll both stdin and the install_done
+# event without getting stuck.
+
+_stdin_queue: "queue.Queue[str | None]" = queue.Queue()
+
+
+def _stdin_reader_thread() -> None:
+    """
+    Daemon thread: reads lines from stdin and pushes them onto _stdin_queue.
+    A None sentinel is pushed on EOF or error.
+    """
 
     try:
-        line = sys.stdin.readline()
+        # Force binary reads then decode manually so we control the codec.
+        raw_in = getattr(sys.stdin, "buffer", sys.stdin)
 
-        if not line:
-            return None
+        while True:
+            try:
+                raw_line = raw_in.readline()
 
-        return line.strip()
+            except Exception as exc:
+                _log(f"stdin read error: {exc}")
+                break
 
-    except Exception:
-        return None
+            if not raw_line:
+                break
+
+            try:
+                line = raw_line.decode("utf-8").rstrip("\r\n")
+
+            except Exception:
+                line = raw_line.decode("latin-1").rstrip("\r\n")
+
+            _stdin_queue.put(line)
+
+    finally:
+        _stdin_queue.put(None)  # EOF sentinel
+
+
+def _read_line_nonblocking(timeout: float = 0.1) -> "str | None | object":
+    """
+    Try to get one line from the stdin queue.
+
+    Returns:
+        str   — a line of text (stripped)
+        None  — EOF / stdin closed
+        _TIMEOUT  — no data within *timeout* seconds (caller should retry)
+    """
+
+    try:
+        return _stdin_queue.get(timeout=timeout)
+
+    except queue.Empty:
+        return _TIMEOUT
+
+
+_TIMEOUT = object()  # sentinel for "no data yet"
 
 
 # ---------------------------------------------------------------------------
@@ -119,20 +206,26 @@ def _read_line() -> str | None:
 
 
 def _is_installed() -> bool:
+    """Return True if the memento module is importable from the current Python."""
 
     try:
         import importlib.util
 
-        return importlib.util.find_spec("memento") is not None
+        spec = importlib.util.find_spec(MODULE_NAME)
+        result = spec is not None
+        _log(f"_is_installed check: {result} (spec={spec})")
+        return result
 
-    except Exception:
+    except Exception as exc:
+        _log(f"_is_installed error: {exc}")
         return False
 
 
-def _install_package() -> tuple[bool, str]:
+def _install_package() -> "tuple[bool, str]":
     """Install mcp-memento via pip --user.  Returns (success, error_message)."""
 
     _log(f"Installing {PACKAGE_NAME} via pip …")
+    _log(f"Using Python: {sys.executable}")
 
     try:
         result = subprocess.run(
@@ -140,13 +233,21 @@ def _install_package() -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=300,
+            encoding="utf-8",
+            errors="replace",
         )
+
+        stdout_snippet = (result.stdout or "").strip()[-500:]
+        stderr_snippet = (result.stderr or "").strip()[-500:]
+
+        _log(f"pip stdout: {stdout_snippet}")
+        _log(f"pip stderr: {stderr_snippet}")
 
         if result.returncode == 0:
             _log(f"{PACKAGE_NAME} installed successfully.")
             return True, ""
 
-        error = result.stderr.strip() or result.stdout.strip()
+        error = stderr_snippet or stdout_snippet or f"rc={result.returncode}"
         _log(f"pip failed (rc={result.returncode}): {error}")
         return False, error
 
@@ -162,7 +263,7 @@ def _install_package() -> tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
-# Real-server proxy (used after installation completes)
+# Real-server proxy
 # ---------------------------------------------------------------------------
 
 
@@ -170,8 +271,9 @@ def _launch_real_server() -> subprocess.Popen:
     """Start the real mcp-memento process and return the Popen object."""
 
     env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
 
-    cmd = [sys.executable, "-u", "-m", "memento"]
+    cmd = [sys.executable, "-u", "-m", MODULE_NAME]
     _log(f"Launching real server: {' '.join(cmd)}")
 
     return subprocess.Popen(
@@ -185,73 +287,100 @@ def _launch_real_server() -> subprocess.Popen:
 
 def _proxy_loop(
     real_proc: subprocess.Popen,
-    pending_requests: list[str],
+    pending_requests: "list[str]",
 ) -> None:
     """
     Forward stdin → real_proc.stdin and real_proc.stdout → stdout.
     Also drains any requests that arrived during installation.
     """
 
-    def _forward_stdout() -> None:
+    _log(f"Entering proxy loop. Buffered requests to replay: {len(pending_requests)}")
+
+    def _forward_real_stdout() -> None:
 
         try:
             assert real_proc.stdout is not None
 
-            for raw_line in real_proc.stdout:
-                # Normalize CRLF → LF: on Windows the subprocess stdout may
-                # emit \r\n which confuses Zed's JSON-RPC line reader.
-                normalized = raw_line.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-                sys.stdout.buffer.write(normalized)
-                sys.stdout.buffer.flush()
+            while True:
+                chunk = real_proc.stdout.read(4096)
+
+                if not chunk:
+                    break
+
+                _raw_stdout.write(chunk)
+                _raw_stdout.flush()
 
         except Exception as exc:
             _log(f"stdout-forwarder error: {exc}")
 
-    # Start background thread that copies real server output to Zed.
-    t = threading.Thread(target=_forward_stdout, daemon=True)
-    t.start()
+    fwd_thread = threading.Thread(target=_forward_real_stdout, daemon=True)
+    fwd_thread.start()
 
-    # Replay buffered requests that arrived while installing.
     assert real_proc.stdin is not None
 
+    # Replay buffered requests from the stub phase.
     for buffered in pending_requests:
-        _log(f"Replaying buffered request: {buffered[:120]}")
-        real_proc.stdin.write((buffered + "\n").encode())
+        if buffered:
+            _log(f"Replaying: {buffered[:120]}")
 
-    real_proc.stdin.flush()
+            try:
+                real_proc.stdin.write((buffered + "\n").encode("utf-8"))
 
-    # Forward new stdin lines to real server.
+            except Exception as exc:
+                _log(f"Replay write error: {exc}")
+
     try:
-        for raw_line in sys.stdin:
-            real_proc.stdin.write(
-                raw_line.encode() if isinstance(raw_line, str) else raw_line
-            )
-            real_proc.stdin.flush()
+        real_proc.stdin.flush()
+
+    except Exception:
+        pass
+
+    # Forward new stdin lines to real server via the queue.
+    try:
+        while True:
+            item = _stdin_queue.get(timeout=1.0)
+
+            if item is None:
+                _log("stdin EOF — closing real server stdin.")
+                break
+
+            try:
+                real_proc.stdin.write((item + "\n").encode("utf-8"))
+                real_proc.stdin.flush()
+
+            except Exception as exc:
+                _log(f"Forward write error: {exc}")
+                break
+
+    except queue.Empty:
+        pass
 
     except Exception as exc:
         _log(f"stdin-forwarder error: {exc}")
 
     finally:
-        real_proc.stdin.close()
+        try:
+            real_proc.stdin.close()
+
+        except Exception:
+            pass
 
     real_proc.wait()
     _log(f"Real server exited with code {real_proc.returncode}.")
 
 
 # ---------------------------------------------------------------------------
-# Stub MCP loop (runs while mcp-memento is being installed)
+# Stub MCP loop
 # ---------------------------------------------------------------------------
 
 
-def _handle_stub_request(request: dict, install_done: threading.Event) -> bool:
-    """
-    Handle a single JSON-RPC request with stub responses.
-    Returns True when the stub loop should exit (installation done + initialize ack sent),
-    or False to keep looping.
-    """
+def _handle_stub_request(request: dict) -> None:
+    """Respond to a single JSON-RPC request with stub responses."""
 
     request_id = request.get("id")
     method = request.get("method", "")
+
+    _log(f"Stub handling method={method!r} id={request_id!r}")
 
     if method == "initialize":
         _send(
@@ -266,11 +395,11 @@ def _handle_stub_request(request: dict, install_done: threading.Event) -> bool:
             }
         )
         _log("Stub: sent initialize response.")
-        return False
+        return
 
     if method == "initialized":
-        # Notification, no id, no response needed.
-        return False
+        # Notification — no response needed.
+        return
 
     if method == "tools/list":
         _send(
@@ -281,7 +410,7 @@ def _handle_stub_request(request: dict, install_done: threading.Event) -> bool:
             }
         )
         _log("Stub: sent empty tools/list (installation in progress).")
-        return False
+        return
 
     if method == "tools/call":
         _send_error(
@@ -289,34 +418,42 @@ def _handle_stub_request(request: dict, install_done: threading.Event) -> bool:
             -32603,
             "mcp-memento is being installed, please retry in a moment.",
         )
-        return False
+        return
 
-    # Unknown method – respond with method-not-found.
+    if method == "ping":
+        if request_id is not None:
+            _send({"jsonrpc": "2.0", "id": request_id, "result": {}})
+        return
+
+    # Unknown method — respond with method-not-found (only if it has an id).
     if request_id is not None:
         _send_error(request_id, -32601, f"Method not found: {method}")
-
-    return False
 
 
 def _stub_loop(
     install_done: threading.Event,
-    install_result: list,
-    buffered: list[str],
+    buffered: "list[str]",
 ) -> None:
     """
-    Read JSON-RPC requests from stdin, answer them with stub responses,
-    and buffer everything so it can be replayed to the real server.
-    Runs until installation completes and stdin is transferred to _proxy_loop.
+    Read JSON-RPC requests from the stdin queue, answer with stub responses,
+    and buffer lines so they can be replayed to the real server.
+    Exits when installation completes.
     """
 
-    _log("Stub loop started – waiting for MCP requests while installing …")
+    _log("Stub loop started — waiting for MCP requests while installing …")
 
     while not install_done.is_set():
-        line = _read_line()
+        item = _read_line_nonblocking(timeout=0.05)
 
-        if line is None:
+        if item is _TIMEOUT:
+            # No data yet — keep polling the install_done flag.
+            continue
+
+        if item is None:
             _log("stdin closed during stub loop.")
             sys.exit(0)
+
+        line: str = item  # type: ignore[assignment]
 
         if not line:
             continue
@@ -330,9 +467,29 @@ def _stub_loop(
             _log(f"Invalid JSON received: {line[:200]}")
             continue
 
-        _handle_stub_request(request, install_done)
+        _handle_stub_request(request)
 
-    _log("Installation complete – exiting stub loop.")
+    # Drain any lines that arrived in the last poll window.
+    while True:
+        try:
+            item = _stdin_queue.get_nowait()
+
+        except queue.Empty:
+            break
+
+        if item is None:
+            break
+
+        if item:
+            buffered.append(item)
+
+            try:
+                _handle_stub_request(json.loads(item))
+
+            except Exception:
+                pass
+
+    _log("Stub loop exiting — installation complete.")
 
 
 # ---------------------------------------------------------------------------
@@ -342,29 +499,39 @@ def _stub_loop(
 
 def main() -> None:
 
-    _log(f"Bootstrap starting. Python {sys.version.split()[0]} @ {sys.executable}")
+    _setup_streams()
 
-    # Make stdout binary-safe on Windows.
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(line_buffering=True)
+    _log(
+        f"Bootstrap starting. "
+        f"Python {sys.version.split()[0]} @ {sys.executable} | "
+        f"platform={sys.platform} | "
+        f"cwd={os.getcwd()}"
+    )
 
-        except Exception:
-            pass
+    # Start the stdin reader thread immediately so no bytes are lost.
+    reader_thread = threading.Thread(
+        target=_stdin_reader_thread, daemon=True, name="stdin-reader"
+    )
+    reader_thread.start()
+    _log("stdin reader thread started.")
 
-    # --- Check if already installed ---
+    # --- Fast path: already installed ---
     already_installed = _is_installed()
 
     if already_installed:
-        _log(f"{PACKAGE_NAME} is already installed – launching directly.")
-        # No need to stub: just exec into the real server immediately.
+        _log(f"{PACKAGE_NAME} already installed — launching directly.")
         real_proc = _launch_real_server()
         _proxy_loop(real_proc, [])
-        sys.exit(real_proc.returncode if real_proc.returncode is not None else 0)
+        rc = real_proc.returncode
 
-    # --- Not installed: start background installation ---
+        if rc is None:
+            rc = 0
+
+        sys.exit(rc)
+
+    # --- Slow path: install in background, stub in foreground ---
     install_done = threading.Event()
-    install_result: list = []  # Will hold (success: bool, error: str)
+    install_result: "list[tuple[bool, str]]" = []
 
     def _install_thread_fn() -> None:
 
@@ -372,25 +539,26 @@ def main() -> None:
         install_result.append((success, error))
         install_done.set()
 
-    install_thread = threading.Thread(target=_install_thread_fn, daemon=True)
+    install_thread = threading.Thread(
+        target=_install_thread_fn,
+        daemon=True,
+        name="pip-install",
+    )
     install_thread.start()
+    _log("pip install thread started.")
 
-    # --- Run stub loop in the MAIN THREAD (owns stdin) ---
-    buffered_requests: list[str] = []
+    buffered_requests: "list[str]" = []
+    _stub_loop(install_done, buffered_requests)
 
-    _stub_loop(install_done, install_result, buffered_requests)
-
-    # --- Installation finished: check result ---
-    install_thread.join(timeout=5)
+    install_thread.join(timeout=10)
 
     if not install_result:
-        _log("Installation result missing – aborting.")
+        _log("Installation result missing — aborting.")
         sys.exit(1)
 
     success, error = install_result[0]
 
     if not success:
-        # Notify Zed via a JSON-RPC error notification so the user sees it.
         _send(
             {
                 "jsonrpc": "2.0",
@@ -404,22 +572,26 @@ def main() -> None:
         _log(f"Installation failed: {error}")
         sys.exit(1)
 
-    # --- Hand off to real server ---
-    # Reload sys.path so pip's newly installed package is visible.
+    # Refresh sys.path so the freshly-installed package is importable.
     import importlib
     import site
 
     importlib.invalidate_caches()
 
-    # Re-add user site-packages in case it wasn't on the path initially.
     user_site = site.getusersitepackages()
 
     if user_site not in sys.path:
         sys.path.insert(0, user_site)
+        _log(f"Added user site-packages to sys.path: {user_site}")
 
     real_proc = _launch_real_server()
     _proxy_loop(real_proc, buffered_requests)
-    sys.exit(real_proc.returncode if real_proc.returncode is not None else 0)
+    rc = real_proc.returncode
+
+    if rc is None:
+        rc = 0
+
+    sys.exit(rc)
 
 
 if __name__ == "__main__":
