@@ -489,8 +489,7 @@ def git_is_clean(dry: bool = False) -> bool:
     # files should block a release. On Windows, git sometimes reports a phantom
     # "NUL" untracked entry that must not abort the bump.
     tracked_changes = [
-        line for line in out.splitlines()
-        if line and not line.startswith("??")
+        line for line in out.splitlines() if line and not line.startswith("??")
     ]
     return len(tracked_changes) == 0
 
@@ -635,7 +634,10 @@ def build_stub_local(dry: bool) -> None:
     step("Building stub binary for current platform")
 
     stub_dir = ZED_DIR / "stub"
-    target_dir = stub_dir / "target" / "release"
+    # Cargo outputs to the workspace target dir (integrations/zed/target/),
+    # NOT the sub-crate's own target/, because the workspace Cargo.toml in
+    # ZED_DIR controls the output location.
+    target_dir = ZED_DIR / "target" / "release"
 
     run(
         f"cargo build --release --manifest-path {stub_dir / 'Cargo.toml'}",
@@ -672,6 +674,7 @@ def build_stub_local(dry: bool) -> None:
             die(f"Expected stub binary not found: {src}")
         ZED_STUB_BIN.mkdir(parents=True, exist_ok=True)
         import shutil as _shutil
+
         _shutil.copy2(src, dst)
 
     ok(f"Stub built and copied to {dst.relative_to(ROOT)}")
