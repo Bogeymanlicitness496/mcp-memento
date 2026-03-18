@@ -364,28 +364,76 @@ def build_package(dry: bool) -> None:
 
 
 def _patch_readme_for_pypi(dry: bool) -> Path | None:
-    """Replace relative markdown links with absolute GitHub URLs for PyPI."""
+    """Patch README.md for PyPI:
+    - Replace all relative markdown links with absolute GitHub URLs.
+    - Inject a compact changelog section above the Links footer.
+    """
     backup = README.with_suffix(".md.bak")
     if dry:
-        info("Would patch README.md for PyPI (absolute links)")
+        info("Would patch README.md for PyPI (absolute links + changelog section)")
         return None
     shutil.copy2(README, backup)
     text = README.read_text(encoding="utf-8")
+
     base = f"https://github.com/{GITHUB_REPO}/blob/main/"
     tree = f"https://github.com/{GITHUB_REPO}/tree/main/"
+    changelog_url = f"https://github.com/{GITHUB_REPO}/blob/main/CHANGELOG.md"
+
+    # --- Absolute link replacements (order matters: longest prefix first) ---
     for rel, abs_ in [
-        ("](docs/", f"]({base}docs/"),
         ("](./docs/", f"]({base}docs/"),
-        ("](CONTRIBUTING.md)", f"]({base}CONTRIBUTING.md)"),
+        ("](docs/", f"]({base}docs/"),
         ("](./CONTRIBUTING.md)", f"]({base}CONTRIBUTING.md)"),
-        ("](LICENSE)", f"]({base}LICENSE)"),
+        ("](CONTRIBUTING.md)", f"]({base}CONTRIBUTING.md)"),
         ("](./LICENSE)", f"]({base}LICENSE)"),
+        ("](LICENSE)", f"]({base}LICENSE)"),
+        ("](./CHANGELOG.md)", f"]({base}CHANGELOG.md)"),
+        ("](CHANGELOG.md)", f"]({base}CHANGELOG.md)"),
     ]:
         text = text.replace(rel, abs_)
-    # tree links for directories
+
+    # tree-style links for bare directory references
     text = text.replace("](docs/)", f"]({tree}docs/)")
+
+    # --- Inject compact changelog section just before the ## 📄 License section ---
+    changelog_section = _build_changelog_snippet(changelog_url)
+    license_anchor = "\n## 📄 License"
+    if license_anchor in text and "## 📋 Recent Changes" not in text:
+        text = text.replace(license_anchor, f"\n{changelog_section}{license_anchor}")
+
     README.write_text(text, encoding="utf-8")
+    info("Patched README.md for PyPI (absolute links + changelog snippet)")
     return backup
+
+
+def _build_changelog_snippet(changelog_url: str, max_entries: int = 4) -> str:
+    """Read CHANGELOG.md and return a compact Markdown table for PyPI."""
+    try:
+        raw = CHANGELOG.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+    # Each entry starts with "* YYYY-MM-DD: vX.Y.Z - <title> (author)"
+    entries = re.findall(
+        r"^\* (\d{4}-\d{2}-\d{2}): (v[\d.]+) - (.+?) \(\w+\)",
+        raw,
+        flags=_re.MULTILINE,
+    )
+    if not entries:
+        return ""
+
+    rows = []
+    for date, ver, title in entries[:max_entries]:
+        rows.append(f"| `{ver}` | {date} | {title} |")
+
+    table = "\n".join(rows)
+    return (
+        f"## 📋 Recent Changes\n\n"
+        f"| Version | Date | Highlights |\n"
+        f"|---------|------|------------|\n"
+        f"{table}\n\n"
+        f"Full history: [{changelog_url}]({changelog_url})\n"
+    )
 
 
 def _restore_readme(backup: Path, dry: bool) -> None:

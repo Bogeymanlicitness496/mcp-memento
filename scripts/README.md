@@ -33,6 +33,16 @@ python scripts/deploy.py bump 0.3.0 --ext 2 --yes
 ### `build`
 Build `sdist` + wheel only, with no version bump or git operations.
 
+Before invoking `python -m build`, this command temporarily patches `README.md` for
+PyPI compatibility:
+- Converts all relative markdown links to absolute GitHub URLs (so tables and
+  cross-references render correctly on the PyPI project page).
+- Injects a compact **"📋 Recent Changes"** table (last 4 releases from
+  `CHANGELOG.md`) just before the License section, giving PyPI visitors a quick
+  at-a-glance history without having to leave the page.
+
+The original `README.md` is restored immediately after the wheel is built.
+
 ```bash
 python scripts/deploy.py build
 ```
