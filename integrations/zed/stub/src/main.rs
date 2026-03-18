@@ -353,10 +353,7 @@ fn run_proxy(python: &Path, buffered: Vec<String>, stdin_rx: mpsc::Receiver<Stri
 // ---------------------------------------------------------------------------
 
 fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
-    // We read stdin on a dedicated thread so we can apply a timeout.
-    // If Zed's ShellBuilder pipes stdin but the messages are delayed (or
-    // if the pipe is set up after the process has already started), we still
-    // want to respond within the 60-second window.
+    // Read stdin on a dedicated thread so the main thread can remain responsive.
     let (tx, rx) = mpsc::channel::<String>();
 
     thread::spawn(move || {
@@ -377,57 +374,21 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
     let mut buffered: Vec<String> = Vec::new();
     let mut initialized = false;
 
-    // Wait up to 2 seconds for the first message from Zed.
-    // If nothing arrives, respond proactively with a synthetic initialize
-    // response so that Zed's 60-second timeout is never triggered.
-    let first_timeout = std::time::Duration::from_millis(2000);
-    let line_timeout = std::time::Duration::from_millis(500);
+    // Wait indefinitely for messages from Zed — it always sends initialize first.
+    // We use a long per-message timeout only to detect a broken pipe.
+    let line_timeout = std::time::Duration::from_secs(55);
 
-    let recv_first = rx.recv_timeout(first_timeout);
-
-    let first_line = match recv_first {
-        Ok(l) => {
-            log!("First stdin line received within timeout.");
-            Some(l)
-        }
-        Err(_) => {
-            // Timeout — Zed never sent anything (ShellBuilder buffering issue).
-            // Respond proactively: Zed always sends id=1 for initialize.
-            log!("Stdin timeout — sending proactive initialize response (id=1).");
-            respond_initialize("1");
-            initialized = true;
-            None
-        }
-    };
-
-    // Process the first line if we got one, then continue reading.
-    let mut lines_to_process: Vec<String> = Vec::new();
-
-    if let Some(l) = first_line {
-        lines_to_process.push(l);
-    }
-
-    // Now drain remaining messages with a shorter per-line timeout.
-    // We keep reading until the stub phase is complete.
     loop {
-        // Pull any already-queued lines first.
-        let line = if !lines_to_process.is_empty() {
-            lines_to_process.remove(0)
-        } else {
-            match rx.recv_timeout(line_timeout) {
-                Ok(l) => l,
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    // No more messages for now.
-                    if initialized {
-                        // Hand off to proxy — Zed will send more after initialize.
-                        log!("Stub phase complete (timeout after init).");
-                        return (buffered, rx);
-                    }
-
-                    // Still waiting for initialize.
-                    continue;
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        let line = match rx.recv_timeout(line_timeout) {
+            Ok(l) => l,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                // Nothing received in 55s — something is wrong, bail out.
+                log!("Stub phase timed out waiting for Zed messages.");
+                break;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                log!("Stdin closed — exiting stub phase.");
+                break;
             }
         };
 
@@ -437,7 +398,6 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
 
         log!("Stub recv: {}", &line[..line.len().min(200)]);
 
-        // Always buffer so we can replay to the real server.
         buffered.push(line.clone());
 
         let method = json_str_field(&line, "method").unwrap_or("").to_owned();
@@ -445,9 +405,6 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
 
         match method.as_str() {
             "initialize" => {
-                // Always respond to initialize, even if we already sent a
-                // proactive response: Zed may have missed it (ShellBuilder
-                // buffering) and will send its own initialize with a real id.
                 if let Some(ref id) = id {
                     respond_initialize(id);
                 }
@@ -456,6 +413,10 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
 
             "initialized" => {
                 // Notification — no response needed.
+                if initialized {
+                    log!("Stub phase complete (initialized notification).");
+                    return (buffered, rx);
+                }
             }
 
             "tools/list" => {
@@ -471,9 +432,10 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
 
             "ping" => {
                 if let Some(ref id) = id {
-                    let resp =
-                        format!(r#"{{"jsonrpc":"2.0","id":{id},"result":{{}}}}"#, id = id);
-                    send(&resp);
+                    send(&format!(
+                        r#"{{"jsonrpc":"2.0","id":{id},"result":{{}}}}"#,
+                        id = id
+                    ));
                 }
             }
 
@@ -484,7 +446,6 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
                     }
                 }
 
-                // Any message after initialize means handshake is done.
                 if initialized {
                     log!("Stub phase complete (post-init message: {}).", method);
                     return (buffered, rx);
