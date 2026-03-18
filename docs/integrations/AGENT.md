@@ -47,7 +47,39 @@ Gemini CLI configuration is stored in `~/.gemini/config.json`:
 }
 ```
 
-**Advanced configuration with custom profile:**
+### Configuration Options
+Memento supports multiple configuration methods that can be used individually or combined:
+
+**Method 1: CLI Arguments Only** (recommended for clarity)
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": ["--profile", "extended", "--db", "~/.gemini-memento/context.db", "--log-level", "INFO"]
+    }
+  }
+}
+```
+
+**Method 2: Environment Variables Only**
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": [],
+      "env": {
+        "MEMENTO_PROFILE": "extended",
+        "MEMENTO_DB_PATH": "~/.gemini-memento/context.db",
+        "MEMENTO_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+**Method 3: Mixed Approach** (use with caution - can be confusing)
 ```json
 {
   "mcpServers": {
@@ -55,13 +87,22 @@ Gemini CLI configuration is stored in `~/.gemini/config.json`:
       "command": "memento",
       "args": ["--profile", "extended"],
       "env": {
-        "MEMENTO_SQLITE_PATH": "~/.gemini-memento/context.db",
+        "MEMENTO_DB_PATH": "~/.gemini-memento/context.db",
         "MEMENTO_LOG_LEVEL": "INFO"
       }
     }
   }
 }
 ```
+
+### Configuration Priority
+When using mixed approaches, remember the priority order (highest to lowest):
+1. **CLI Arguments** (`--profile`, `--db`, `--log-level`)
+2. **Environment Variables** (`MEMENTO_PROFILE`, `MEMENTO_DB_PATH`, `MEMENTO_LOG_LEVEL`)
+3. **YAML Configuration Files** (`~/.mcp-memento/config.yaml`, `./memento.yaml`)
+4. **Default Values**
+
+**Recommendation**: For clarity and maintainability, choose **one method consistently** across your configuration.
 
 ### Where to Save Configuration
 - **User-level**: `~/.gemini/config.json` (affects all Gemini CLI sessions)
@@ -126,11 +167,11 @@ claude --mcp-servers memento
 # claude-memento - Claude CLI with Memento integration
 
 # Configuration
-export MEMENTO_SQLITE_PATH="${MEMENTO_SQLITE_PATH:-~/.claude-memento/context.db}"
-export MEMENTO_TOOL_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
+export MEMENTO_DB_PATH="${MEMENTO_DB_PATH:-~/.claude-memento/context.db}"
+export MEMENTO_PROFILE="${MEMENTO_PROFILE:-extended}"
 
 # Ensure directory exists
-mkdir -p "$(dirname "$MEMENTO_SQLITE_PATH")"
+mkdir -p "$(dirname "$MEMENTO_DB_PATH")"
 
 # Start Claude with Memento
 exec claude --mcp-servers memento "$@"
@@ -144,7 +185,7 @@ chmod +x ~/bin/claude-memento
 **Option 3: Environment variables in shell profile**
 Add to `~/.bashrc`, `~/.zshrc`, or equivalent:
 ```bash
-export MEMENTO_SQLITE_PATH="~/.claude-memento/context.db"
+export MEMENTO_DB_PATH="~/.claude-memento/context.db"
 alias claude-memento='claude --mcp-servers memento'
 ```
 
@@ -452,8 +493,8 @@ For simpler integration, create a shell script wrapper:
 
 set -e
 
-MEMENTO_DB="${MEMENTO_SQLITE_PATH:-~/.mcp-memento/agent.db}"
-MEMENTO_PROFILE="${MEMENTO_TOOL_PROFILE:-extended}"
+MEMENTO_DB="${MEMENTO_DB_PATH:-~/.mcp-memento/agent.db}"
+MEMENTO_PROFILE="${MEMENTO_PROFILE:-extended}"
 
 # Ensure database directory exists
 mkdir -p "$(dirname "$MEMENTO_DB")"
@@ -574,8 +615,8 @@ case "$1" in
         echo "  $0 help                            Show this help"
         echo ""
         echo "Environment variables:"
-        echo "  MEMENTO_SQLITE_PATH    Database location (default: ~/.mcp-memento/agent.db)"
-        echo "  MEMENTO_TOOL_PROFILE   Tool profile (default: extended)"
+        echo "  MEMENTO_DB_PATH    Database location (default: ~/.mcp-memento/agent.db)"
+        echo "  MEMENTO_PROFILE   Tool profile (default: extended)"
         ;;
     *)
         echo "Unknown command: $1"

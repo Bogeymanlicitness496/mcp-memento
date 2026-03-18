@@ -11,8 +11,8 @@ Usage:
     python run_mcp_memento.py
 
 Environment Variables:
-    MEMENTO_SQLITE_PATH: Path to SQLite database file
-    MEMENTO_TOOL_PROFILE: Tool profile (core|extended|advanced)
+    MEMENTO_DB_PATH: Path to SQLite database file
+    MEMENTO_PROFILE: Tool profile (core|extended|advanced)
     MEMENTO_LOG_LEVEL: Logging level (DEBUG|INFO|WARNING|ERROR)
 """
 
@@ -58,15 +58,15 @@ def run_server():
     env_config = {}
 
     # SQLite database path
-    if sqlite_path := os.getenv("MEMENTO_SQLITE_PATH"):
-        env_config["sqlite_path"] = sqlite_path
+    if db_path := os.getenv("MEMENTO_DB_PATH"):
+        env_config["sqlite_path"] = db_path
         # Also set environment variable directly to ensure Config reads it
-        os.environ["MEMENTO_SQLITE_PATH"] = sqlite_path
+        os.environ["MEMENTO_DB_PATH"] = db_path
 
     # Tool profile
-    if tool_profile := os.getenv("MEMENTO_TOOL_PROFILE"):
-        env_config["tool_profile"] = tool_profile
-        os.environ["MEMENTO_TOOL_PROFILE"] = tool_profile
+    if profile := os.getenv("MEMENTO_PROFILE"):
+        env_config["tool_profile"] = profile
+        os.environ["MEMENTO_PROFILE"] = profile
 
     # Log level
     if log_level := os.getenv("MEMENTO_LOG_LEVEL"):
@@ -99,8 +99,8 @@ def show_help():
     print("  python run_mcp_memento.py --help   - Show this help")
     print()
     print("Environment Variables:")
-    print("  MEMENTO_SQLITE_PATH    - Path to SQLite database file")
-    print("  MEMENTO_TOOL_PROFILE   - Tool profile (core|extended)")
+    print("  MEMENTO_DB_PATH        - Path to SQLite database file")
+    print("  MEMENTO_PROFILE        - Tool profile (core|extended|advanced)")
     print("  MEMENTO_LOG_LEVEL      - Logging level (DEBUG|INFO|WARNING|ERROR)")
     print()
     print("For more CLI options, use the memento module directly:")

@@ -15,14 +15,14 @@
 # ----------------------
 # Global database location
 # Default: ~/.mcp-memento/context.db
-sqlite_path: "~/.mcp-memento/global.db"
+db_path: "~/.mcp-memento/global.db"
 
 # Tool Configuration
 # ------------------
 # Global tool profile
 # Options: core, extended, advanced
 # Recommended: extended (balanced feature set)
-tool_profile: "extended"
+profile: "extended"
 
 # Enable advanced tools globally
 # Default: false
@@ -128,12 +128,12 @@ maintenance:
 
   # Auto-vacuum database
   auto_vacuum: true
-  vacuum_interval: 86400  # 24 hours in seconds
+  vacuum_interval: 86400 # 24 hours in seconds
 
   # Backup settings
   backup:
     enabled: true
-    interval: 604800  # 7 days in seconds
+    interval: 604800 # 7 days in seconds
     keep_backups: 5
     location: "~/.mcp-memento/backups"
 
@@ -162,7 +162,7 @@ performance:
   # Cache settings
   cache_enabled: true
   cache_size: 100
-  cache_ttl: 3600  # 1 hour in seconds
+  cache_ttl: 3600 # 1 hour in seconds
 
   # Query optimization
   query_timeout: 10
@@ -174,7 +174,7 @@ performance:
 #    Create ./memento.yaml in project directory to override these settings
 #
 # 2. Environment variable overrides (highest priority):
-#    export MEMENTO_TOOL_PROFILE="advanced"
+#    export MEMENTO_PROFILE="advanced"
 #    export MEMENTO_LOG_LEVEL="DEBUG"
 #
 # 3. CLI argument overrides (highest priority):
@@ -194,20 +194,20 @@ performance:
 # Uncomment one of these profiles for quick setup:
 
 # # Development Profile
-# sqlite_path: "~/.mcp-memento/dev.db"
-# tool_profile: "advanced"
+# db_path: "~/.mcp-memento/dev.db"
+# profile: "advanced"
 # logging.level: "DEBUG"
 # features.allow_relationship_cycles: true
 
 # # Production Profile
-# sqlite_path: "/var/lib/memento/production.db"
-# tool_profile: "extended"
+# db_path: "/var/lib/memento/production.db"
+# profile: "extended"
 # logging.level: "WARNING"
 # security.encryption: true
 
 # # Minimal Profile
-# sqlite_path: "~/.mcp-memento/minimal.db"
-# tool_profile: "core"
+# db_path: "~/.mcp-memento/minimal.db"
+# profile: "core"
 # logging.level: "ERROR"
 # performance.cache_enabled: false
 

@@ -178,10 +178,9 @@ def print_config_summary() -> None:
 
     _eprint("\nCurrent Configuration:")
     _eprint(f"  Database: SQLite")
-    _eprint(f"  Tool Profile: {Config.TOOL_PROFILE}")
-    _eprint(f"  Enable Advanced Tools: {Config.ENABLE_ADVANCED_TOOLS}")
+    _eprint(f"  Profile: {Config.PROFILE}")
     _eprint(f"  Log Level: {config['logging']['level']}")
-    _eprint(f"\n  SQLite Path: {config['database']['path']}")
+    _eprint(f"\n  Database Path: {config['database']['path']}")
     _eprint()
 
     # Show YAML config sources
@@ -195,25 +194,11 @@ def print_config_summary() -> None:
 
 def validate_profile(profile: str) -> None:
     """Validate tool profile choice."""
-    valid_profiles = list(TOOL_PROFILES.keys()) + [
-        "lite",
-        "standard",
-        "full",
-    ]  # Include legacy
+    valid_profiles = list(TOOL_PROFILES.keys())
     if profile not in valid_profiles:
         _eprint(f"Error: Invalid profile '{profile}'")
-        _eprint(
-            "Valid options: core, extended, advanced (or legacy: lite, standard, full)"
-        )
+        _eprint("Valid options: core, extended, advanced")
         sys.exit(1)
-
-    # Warn about legacy profiles
-    legacy_map = {"lite": "core", "standard": "extended", "full": "extended"}
-    if profile in legacy_map:
-        _eprint(
-            f"Warning: Profile '{profile}' is deprecated. Using '{legacy_map[profile]}' instead."
-        )
-        _eprint(f"   Update your configuration to use: --profile {legacy_map[profile]}")
 
 
 def main() -> None:
@@ -226,10 +211,10 @@ Examples:
   # Start with default settings (SQLite database, core profile)
   memento
 
-  # Use extended profile (11 tools)
+  # Use extended profile (17 tools)
   memento --profile extended
 
-  # Use advanced profile (18 tools, includes confidence system)
+  # Use advanced profile (25 tools, includes confidence system)
   memento --profile advanced
 
   # Show current configuration
@@ -239,30 +224,30 @@ Examples:
   memento --health
 
 Environment Variables:
-  MEMENTO_TOOL_PROFILE    Tool profile (core|extended|advanced) [default: core]
-  MEMENTO_ENABLE_ADVANCED_TOOLS  Enable advanced tools [default: false]
-  MEMENTO_SQLITE_PATH     SQLite database path [default: ~/.mcp-memento/context.db]
+  MEMENTO_DB_PATH         Database file path [default: ~/.mcp-memento/context.db]
+  MEMENTO_PROFILE         Tool profile (core|extended|advanced) [default: core]
   MEMENTO_LOG_LEVEL       Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
 
   Feature Configuration:
     MEMENTO_ALLOW_CYCLES           Allow cycles in relationship graph [default: false]
+
+
         """,
     )
 
     parser.add_argument("--version", action="version", version=f"memento {__version__}")
 
     parser.add_argument(
+        "--db",
+        type=str,
+        help="Database file path (overrides MEMENTO_DB_PATH env var)",
+    )
+
+    parser.add_argument(
         "--profile",
         type=str,
-        choices=[
-            "core",
-            "extended",
-            "advanced",
-            "lite",
-            "standard",
-            "full",
-        ],  # Include legacy for compatibility
-        help="Tool profile to use: core (default, 9 tools), extended (11 tools), or advanced (18 tools). Legacy profiles lite/standard/full are mapped to core/extended.",
+        choices=["core", "extended", "advanced"],
+        help="Tool profile to use: core (default, 13 tools), extended (17 tools), or advanced (25 tools).",
     )
 
     parser.add_argument(
@@ -339,12 +324,12 @@ Environment Variables:
     # Apply CLI arguments to environment variables.
     # Config uses _EnvVar descriptors that read os.environ dynamically,
     # so setting env vars is sufficient for the current process.
+    if args.db:
+        os.environ["MEMENTO_DB_PATH"] = args.db
+
     if args.profile:
         validate_profile(args.profile)
-        profile = {"lite": "core", "standard": "extended", "full": "extended"}.get(
-            args.profile, args.profile
-        )
-        os.environ["MEMENTO_TOOL_PROFILE"] = profile
+        os.environ["MEMENTO_PROFILE"] = args.profile
 
     if args.log_level:
         os.environ["MEMENTO_LOG_LEVEL"] = args.log_level
@@ -418,8 +403,8 @@ Environment Variables:
     # Start the server - all diagnostic output to stderr to keep stdout
     # clean for MCP JSON-RPC transport
     _eprint(f"Starting MCP Memento Server v{__version__}")
-    _eprint(f"Database: SQLite ({Config.SQLITE_PATH})")
-    _eprint(f"Profile: {Config.TOOL_PROFILE}")
+    _eprint(f"Database: SQLite ({Config.DB_PATH})")
+    _eprint(f"Profile: {Config.PROFILE}")
     _eprint(f"Log Level: {Config.LOG_LEVEL}")
     _eprint("\nPress Ctrl+C to stop the server\n")
 

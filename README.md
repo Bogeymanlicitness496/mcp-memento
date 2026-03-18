@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.5-purple.svg)](https://github.com/annibale-x/memento-mcp-server/releases/tag/v0.2.5)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.6-purple.svg)](https://github.com/annibale-x/memento-mcp-server/releases/tag/v0.2.6)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
@@ -75,16 +75,49 @@ pip install mcp-memento
 
 ### 2. Basic Configuration
 
-**IDEs** (Example for Cursor Editor):
+Memento supports multiple configuration methods. For clarity, we recommend using **one method consistently**:
+
+**Method 1: CLI Arguments** (recommended - most explicit)
 ```json
 {
   "mcpServers": {
     "memento": {
       "command": "memento",
-      "args": ["--profile", "extended"],
+      "args": ["--profile", "extended", "--db", "~/.mcp-memento/context.db"]
+    }
+  }
+}
+```
+
+**Method 2: Environment Variables**
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": [],
       "env": {
-        "MEMENTO_SQLITE_PATH": "~/.mcp-memento/context.db"
+        "MEMENTO_PROFILE": "extended",
+        "MEMENTO_DB_PATH": "~/.mcp-memento/context.db"
       }
+    }
+  }
+}
+```
+
+**Method 3: YAML Configuration File**
+Create `~/.mcp-memento/config.yaml`:
+```yaml
+profile: extended
+db_path: ~/.mcp-memento/context.db
+```
+Then use minimal JSON config:
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento",
+      "args": []
     }
   }
 }
@@ -263,21 +296,23 @@ Memento understands trigger phrases in multiple languages; this natural language
 
 Memento supports multiple configuration sources (in order of precedence):
 
-1. **Environment Variables** (highest priority)
+1. **Command-Line Arguments** (highest priority)
    ```bash
-   export MEMENTO_SQLITE_PATH="~/custom/path/memento.db"
-   export MEMENTO_TOOL_PROFILE="advanced"
+   memento --profile advanced --db ~/custom/path/memento.db --log-level DEBUG
+   ```
+
+2. **Environment Variables**
+   ```bash
+   export MEMENTO_PROFILE="advanced"
+   export MEMENTO_DB_PATH="~/custom/path/memento.db"
    export MEMENTO_LOG_LEVEL="DEBUG"
    ```
 
-2. **YAML Configuration Files**
+3. **YAML Configuration Files**
    - Project config: `./memento.yaml` in current directory
    - Global config: `~/.mcp-memento/config.yaml`
 
-3. **Command-Line Arguments**
-   ```bash
-   memento --profile extended --sqlite-path ~/my-context.db
-   ```
+**Priority Order**: CLI Arguments > Environment Variables > YAML Files > Defaults
 
 4. **Default Values** (lowest priority)
 
@@ -285,15 +320,15 @@ Memento supports multiple configuration sources (in order of precedence):
 
 **Project configuration** (`./memento.yaml`):
 ```yaml
-sqlite_path: ~/.mcp-memento/context.db
-tool_profile: extended
+db_path: ~/.mcp-memento/context.db
+profile: extended
 log_level: INFO
 ```
 
 **Global configuration** (`~/.mcp-memento/config.yaml`):
 ```yaml
-sqlite_path: ~/.mcp-memento/global.db
-tool_profile: extended
+db_path: ~/.mcp-memento/global.db
+profile: extended
 log_level: INFO
 ```
 

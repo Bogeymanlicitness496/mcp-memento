@@ -13,12 +13,18 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-class StopExecution(Exception): pass
+
+
+class StopExecution(Exception):
+    pass
+
+
 def safe_main():
     try:
         main()
     except StopExecution:
         pass
+
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -56,10 +62,7 @@ class TestCLIBasic:
         # Valid modern profiles
         validate_profile("core")
         validate_profile("extended")
-        # Valid legacy profiles (should warn but not exit)
-        validate_profile("lite")
-        validate_profile("standard")
-        validate_profile("full")
+        validate_profile("advanced")
 
     def test_validate_profile_invalid(self):
         """Test profile validation with invalid inputs."""
@@ -214,7 +217,9 @@ class TestCLIHealthCheck:
         """Test --health option."""
         with patch("sys.argv", ["memento.cli", "--health"]):
             with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                with patch("memento.cli.perform_health_check", new_callable=MagicMock) as mock_check:
+                with patch(
+                    "memento.cli.perform_health_check", new_callable=MagicMock
+                ) as mock_check:
                     # Mock async function
                     mock_check.return_value = {
                         "status": "healthy",
@@ -247,7 +252,6 @@ class TestCLIHealthCheck:
                     }
                     # Configure AsyncMock to return value directly without creating coroutine
                     mock_check.return_value = health_data
-                    
 
                     with patch("memento.cli.asyncio.run") as mock_run:
                         with patch("builtins.print") as mock_print:
@@ -482,7 +486,9 @@ class TestCLIExportImport:
                 ],
             ):
                 with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                    with patch("memento.cli.handle_export", new_callable=MagicMock) as mock_handle:
+                    with patch(
+                        "memento.cli.handle_export", new_callable=MagicMock
+                    ) as mock_handle:
                         mock_handle.return_value = None
 
                         with patch("memento.cli.asyncio.run") as mock_run:
@@ -517,7 +523,9 @@ class TestCLIExportImport:
                 ],
             ):
                 with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                    with patch("memento.cli.handle_import", new_callable=MagicMock) as mock_handle:
+                    with patch(
+                        "memento.cli.handle_import", new_callable=MagicMock
+                    ) as mock_handle:
                         mock_handle.return_value = None
 
                         with patch("memento.cli.asyncio.run") as mock_run:
@@ -542,7 +550,9 @@ class TestCLIServerStart:
         """Test default server startup."""
         with patch("sys.argv", ["memento.cli"]):
             with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
+                with patch(
+                    "memento.cli.server_main", new_callable=MagicMock
+                ) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         # Mock KeyboardInterrupt to stop the server
                         mock_run.side_effect = KeyboardInterrupt()
@@ -558,7 +568,9 @@ class TestCLIServerStart:
         """Test server startup with profile option."""
         with patch("sys.argv", ["memento.cli", "--profile", "extended"]):
             with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
+                with patch(
+                    "memento.cli.server_main", new_callable=MagicMock
+                ) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = KeyboardInterrupt()
 
@@ -572,7 +584,9 @@ class TestCLIServerStart:
         """Test server startup with log level option."""
         with patch("sys.argv", ["memento.cli", "--log-level", "DEBUG"]):
             with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
+                with patch(
+                    "memento.cli.server_main", new_callable=MagicMock
+                ) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = KeyboardInterrupt()
 
@@ -585,7 +599,9 @@ class TestCLIServerStart:
         """Test server error handling."""
         with patch("sys.argv", ["memento.cli"]):
             with patch("sys.exit", side_effect=StopExecution) as mock_exit:
-                with patch("memento.cli.server_main", new_callable=MagicMock) as mock_server_main:
+                with patch(
+                    "memento.cli.server_main", new_callable=MagicMock
+                ) as mock_server_main:
                     with patch("memento.cli.asyncio.run") as mock_run:
                         mock_run.side_effect = Exception("Server error")
 
@@ -599,8 +615,8 @@ class TestCLIEnvironmentVariables:
     """Test CLI environment variable handling."""
 
     def test_environment_variable_profile(self):
-        """Test MEMENTO_TOOL_PROFILE environment variable."""
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "extended"}, clear=True):
+        """Test MEMENTO_PROFILE environment variable."""
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "extended"}, clear=True):
             with patch("sys.argv", ["memento.cli", "--show-config"]):
                 with patch("sys.exit", side_effect=StopExecution) as mock_exit:
                     with patch("memento.cli._eprint") as mock_eprint:
@@ -638,7 +654,7 @@ class TestCLIEnvironmentVariables:
 
     def test_cli_args_override_env_vars(self):
         """Test that CLI arguments override environment variables."""
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "core"}, clear=True):
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "core"}, clear=True):
             with patch(
                 "sys.argv",
                 ["memento.cli", "--profile", "extended", "--show-config"],

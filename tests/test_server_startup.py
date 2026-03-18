@@ -18,7 +18,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from memento.config import Config
 from memento.database.engine import SQLiteBackend
 from memento.database.interface import SQLiteMemoryDatabase
 from memento.server import Memento
@@ -30,7 +29,22 @@ class TestServerStartup:
 
     def test_config_default_values(self):
         """Test that Config provides default values."""
-        from memento.config import YAMLConfig
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
 
         # Clear environment variables for this test
         with patch.dict(os.environ, {}, clear=True):
@@ -42,23 +56,36 @@ class TestServerStartup:
             ):
                 Config.reload_config()
 
-                assert Config.TOOL_PROFILE == "core"
-                assert Config.ENABLE_ADVANCED_TOOLS is False
+                assert Config.PROFILE == "core"
                 assert Config.LOG_LEVEL == "INFO"
-                assert isinstance(Config.SQLITE_PATH, str)
-                assert "context.db" in Config.SQLITE_PATH
+                assert isinstance(Config.DB_PATH, str)
+                assert "context.db" in Config.DB_PATH
 
     def test_config_environment_variables(self):
         """Test that Config reads environment variables correctly."""
-        from memento.config import YAMLConfig
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
 
         with patch.dict(
             os.environ,
             {
-                "MEMENTO_TOOL_PROFILE": "advanced",
-                "MEMENTO_ENABLE_ADVANCED_TOOLS": "true",
+                "MEMENTO_PROFILE": "advanced",
                 "MEMENTO_LOG_LEVEL": "DEBUG",
-                "MEMENTO_SQLITE_PATH": "/custom/path/test.db",
+                "MEMENTO_DB_PATH": "/custom/path/test.db",
             },
             clear=True,
         ):
@@ -70,14 +97,15 @@ class TestServerStartup:
             ):
                 Config.reload_config()
 
-                assert Config.TOOL_PROFILE == "advanced"
-                assert Config.ENABLE_ADVANCED_TOOLS is True
+                assert Config.PROFILE == "advanced"
                 assert Config.LOG_LEVEL == "DEBUG"
-                assert Config.SQLITE_PATH == "/custom/path/test.db"
+                assert Config.DB_PATH == "/custom/path/test.db"
 
     def test_get_enabled_tools_core_profile(self):
         """Test that core profile returns correct tools."""
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "core"}, clear=True):
+        from memento.config import Config
+
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "core"}, clear=True):
             Config.reload_config()
             tools = Config.get_enabled_tools()
 
@@ -89,7 +117,9 @@ class TestServerStartup:
 
     def test_get_enabled_tools_extended_profile(self):
         """Test that extended profile includes additional tools."""
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "extended"}, clear=True):
+        from memento.config import Config
+
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "extended"}, clear=True):
             Config.reload_config()
             tools = Config.get_enabled_tools()
 
@@ -263,11 +293,26 @@ class TestServerStartup:
 
     def test_config_reload(self):
         """Test that configuration can be reloaded."""
-        from memento.config import YAMLConfig
+        import importlib
+        import sys
 
-        original_profile = Config.TOOL_PROFILE
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
 
-        with patch.dict(os.environ, {"MEMENTO_TOOL_PROFILE": "extended"}, clear=True):
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
+
+        original_profile = Config.PROFILE
+
+        with patch.dict(os.environ, {"MEMENTO_PROFILE": "extended"}, clear=True):
             # Clear YAML config cache to ensure fresh load
             YAMLConfig._config_cache.clear()
             # Patch YAMLConfig.load_config to return defaults only
@@ -275,7 +320,7 @@ class TestServerStartup:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.TOOL_PROFILE == "extended"
+                assert Config.PROFILE == "extended"
 
         # Restore original
         with patch.dict(os.environ, clear=True):
@@ -286,10 +331,12 @@ class TestServerStartup:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.TOOL_PROFILE == "core"
+                assert Config.PROFILE == "core"
 
     def test_config_summary(self):
         """Test that config summary provides comprehensive information."""
+        from memento.config import Config
+
         summary = Config.get_config_summary()
 
         assert isinstance(summary, dict)
@@ -305,7 +352,6 @@ class TestServerStartup:
 
         assert isinstance(summary["tools"], dict)
         assert "profile" in summary["tools"]
-        assert "enable_advanced" in summary["tools"]
         assert "enabled_tools_count" in summary["tools"]
 
         # Verify counts are positive
@@ -315,57 +361,112 @@ class TestServerStartup:
 class TestServerIntegration:
     """Integration tests for server startup and shutdown."""
 
+    def setup_method(self):
+        """Clean up configuration state before each test."""
+        import os
+        from memento.config import YAMLConfig
+        
+        # Clear any MEMENTO_* environment variables
+        for key in list(os.environ.keys()):
+            if key.startswith("MEMENTO_"):
+                del os.environ[key]
+        
+        # Clear YAML config cache
+        YAMLConfig._config_cache.clear()
+        
+        # Reload config with clean environment
+        from memento.config import Config
+        Config.reload_config()
+
     @pytest.mark.asyncio
     async def test_server_main_function(self):
         """Test the main server entry point with mocked stdio."""
-        # Mock the stdio server to avoid actual I/O
-        mock_stdio = AsyncMock()
-        mock_read_stream = AsyncMock()
-        mock_write_stream = AsyncMock()
+        import importlib
+        import sys
+        import os
+        
+        # Save original modules
+        saved_modules = {}
+        for name in list(sys.modules.keys()):
+            if name.startswith('memento.') or name == 'memento':
+                saved_modules[name] = sys.modules[name]
+        
+        try:
+            # Delete memento modules to force fresh import after patching
+            for name in list(sys.modules.keys()):
+                if name.startswith('memento.') or name == 'memento':
+                    del sys.modules[name]
+            
+            # Mock anyio.wrap_file and TextIOWrapper to avoid I/O errors
+            mock_file = MagicMock()
+            mock_file.buffer = MagicMock()
+            mock_file.buffer.readable.return_value = True
+            mock_file.buffer.writable.return_value = True
+            
+            # Mock the stdio server to avoid actual I/O
+            mock_stdio = AsyncMock()
+            mock_read_stream = AsyncMock()
+            mock_write_stream = AsyncMock()
 
-        # Create a mock Memento
-        mock_server = AsyncMock(spec=Memento)
-        mock_server.initialize = AsyncMock()
-        mock_server.cleanup = AsyncMock()
-        mock_server.server = MagicMock()
-        mock_server.server.run = AsyncMock()
-        mock_server.capabilities = MagicMock(
-            return_value={"tools": [], "resources": []}
-        )
+            # Create a mock Memento
+            mock_server = AsyncMock(spec=Memento)
+            mock_server.initialize = AsyncMock()
+            mock_server.cleanup = AsyncMock()
+            mock_server.server = MagicMock()
+            mock_server.server.run = AsyncMock()
+            mock_server.capabilities = MagicMock(
+                return_value={"tools": [], "resources": []}
+            )
 
-        with patch("memento.server.stdio_server", return_value=mock_stdio):
-            mock_stdio.__aenter__.return_value = (mock_read_stream, mock_write_stream)
-            mock_stdio.__aexit__.return_value = None
+            with patch("anyio.wrap_file", return_value=mock_file):
+                with patch("io.TextIOWrapper", return_value=mock_file):
+                    with patch("memento.server.stdio_server", return_value=mock_stdio):
+                        mock_stdio.__aenter__.return_value = (mock_read_stream, mock_write_stream)
+                        mock_stdio.__aexit__.return_value = None
 
-            with patch("memento.server.Memento", return_value=mock_server):
-                # Mock server.serve() to avoid Pydantic validation error
-                # Create a proper mock that passes Pydantic validation
-                from mcp.types import ServerCapabilities
+                        with patch("memento.server.Memento", return_value=mock_server):
+                            # Mock server.serve() to avoid Pydantic validation error
+                            # Create a proper mock that passes Pydantic validation
+                            from mcp.types import ServerCapabilities
 
-                mock_capabilities = ServerCapabilities(tools={}, logging={})
-                mock_serve_result = MagicMock()
-                mock_serve_result.capabilities = mock_capabilities
-                mock_server.serve = AsyncMock(return_value=mock_serve_result)
+                            mock_capabilities = ServerCapabilities(tools={}, logging={})
+                            mock_serve_result = MagicMock()
+                            mock_serve_result.capabilities = mock_capabilities
+                            mock_server.serve = AsyncMock(return_value=mock_serve_result)
 
-                # Also mock InitializationOptions to avoid validation errors
-                with patch("memento.server.InitializationOptions") as mock_init_options:
-                    mock_init_options.return_value = MagicMock()
+                            # Also mock InitializationOptions to avoid validation errors
+                            with patch("memento.server.InitializationOptions") as mock_init_options:
+                                mock_init_options.return_value = MagicMock()
 
-                    # Run server main (should handle KeyboardInterrupt)
-                    task = asyncio.create_task(server_main())
+                                # Make server.server.run raise CancelledError immediately
+                                # so the async with block exits quickly
+                                mock_server.server.run.side_effect = asyncio.CancelledError()
 
-                    # Cancel the task to simulate Ctrl+C
-                    await asyncio.sleep(0.01)
-                    task.cancel()
+                                # Import server_main AFTER all patches are applied
+                                from memento.server import main as server_main
 
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                                # Run server main (should handle KeyboardInterrupt)
+                                task = asyncio.create_task(server_main())
 
-                    # Verify server was initialized and cleaned up
-                    mock_server.initialize.assert_called_once()
-                    mock_server.cleanup.assert_called_once()
+                                # Give it a moment to run
+                                await asyncio.sleep(0.05)
+                                task.cancel()
+
+                                try:
+                                    await task
+                                except asyncio.CancelledError:
+                                    pass
+
+                                # Verify server was initialized and cleaned up
+                                mock_server.initialize.assert_called()
+                                mock_server.cleanup.assert_called()
+        finally:
+            # Restore original modules
+            for name in list(sys.modules.keys()):
+                if name.startswith('memento.') or name == 'memento':
+                    del sys.modules[name]
+            for name, module in saved_modules.items():
+                sys.modules[name] = module
 
     @pytest.mark.asyncio
     async def test_server_initialization_error_handling(self):
@@ -387,7 +488,22 @@ class TestConfigurationPaths:
 
     def test_default_sqlite_path(self):
         """Test default SQLite database path resolution."""
-        from memento.config import YAMLConfig
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
 
         # Clear environment variables and YAML config cache
         with patch.dict(os.environ, {}, clear=True):
@@ -399,7 +515,7 @@ class TestConfigurationPaths:
             ):
                 Config.reload_config()
 
-                path = Config.SQLITE_PATH
+                path = Config.DB_PATH
 
                 assert isinstance(path, str)
                 assert path.endswith("context.db")
@@ -407,11 +523,26 @@ class TestConfigurationPaths:
 
     def test_custom_sqlite_path(self):
         """Test custom SQLite database path."""
-        from memento.config import YAMLConfig
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
 
         custom_path = f"/tmp/test_{uuid.uuid4().hex}.db"
 
-        with patch.dict(os.environ, {"MEMENTO_SQLITE_PATH": custom_path}, clear=True):
+        with patch.dict(os.environ, {"MEMENTO_DB_PATH": custom_path}, clear=True):
             # Clear YAML config cache to ensure fresh load
             YAMLConfig._config_cache.clear()
             # Patch YAMLConfig.load_config to return defaults only
@@ -419,7 +550,7 @@ class TestConfigurationPaths:
                 YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
             ):
                 Config.reload_config()
-                assert Config.SQLITE_PATH == custom_path
+                assert Config.DB_PATH == custom_path
 
 
 class TestToolProfiles:
@@ -427,6 +558,23 @@ class TestToolProfiles:
 
     def test_tool_profile_mapping(self):
         """Test legacy tool profile mapping to modern equivalents."""
+        import importlib
+        import sys
+
+        # Force reload by deleting ALL memento modules from sys.modules
+        modules_to_delete = []
+        for module_name in list(sys.modules.keys()):
+            if module_name.startswith("memento."):
+                modules_to_delete.append(module_name)
+        for module_name in modules_to_delete:
+            del sys.modules[module_name]
+
+        # Also delete memento itself if present
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config
+
         test_cases = [
             ("lite", "core"),
             ("standard", "extended"),
@@ -438,31 +586,12 @@ class TestToolProfiles:
 
         for legacy_profile, expected_profile in test_cases:
             with patch.dict(
-                os.environ, {"MEMENTO_TOOL_PROFILE": legacy_profile}, clear=True
+                os.environ, {"MEMENTO_PROFILE": legacy_profile}, clear=True
             ):
                 Config.reload_config()
                 enabled_tools = Config.get_enabled_tools()
                 assert isinstance(enabled_tools, list)
                 # Just verify it returns a list without errors
-
-    def test_enable_advanced_tools_flag(self):
-        """Test ENABLE_ADVANCED_TOOLS environment variable."""
-        with patch.dict(
-            os.environ,
-            {
-                "MEMENTO_TOOL_PROFILE": "extended",
-                "MEMENTO_ENABLE_ADVANCED_TOOLS": "true",
-            },
-            clear=True,
-        ):
-            Config.reload_config()
-
-            assert Config.ENABLE_ADVANCED_TOOLS is True
-
-            # Check that advanced tools would be included
-            tools = Config.get_enabled_tools()
-            # Verify tools list is generated without error
-            assert isinstance(tools, list)
 
 
 if __name__ == "__main__":

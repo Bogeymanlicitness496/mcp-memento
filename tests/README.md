@@ -98,7 +98,7 @@ chmod +x run_tests.sh      # Make executable (first time)
 
 ### 4. Integration Tests
 - **Zed MCP Protocol**: Proper JSON-RPC communication
-- **Environment Variables**: `MEMENTO_SQLITE_PATH`, `MEMENTO_TOOL_PROFILE` handling
+- **Environment Variables**: `MEMENTO_DB_PATH`, `MEMENTO_PROFILE` handling
 - **Database Operations**: SQLite connection and transaction management
 - **Unicode Support**: UTF-8 encoding for tool descriptions and memory content
 
@@ -217,10 +217,10 @@ The test suite is designed for seamless CI/CD integration:
 ### Environment Variables for CI
 ```bash
 # Database configuration
-export MEMENTO_SQLITE_PATH=tests/test_data/ci_test.db
+export MEMENTO_DB_PATH=tests/test_data/ci_test.db
 
 # Tool profile
-export MEMENTO_TOOL_PROFILE=extended
+export MEMENTO_PROFILE=extended
 
 # Logging
 export MEMENTO_LOG_LEVEL=INFO

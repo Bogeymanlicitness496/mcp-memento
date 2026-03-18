@@ -66,7 +66,7 @@ class Memento:
             # Filter tools by name
             self.tools = [tool for tool in all_tools if tool.name in enabled_tool_names]
             logger.info(
-                f"Tool profile: {Config.TOOL_PROFILE.upper()} - {len(self.tools)}/{len(all_tools)} tools enabled"
+                f"Tool profile: {Config.PROFILE.upper()} - {len(self.tools)}/{len(all_tools)} tools enabled"
             )
 
     def _collect_all_tools(self) -> List[Tool]:
@@ -167,7 +167,7 @@ class Memento:
             logger.info("MCP Memento initialized successfully.")
             logger.info(f"Backend: {backend_name}")
             logger.info(
-                f"Tool profile: {Config.TOOL_PROFILE.upper()} ({len(self.tools)} tools enabled)"
+                f"Tool profile: {Config.PROFILE.upper()} ({len(self.tools)} tools enabled)"
             )
 
         except Exception as e:

@@ -35,7 +35,7 @@ class SQLiteBackend(GraphBackend):
         Raises:
             DatabaseConnectionError: If SQLite connection fails
         """
-        self.db_path: str = db_path if db_path is not None else Config.SQLITE_PATH
+        self.db_path: str = db_path if db_path is not None else Config.DB_PATH
         self.conn: Optional[aiosqlite.Connection] = None
         self._connected = False
         self._supports_fts = False
@@ -190,7 +190,6 @@ class SQLiteBackend(GraphBackend):
                 "CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(rel_type)"
             )
 
-
             # Create FTS5 virtual table for full-text search
             try:
                 await self.conn.execute("""
@@ -277,7 +276,6 @@ class SQLiteBackend(GraphBackend):
     def supports_transactions(self) -> bool:
         """Check if this backend supports ACID transactions."""
         return True  # SQLite supports transactions
-
 
     @classmethod
     async def create(cls, db_path: Optional[str] = None) -> "SQLiteBackend":

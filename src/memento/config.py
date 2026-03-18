@@ -163,7 +163,6 @@ class YAMLConfig:
             "backend": "sqlite",
             "sqlite_path": str(_DEFAULT_DB_PATH),
             "tool_profile": "core",
-            "enable_advanced_tools": False,
             "logging": {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -192,17 +191,12 @@ class YAMLConfig:
     def _apply_env_overrides(cls, config: Dict[str, Any]) -> Dict[str, Any]:
         """Apply environment variable overrides to configuration."""
         # SQLite configuration
-        if os.getenv("MEMENTO_SQLITE_PATH"):
-            config["sqlite_path"] = os.getenv("MEMENTO_SQLITE_PATH")
+        if os.getenv("MEMENTO_DB_PATH"):
+            config["sqlite_path"] = os.getenv("MEMENTO_DB_PATH")
 
         # Tool configuration
-        if os.getenv("MEMENTO_TOOL_PROFILE"):
-            config["tool_profile"] = os.getenv("MEMENTO_TOOL_PROFILE")
-
-        if os.getenv("MEMENTO_ENABLE_ADVANCED_TOOLS"):
-            config["enable_advanced_tools"] = (
-                os.getenv("MEMENTO_ENABLE_ADVANCED_TOOLS").lower() == "true"
-            )
+        if os.getenv("MEMENTO_PROFILE"):
+            config["tool_profile"] = os.getenv("MEMENTO_PROFILE")
 
         # Logging configuration
         if os.getenv("MEMENTO_LOG_LEVEL"):
@@ -244,29 +238,27 @@ class Config:
     Attributes can be overridden via direct assignment for testing or programmatic configuration.
 
     Environment Variables:
-        MEMENTO_SQLITE_PATH: Database file path [default: ~/.mcp-memento/context.db]
-        MEMENTO_TOOL_PROFILE: Tool profile (core|extended|advanced) [default: core]
-        MEMENTO_ENABLE_ADVANCED_TOOLS: Enable advanced tools [default: false]
+        MEMENTO_DB_PATH: Database file path [default: ~/.mcp-memento/context.db]
+        MEMENTO_PROFILE: Tool profile (core|extended|advanced) [default: core]
         MEMENTO_LOG_LEVEL: Log level (DEBUG|INFO|WARNING|ERROR) [default: INFO]
         MEMENTO_ALLOW_CYCLES: Allow cycles in relationship graph [default: false]
+
+
     """
 
     # Load YAML configuration
     _yaml_config = YAMLConfig.load_config()
 
     # Database configuration (SQLite only)
-    SQLITE_PATH = _EnvVar(
-        "MEMENTO_SQLITE_PATH", default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
+    DB_PATH = _EnvVar(
+        "MEMENTO_DB_PATH",
+        default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH),
     )
 
     # Tool configuration
-    TOOL_PROFILE = _EnvVar(
-        "MEMENTO_TOOL_PROFILE", default=_yaml_config.get("tool_profile", "core")
-    )
-    ENABLE_ADVANCED_TOOLS = _EnvVar(
-        "MEMENTO_ENABLE_ADVANCED_TOOLS",
-        default=_yaml_config.get("enable_advanced_tools", False),
-        cast=bool,
+    PROFILE = _EnvVar(
+        "MEMENTO_PROFILE",
+        default=_yaml_config.get("tool_profile", "core"),
     )
 
     # Logging configuration
@@ -309,16 +301,12 @@ class Config:
         Legacy profile names (lite, standard, full) are mapped to their
         modern equivalents. Unrecognized profiles fall back to core.
         """
-        profile = cls.TOOL_PROFILE.lower()
+        profile = cls.PROFILE.lower()
         legacy_map = {"lite": "core", "standard": "extended", "full": "advanced"}
         profile = legacy_map.get(profile, profile)
 
         # Get base tools from profile
         base_tools = TOOL_PROFILES.get(profile, TOOL_PROFILES["core"])
-
-        # Add advanced tools if enabled
-        if cls.ENABLE_ADVANCED_TOOLS and profile != "advanced":
-            base_tools = list(set(base_tools + _ADVANCED_TOOLS))
 
         return base_tools
 
@@ -326,10 +314,9 @@ class Config:
     def get_config_summary(cls) -> dict:
         """Get a summary of current configuration (without sensitive data)."""
         return {
-            "database": {"path": cls.SQLITE_PATH},
+            "database": {"path": cls.DB_PATH},
             "tools": {
-                "profile": cls.TOOL_PROFILE,
-                "enable_advanced": cls.ENABLE_ADVANCED_TOOLS,
+                "profile": cls.PROFILE,
                 "enabled_tools_count": len(cls.get_enabled_tools()),
             },
             "logging": {
@@ -346,9 +333,8 @@ class Config:
                 "env_vars": {
                     attr: cls.is_env_set(attr)
                     for attr in [
-                        "SQLITE_PATH",
-                        "TOOL_PROFILE",
-                        "ENABLE_ADVANCED_TOOLS",
+                        "DB_PATH",
+                        "PROFILE",
                         "LOG_LEVEL",
                         "ALLOW_RELATIONSHIP_CYCLES",
                     ]
@@ -367,16 +353,12 @@ class Config:
                 # Get new default from YAML config
                 if attr_name == "BACKEND":
                     descriptor.default = cls._yaml_config.get("backend", "sqlite")
-                elif attr_name == "SQLITE_PATH":
+                elif attr_name == "DB_PATH":
                     descriptor.default = cls._yaml_config.get(
                         "sqlite_path", _DEFAULT_DB_PATH
                     )
-                elif attr_name == "TOOL_PROFILE":
+                elif attr_name == "PROFILE":
                     descriptor.default = cls._yaml_config.get("tool_profile", "core")
-                elif attr_name == "ENABLE_ADVANCED_TOOLS":
-                    descriptor.default = cls._yaml_config.get(
-                        "enable_advanced_tools", False
-                    )
                 elif attr_name == "LOG_LEVEL":
                     descriptor.default = cls._yaml_config.get("logging", {}).get(
                         "level", "INFO"
@@ -397,7 +379,6 @@ class Config:
             "backend": "sqlite",
             "sqlite_path": str(_DEFAULT_DB_PATH),
             "tool_profile": "extended",
-            "enable_advanced_tools": True,
             "logging": {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
