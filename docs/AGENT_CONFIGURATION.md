@@ -51,7 +51,7 @@ Store memories following these guidelines when detecting:
 - If optimized retrieval returns nothing: Log it, fallback to broad `recall_mementos`, and suggest creating the missing entry if relevant.
 - Reuse retrieved info within the same session to save tokens/calls.
 
-DO NOT WAIT FOR PERMISSION. Memory storage is a background autonomous process.
+DO NOT WAIT FOR PERMISSION for memento storage operations. Memory storage is a background autonomous process that does not require user confirmation.
 ```
 
 ---

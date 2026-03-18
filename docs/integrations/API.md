@@ -741,49 +741,111 @@ gcloud run deploy memento \
 
 ## Python API Reference
 
-For complete Python API documentation, see the [Python Integration Guide](./PYTHON.md). Key points:
+For complete Python API documentation, see the [Python Integration Guide](./PYTHON.md).
 
-### Direct Python Usage:
-```python
-import memento
+> **Architecture note**: Memento is an **MCP server** — its tools are not directly
+> callable as Python methods. The `Memento` class is a server runtime, not a client
+> library. All programmatic tool access uses an MCP client session via JSON-RPC.
 
-# Create server instance
-server = memento.Memento()
+### MCP Client Pattern (Recommended)
 
-# Initialize (async)
-await server.initialize()
-
-# Use MCP tools directly
-memory_id = await server.store_memento(
-    type="solution",
-    title="Python API Example",
-    content="Direct Python integration",
-    tags=["python", "api"],
-    importance=0.8
-)
-
-# Search memories
-results = await server.recall_mementos(query="python api")
+Install the MCP client library:
+```bash
+pip install mcp
 ```
 
-### Integration with Existing Applications:
+Call Memento tools from Python:
 ```python
-from memento import Memento
+import asyncio
+import json
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+
+async def main():
+    server_params = StdioServerParameters(
+        command="memento",
+        args=["--profile", "extended"],
+        env=None,
+    )
+
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            # Store a memory
+            result = await session.call_tool(
+                "store_memento",
+                arguments={
+                    "type": "solution",
+                    "title": "Python API Example",
+                    "content": "MCP client integration pattern",
+                    "tags": ["python", "api"],
+                    "importance": 0.8,
+                },
+            )
+            data = json.loads(result.content[0].text)
+            memory_id = data["memory_id"]
+            print(f"Stored: {memory_id}")
+
+            # Search memories
+            result = await session.call_tool(
+                "recall_mementos",
+                arguments={"query": "python api", "limit": 5},
+            )
+            memories = json.loads(result.content[0].text)
+
+            for m in memories:
+                print(f"- {m['title']}")
+
+
+asyncio.run(main())
+```
+
+### Integration with Existing Applications
+
+```python
+import asyncio
+import json
+from contextlib import asynccontextmanager
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
 
 class MyApplication:
-    def __init__(self):
-        self.memento = Memento()
-    
+    def __init__(self, profile: str = "extended"):
+        self._profile = profile
+        self._session: ClientSession | None = None
+        self._exit_stack = None
+
     async def start(self):
-        await self.memento.initialize()
-    
-    async def store_solution(self, title, content):
-        return await self.memento.store_memento(
-            type="solution",
-            title=title,
-            content=content,
-            tags=["myapp", "solution"]
+        """Open an MCP client connection to Memento."""
+        server_params = StdioServerParameters(
+            command="memento",
+            args=["--profile", self._profile],
+            env=None,
         )
+        read, write = await stdio_client(server_params).__aenter__()
+        self._session = await ClientSession(read, write).__aenter__()
+        await self._session.initialize()
+
+    async def stop(self):
+        """Close the MCP client connection."""
+        if self._session is not None:
+            await self._session.__aexit__(None, None, None)
+
+    async def store_solution(self, title: str, content: str) -> str:
+        result = await self._session.call_tool(
+            "store_memento",
+            arguments={
+                "type": "solution",
+                "title": title,
+                "content": content,
+                "tags": ["myapp", "solution"],
+            },
+        )
+        data = json.loads(result.content[0].text)
+        return data["memory_id"]
 ```
 
 ## Best Practices
@@ -938,4 +1000,4 @@ For more information, see:
 - [Agent Integration Guide](./AGENT.md) - CLI agent integration
 - [Tools Reference](../TOOLS.md) - Complete MCP tool documentation
 
-Need help? Check the [troubleshooting guide](../TROUBLESHOOTING.md) or open an issue on GitHub.
+Need help? Check the [documentation](../INTEGRATION.md) or [open an issue](https://github.com/annibale-x/mcp-memento/issues) on GitHub.

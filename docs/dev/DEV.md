@@ -406,7 +406,7 @@ python scripts/deploy.py ext-binaries --ext 2
 gh release download v0.3.0-ext.2 --repo annibale-x/mcp-memento \
   --dir integrations/zed/stub/bin/ --clobber
 git add integrations/zed/stub/bin/
-git commit -m "chore(zed): bundle stub binaries from v0.3.0-ext.2"
+git commit -m "chore(ext): bundle stub binaries from v0.3.0-ext.2"
 git push origin dev
 ```
 

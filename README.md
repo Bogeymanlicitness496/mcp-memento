@@ -3,14 +3,14 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.6-purple.svg)](https://github.com/annibale-x/memento-mcp-server/releases/tag/v0.2.6)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.6-purple.svg)](https://github.com/annibale-x/mcp-memento/releases/tag/v0.2.6)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
 Memento is an MCP server that provides persistent memory capabilities across multiple platforms:
 - **IDEs**: Zed, Cursor, Windsurf, VSCode, Claude Desktop
 - **CLI Agents**: Gemini CLI, Claude CLI, custom agents
-- **Programmatic Usage**: Python API, REST API, custom integrations
+- **Programmatic Usage**: MCP client (Python/Node.js), REST API, custom integrations
 - **Applications**: Any MCP-compatible application
 
 Build a personal or team knowledge base that grows smarter over time, accessible from all your development tools.
@@ -145,6 +145,11 @@ store_memento(
 # Find knowledge later
 recall_mementos(query="Redis timeout solutions")
 ```
+
+> **📌 Note**: The code above represents **MCP tool calls** — instructions you give
+> your AI assistant (Claude, Cursor, Gemini, etc.) to invoke Memento's tools.
+> This is **not** a Python library you can `import`. For programmatic Python access
+> see the [Python Integration Guide](docs/integrations/PYTHON.md).
 
 **💬 Natural Language**: You can also interact with Memento through natural conversation. Just tell your AI assistant things like "Remember that..." or "Store this..." or "Memento..."- no code required.
 
@@ -429,10 +434,10 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🔗 Links
 
-- **[GitHub Repository](https://github.com/annibale-x/memento-mcp-server)** - Source code and issues
+- **[GitHub Repository](https://github.com/annibale-x/mcp-memento)** - Source code and issues
 - **[MCP Protocol](https://spec.modelcontextprotocol.io/)** - Model Context Protocol specification
 - **[PyPI Package](https://pypi.org/project/mcp-memento/)** - Python Package Index
 
 ---
 
-**Need help?** Check the [documentation](docs/) or open an [issue](https://github.com/annibale-x/memento-mcp-server/issues) on GitHub.
+**Need help?** Check the [documentation](docs/) or open an [issue](https://github.com/annibale-x/mcp-memento/issues) on GitHub.

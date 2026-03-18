@@ -59,7 +59,7 @@ Memento offers three tool profiles with increasing capabilities:
 
 ### Extended Profile (17 tools)
 - All Core Profile tools
-- Additional confidence tools: `apply_memento_confidence_decay`
+- Additional tools: `get_memento_statistics`, `search_memento_relationships_by_context`, `contextual_memento_search`, `apply_memento_confidence_decay`
 
 ### Advanced Profile (25 tools)
 - All Extended Profile tools
@@ -172,6 +172,11 @@ Common error scenarios:
 - Permission/access restrictions
 
 ## Integration Patterns
+
+> **📌 Note**: The code snippets below are **MCP tool call pseudocode** — they
+> illustrate which tools an AI agent should invoke and with what arguments. They are
+> **not** importable Python functions. For programmatic Python access, use the MCP
+> client pattern described in [PYTHON.md](integrations/PYTHON.md).
 
 ### With AI Assistants
 ```python

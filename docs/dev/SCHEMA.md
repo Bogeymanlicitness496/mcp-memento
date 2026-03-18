@@ -105,7 +105,6 @@ This index supports optimistic locking for memory updates.
   "last_validated": "ISO timestamp",
   "validation_count": 0,
   "counter_evidence_count": 0,
-  "confidence": 0.8,
   "last_accessed": "ISO timestamp",
   "access_count": 0,
   "decay_factor": 0.95

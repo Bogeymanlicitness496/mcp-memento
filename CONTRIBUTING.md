@@ -19,7 +19,7 @@ Please be respectful and considerate of others when contributing to this project
 ## Getting Started
 
 ### Finding Issues to Work On
-- Check the [GitHub Issues](https://github.com/annibale-x/memento-mcp-server/issues) for bugs and feature requests
+- Check the [GitHub Issues](https://github.com/annibale-x/mcp-memento/issues) for bugs and feature requests
 - Look for issues tagged with `good-first-issue` or `help-wanted`
 - Discuss proposed changes in an issue before starting work
 
@@ -27,7 +27,7 @@ Please be respectful and considerate of others when contributing to this project
 
 1. **Fork and clone the repository**:
    ```bash
-   git clone https://github.com/annibale-x/memento-mcp-server.git
+   git clone https://github.com/annibale-x/mcp-memento.git
    cd mcp-memento
    ```
 
@@ -140,17 +140,20 @@ pytest tests/test_memory_operations.py::test_store_memory -v
 ### Documentation Structure
 ```
 docs/
-├── TOOLS.md          # MCP tools reference
-├── DECAY_SYSTEM.md   # Confidence system documentation
-├── RULES.md          # Usage rules and best practices
-├── INTEGRATION.md    # Integration overview
-├── integrations/     # Detailed integration guides
-│   ├── IDE.md        # IDE integration (Zed, Cursor, Windsurf, etc.)
-│   ├── PYTHON.md     # Python library and API usage
-│   ├── AGENT.md      # CLI agent integration (Gemini, Claude, etc.)
-│   └── API.md        # HTTP REST API, Node.js SDK, Docker deployment
-└── dev/              # Development documentation
-    └── SCHEMA.md     # Database schema documentation
+├── TOOLS.md              # MCP tools reference
+├── DECAY_SYSTEM.md       # Confidence system documentation
+├── RULES.md              # Usage rules and best practices
+├── RELATIONSHIPS.md      # Relationship types reference
+├── AGENT_CONFIGURATION.md # Agent prompt templates and configuration
+├── INTEGRATION.md        # Integration overview
+├── integrations/         # Detailed integration guides
+│   ├── IDE.md            # IDE integration (Zed, Cursor, Windsurf, etc.)
+│   ├── PYTHON.md         # Python MCP client and programmatic usage
+│   ├── AGENT.md          # CLI agent integration (Gemini, Claude, etc.)
+│   └── API.md            # HTTP REST API, Node.js SDK, Docker deployment
+└── dev/                  # Development documentation
+    ├── DEV.md            # Development workflow and release process
+    └── SCHEMA.md         # Database schema documentation
 ```
 
 **Note**: This file (`CONTRIBUTING.md`) is located in the project root, following GitHub conventions for contributor guidelines. For detailed technical documentation, see the `docs/` directory.
@@ -250,6 +253,8 @@ Use the following commit message format:
 - `test(memory): add tests for relationship validation`
 
 ## Release Process
+
+> **Note**: For the complete automated release workflow (tag conventions, deploy script, CI/CD), see [docs/dev/DEV.md](docs/dev/DEV.md).
 
 ### Versioning
 We follow [Semantic Versioning](https://semver.org/):

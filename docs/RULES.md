@@ -295,8 +295,7 @@ When making high-level choices:
 
 ### 3. Monthly
 - **Apply confidence decay**: `apply_memento_confidence_decay()`
-- **Export backup**: `memento --export`
-- **Database maintenance**: `memento --maintenance`
+- **Export backup**: `memento export --format json --output memento-backup.json`
 - **Review tags**: Clean up unused or inconsistent tags
 
 ### 4. Quarterly

@@ -317,7 +317,7 @@ Quick reference by profile:
 | Profile | Tools | Key additions |
 |---|---|---|
 | `core` | 13 | `store_memento`, `get_memento`, `update_memento`, `delete_memento`, `recall_mementos`, `search_mementos`, `create_memento_relationship`, `get_related_mementos`, ... |
-| `extended` | 17 | + `apply_memento_confidence_decay` |
+| `extended` | 17 | + `get_memento_statistics`, `search_memento_relationships_by_context`, `contextual_memento_search`, `apply_memento_confidence_decay` |
 | `advanced` | 25 | + graph analytics, `set_memento_decay_factor`, ... |
 
 ---

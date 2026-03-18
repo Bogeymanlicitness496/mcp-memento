@@ -168,7 +168,7 @@ For full details see [Python Integration Guide](./integrations/PYTHON.md).
 - **Best Profile**: Extended or Advanced
 
 ### For AI Agent Developers
-- **Primary Use**: Python API for custom agents
+- **Primary Use**: MCP client (Python `mcp` library) for custom agents
 - **Secondary Use**: HTTP REST API for multi-language support
 - **Best Profile**: Advanced (25 tools)
 
