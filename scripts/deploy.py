@@ -714,8 +714,12 @@ def cmd_bump(
     if not dev_only:
         git_merge_to_main(dry)
 
-    # 8. Upload stub binaries to the GitHub release
-    upload_stub_binaries_to_release(new_ver, dry)
+    # 8. Upload stub binaries to the GitHub release (skipped with --dev:
+    #    no GitHub Release exists yet, only the tag)
+    if not dev_only:
+        upload_stub_binaries_to_release(new_ver, dry)
+    else:
+        info("Stub binary upload skipped (--dev). Run without --dev to create the full release.")
 
     print()
     ok(f"Release v{new_ver} complete!")
