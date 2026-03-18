@@ -532,8 +532,19 @@ def git_tag_exists_local(tag: str) -> bool:
     return result.strip() == tag
 
 
+def git_tag_exists_remote(tag: str) -> bool:
+    """Return True if the tag already exists on the remote repository."""
+    result = run(
+        f"git ls-remote --tags origin refs/tags/{tag}",
+        capture=True,
+        dry=False,
+        check=False,
+    )
+    return bool(result.strip())
+
+
 def git_retag(tag: str, dry: bool) -> None:
-    """Delete the local tag and re-create it pointing to HEAD, then force-push."""
+    """Delete the local tag and re-create it pointing to HEAD."""
     run(f"git tag -d {tag}", dry=dry)
     run(f"git tag {tag}", dry=dry)
 
@@ -965,10 +976,23 @@ def cmd_bump(
             else:
                 info(f"Tag {py_tag} left unchanged.")
         else:
-            die(
-                f"Tag {py_tag} already exists. Cannot overwrite a non-dev release tag.\n"
-                "  Bump to a new version or delete the tag manually if this was a mistake."
-            )
+            # Tag exists locally but may not yet be on remote (e.g. after a --dev bump).
+            # If it is remote-only or on both, refuse to overwrite to avoid clobbering a
+            # published release.
+            if git_tag_exists_remote(py_tag):
+                die(
+                    f"Tag {py_tag} already exists on the remote. Cannot overwrite a published release tag.\n"
+                    "  Bump to a new version or delete the tag manually if this was a mistake."
+                )
+
+            warn(f"Tag {py_tag} exists locally but NOT on remote (likely from a --dev bump).")
+
+            if confirm(f"Move tag {py_tag} to current HEAD and push it?", yes):
+                git_retag(py_tag, dry)
+                git_push_tag(py_tag, dry)
+                ok(f"Tag {py_tag} moved to HEAD and pushed")
+            else:
+                die("Aborted. Delete the local tag manually or bump to a new version.")
     else:
         git_tag(py_tag, dry)
         if dev_only:
