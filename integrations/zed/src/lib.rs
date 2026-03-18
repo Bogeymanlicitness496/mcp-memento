@@ -4,12 +4,13 @@ use zed_extension_api::{
     self as zed, Command, ContextServerId, DownloadedFileType, Os, Project, Result,
 };
 
-/// Version of the native stub binary to download from GitHub Releases.
-const STUB_VERSION: &str = "0.1.0";
+/// Git ref (branch or commit SHA) from which to download the stub binaries.
+/// Changing this forces a re-download of the stub.
+const STUB_REF: &str = "dev";
 
-/// GitHub Releases base URL for the stub binary.
-/// Tag convention: stub-v{STUB_VERSION}
-const STUB_BASE_URL: &str = "https://github.com/annibale-x/mcp-memento/releases/download";
+/// Base URL for raw binary downloads directly from the repository.
+/// Path: {STUB_RAW_BASE}/{STUB_REF}/integrations/zed/stub/bin/{asset}
+const STUB_RAW_BASE: &str = "https://raw.githubusercontent.com/annibale-x/mcp-memento";
 
 struct MementoExtension {
     cached_stub: Option<String>,
@@ -31,40 +32,38 @@ impl MementoExtension {
         }
     }
 
-    /// Returns the local filename for the versioned stub binary.
-    /// Embedding the version ensures a fresh download whenever STUB_VERSION changes.
-    fn stub_local_name(os: Os, arch: zed_extension_api::Architecture, version: &str) -> String {
+    /// Returns the local filename for the cached stub binary.
+    /// Embedding git_ref ensures a re-download whenever STUB_REF changes.
+    fn stub_local_name(os: Os, arch: zed_extension_api::Architecture, git_ref: &str) -> String {
         let asset = Self::stub_asset_name(os, arch);
+        // Replace '/' in branch names (e.g. "refs/heads/dev") with '-'.
+        let safe_ref = git_ref.replace('/', "-");
 
-        // Strip the extension suffix so we can insert the version cleanly,
-        // then re-attach it.
         if let Some(stem) = asset.strip_suffix(".exe") {
-            format!("{}-v{}.exe", stem, version)
+            format!("{}-{}.exe", stem, safe_ref)
         } else {
-            format!("{}-v{}", asset, version)
+            format!("{}-{}", asset, safe_ref)
         }
     }
 
-    /// Downloads the stub binary into the extension working directory if not
-    /// already present, marks it executable on Unix, and returns its absolute path.
-    fn ensure_stub(
-        &mut self,
-        os: Os,
-        arch: zed_extension_api::Architecture,
-        version: &str,
-    ) -> Result<String> {
+    /// Downloads the stub binary from raw.githubusercontent.com if not already
+    /// present, marks it executable on Unix, and returns its absolute path.
+    fn ensure_stub(&mut self, os: Os, arch: zed_extension_api::Architecture) -> Result<String> {
         if let Some(ref cached) = self.cached_stub {
             return Ok(cached.clone());
         }
 
-        let local_name = Self::stub_local_name(os, arch, version);
+        let local_name = Self::stub_local_name(os, arch, STUB_REF);
         let asset_name = Self::stub_asset_name(os, arch);
 
         // Skip the network call if the file is already on disk.
         let already_exists = std::fs::metadata(&local_name).is_ok();
 
         if !already_exists {
-            let url = format!("{}/stub-v{}/{}", STUB_BASE_URL, version, asset_name);
+            let url = format!(
+                "{}/{}/integrations/zed/stub/bin/{}",
+                STUB_RAW_BASE, STUB_REF, asset_name
+            );
 
             zed::download_file(&url, &local_name, DownloadedFileType::Uncompressed)
                 .map_err(|e| format!("Failed to download memento stub: {e}"))?;
@@ -100,19 +99,12 @@ impl zed::Extension for MementoExtension {
         let (os, arch) = zed::current_platform();
 
         // --- Read settings ---
-        let mut stub_version = STUB_VERSION.to_string();
         let mut env_vars = vec![("PYTHONUNBUFFERED".to_string(), "1".to_string())];
 
         if let Ok(settings) =
             ContextServerSettings::for_project(context_server_id.as_ref(), project)
         {
             if let Some(zed_extension_api::serde_json::Value::Object(map)) = settings.settings {
-                if let Some(ver) = map.get("STUB_VERSION").and_then(|v| v.as_str()) {
-                    if !ver.is_empty() {
-                        stub_version = ver.to_string();
-                    }
-                }
-
                 if let Some(cmd) = map.get("PYTHON_COMMAND").and_then(|v| v.as_str()) {
                     if !cmd.is_empty() && cmd != "auto" {
                         env_vars.push(("PYTHON_COMMAND".to_string(), cmd.to_string()));
@@ -130,7 +122,7 @@ impl zed::Extension for MementoExtension {
         }
 
         // --- Ensure stub binary is present ---
-        let stub_path = self.ensure_stub(os, arch, &stub_version)?;
+        let stub_path = self.ensure_stub(os, arch)?;
 
         Ok(Command {
             command: stub_path,
@@ -162,11 +154,6 @@ impl zed::Extension for MementoExtension {
                     "type": "string",
                     "description": "Python executable override. Leave empty for automatic discovery, or set to an absolute path (e.g. C:\\Python312\\python.exe).",
                     "default": "auto"
-                },
-                "STUB_VERSION": {
-                    "type": "string",
-                    "description": "Version of the memento-stub binary to download.",
-                    "default": "0.1.0"
                 }
             }
         });
@@ -175,8 +162,7 @@ impl zed::Extension for MementoExtension {
             "{\n",
             "  \"MEMENTO_DB_PATH\": \"~/.mcp-memento/context.db\",\n",
             "  \"MEMENTO_PROFILE\": \"core\",\n",
-            "  \"PYTHON_COMMAND\": \"auto\",\n",
-            "  \"STUB_VERSION\": \"0.1.0\"\n",
+            "  \"PYTHON_COMMAND\": \"auto\"\n",
             "}"
         );
 
