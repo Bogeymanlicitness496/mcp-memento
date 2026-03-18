@@ -319,12 +319,22 @@ def bump_extension_toml(new_ver: str, dry: bool) -> None:
     )
 
 
-def bump_lib_rs_stub_release(new_ver: str, dry: bool) -> None:
+def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
+    """Update STUB_EXT_RELEASE and STUB_CHANNEL in lib.rs."""
+
     tag = f"v{new_ver}"
     _replace_in_file(
         ZED_LIB_RS,
         r'(STUB_EXT_RELEASE:\s*&str\s*=\s*)"[^"]+"',
         rf'\g<1>"{tag}"',
+        dry,
+    )
+
+    channel = "dev" if dev_only else "prod"
+    _replace_in_file(
+        ZED_LIB_RS,
+        r'(STUB_CHANNEL:\s*&str\s*=\s*)"[^"]+"',
+        rf'\g<1>"{channel}"',
         dry,
     )
 
@@ -624,6 +634,39 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
         ok(f"Uploaded: {f.name}")
 
 
+def upload_stub_binaries_to_dev_prerelease(dry: bool) -> None:
+    """Create (or update) the rolling pre-release 'dev-latest' and upload stubs.
+
+    Only the locally built binary for the current platform is uploaded here.
+    The CI workflow (zed-stub-dev.yml) cross-compiles the remaining 4 targets
+    and uploads them to the same pre-release tag.
+    """
+    step("Uploading stub binaries to GitHub pre-release 'dev-latest'")
+
+    files = sorted(ZED_STUB_BIN.glob("memento-stub-*"))
+
+    if not files:
+        die(f"No stub binaries found in {ZED_STUB_BIN}. Run 'dev-stub' first.")
+
+    # Create or recreate the dev-latest pre-release tag.
+    # --clobber on upload handles the case where it already exists.
+    run(
+        f"gh release create dev-latest"
+        f" --repo {GITHUB_REPO}"
+        f" --title 'Dev stub binaries (rolling)'"
+        f" --notes 'Auto-updated on every dev bump. Not for production use.'"
+        f" --prerelease"
+        f" --latest=false",
+        dry=dry,
+        check=False,  # ignore error if release already exists
+    )
+
+    for f in files:
+        cmd = f"gh release upload dev-latest {f} --repo {GITHUB_REPO} --clobber"
+        run(cmd, dry=dry)
+        ok(f"Uploaded: {f.name}")
+
+
 
 def _zed_work_dir() -> "Path | None":
     """Return the Zed extension work directory for mcp-memento, or None if not found.
@@ -878,7 +921,7 @@ def cmd_bump(
     bump_init(new_ver, dry)
     bump_zed_cargo(new_ver, dry)
     bump_extension_toml(new_ver, dry)
-    bump_lib_rs_stub_release(new_ver, dry)
+    bump_lib_rs_stub_release(new_ver, dev_only, dry)
     bump_readme_badge(new_ver, dry)
 
     # 3. Changelog
@@ -929,12 +972,18 @@ def cmd_bump(
 
     # 8. Stub binaries
     if not dev_only:
-        # Full release: upload pre-built binaries to the GitHub release
+        # Full release: upload pre-built binaries to the GitHub release vX.Y.Z.
+        # The CI workflow (zed-stub-release.yml) cross-compiles all 5 targets
+        # and uploads them; here we also upload the locally pre-built ones from
+        # stub/bin/ as a safety net.
         upload_stub_binaries_to_release(new_ver, dry)
     else:
-        # Dev-only: build stub for current platform and bundle it in stub/bin/
-        # so that "Install Dev Extension" in Zed always uses an up-to-date binary.
+        # Dev-only: build stub for the current platform and upload it to the
+        # rolling pre-release "dev-latest" on GitHub.
+        # The CI workflow (zed-stub-dev.yml) cross-compiles the remaining 4
+        # targets and uploads them to the same pre-release.
         build_stub_local(dry)
+        upload_stub_binaries_to_dev_prerelease(dry)
 
     print()
     ok(f"Release v{new_ver} complete!")

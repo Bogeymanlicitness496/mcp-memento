@@ -18,6 +18,11 @@ use zed_extension_api::{
 /// GitHub release tag for the current stub binaries (matches Python version tag).
 const STUB_EXT_RELEASE: &str = "v0.2.9";
 
+/// Distribution channel: "prod" downloads from the vX.Y.Z GitHub Release;
+/// "dev" downloads from the rolling pre-release tag "dev-latest".
+/// Set automatically by scripts/deploy.py during a version bump.
+const STUB_CHANNEL: &str = "dev";
+
 /// GitHub repository (owner/name) hosting the releases.
 const REPO: &str = "annibale-x/mcp-memento";
 
@@ -103,10 +108,17 @@ impl MementoExtension {
         let download_name = Self::stub_download_name(os, arch);
 
         if std::fs::metadata(&download_name).is_err() {
-            // Not cached — download from the GitHub release.
+            // Not cached — download from the appropriate GitHub release.
+            // "prod"  → versioned release  vX.Y.Z  (stable, official)
+            // "dev"   → rolling pre-release dev-latest (updated on every dev bump)
+            let release_tag = match STUB_CHANNEL {
+                "prod" => STUB_EXT_RELEASE.to_string(),
+                _ => "dev-latest".to_string(),
+            };
+
             let url = format!(
                 "https://github.com/{}/releases/download/{}/{}",
-                REPO, STUB_EXT_RELEASE, asset_name,
+                REPO, release_tag, asset_name,
             );
 
             zed::download_file(&url, &download_name, DownloadedFileType::Uncompressed)
