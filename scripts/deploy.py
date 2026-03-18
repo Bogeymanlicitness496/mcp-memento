@@ -388,7 +388,7 @@ def build_package(dry: bool) -> None:
             _restore_readme(readme_backup, dry)
 
     if not dry:
-        files = sorted(DIST_DIR.glob("*"))
+        files = sorted(f for f in DIST_DIR.glob("*") if f.suffix in (".whl", ".gz"))
         for f in files:
             ok(f"Built: {f.name}  ({f.stat().st_size / 1024:.0f} KB)")
 
