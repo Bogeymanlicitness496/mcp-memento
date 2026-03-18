@@ -382,7 +382,7 @@ def build_package(dry: bool) -> None:
     # Temporarily patch README for PyPI (absolute links)
     readme_backup = _patch_readme_for_pypi(dry)
     try:
-        run(f"{UV} run python -m build", dry=dry)
+        run(f"{UV} build --out-dir {DIST_DIR}", dry=dry)
     finally:
         if readme_backup:
             _restore_readme(readme_backup, dry)
