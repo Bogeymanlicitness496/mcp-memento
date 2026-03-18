@@ -196,9 +196,27 @@ impl zed::Extension for MementoExtension {
     ) -> Result<Option<ContextServerConfiguration>> {
         let (os, _arch) = zed::current_platform();
 
+        // Resolve the default DB path at runtime so the user sees (and gets)
+        // a fully expanded, ready-to-use path — no shell variable expansion
+        // required on their side.
         let default_db_path = match os {
-            Os::Windows => "%USERPROFILE%\\.mcp-memento\\context.db",
-            _ => "~/.mcp-memento/context.db",
+            Os::Windows => {
+                let home = std::env::var("USERPROFILE")
+                    .or_else(|_| std::env::var("HOMEDRIVE").and_then(|d| {
+                        std::env::var("HOMEPATH").map(|p| format!("{}{}", d, p))
+                    }))
+                    .unwrap_or_else(|_| "C:/Users/user".to_string());
+
+                // Always use forward slashes — works on Windows and avoids
+                // JSON/TOML escaping issues with backslashes.
+                format!("{}/.mcp-memento/context.db", home.replace('\\', "/"))
+            }
+            _ => {
+                let home = std::env::var("HOME")
+                    .unwrap_or_else(|_| "~".to_string());
+
+                format!("{}/.mcp-memento/context.db", home)
+            }
         };
 
         let settings_schema = zed_extension_api::serde_json::json!({
