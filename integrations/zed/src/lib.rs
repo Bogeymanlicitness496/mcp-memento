@@ -168,8 +168,7 @@ impl zed::Extension for MementoExtension {
                 }
 
                 if let Some(path) = map.get("MEMENTO_DB_PATH").and_then(|v| v.as_str()) {
-                    // Skip empty strings and the placeholder shown in the UI.
-                    if !path.is_empty() && !path.starts_with("<") {
+                    if !path.is_empty() && path != "auto" {
                         env_vars.push(("MEMENTO_DB_PATH".to_string(), path.to_string()));
                     }
                 }
@@ -197,13 +196,9 @@ impl zed::Extension for MementoExtension {
     ) -> Result<Option<ContextServerConfiguration>> {
         let (os, _arch) = zed::current_platform();
 
-        // The WASM sandbox does not expose OS environment variables, so we
-        // cannot resolve %USERPROFILE% or $HOME at this point.
-        // We show a descriptive placeholder instead; the server Python will
-        // use its own OS-aware default when this field is left unchanged.
-        let default_db_path = match os {
-            Os::Windows => "<default: %USERPROFILE%/.mcp-memento/context.db>",
-            _ => "<default: ~/.mcp-memento/context.db>",
+        let db_path_default_hint = match os {
+            Os::Windows => "%USERPROFILE%\\.mcp-memento\\context.db",
+            _ => "~/.mcp-memento/context.db",
         };
 
         let settings_schema = zed_extension_api::serde_json::json!({
@@ -211,40 +206,56 @@ impl zed::Extension for MementoExtension {
             "properties": {
                 "MEMENTO_DB_PATH": {
                     "type": "string",
-                    "description": "Path to the Memento SQLite database file.",
-                    "default": default_db_path
+                    "description": format!(
+                        "Path to the Memento SQLite database file. \
+                         Use 'auto' to let the server choose the OS default ({}).",
+                        db_path_default_hint
+                    ),
+                    "default": "auto"
                 },
                 "MEMENTO_PROFILE": {
                     "type": "string",
-                    "description": "Tool profile to load (core, extended, advanced).",
+                    "description": "Tool profile: 'core' (basic memory ops), 'extended' (+ stats and decay), 'advanced' (+ graph analytics).",
                     "enum": ["core", "extended", "advanced"],
                     "default": "core"
                 },
                 "PYTHON_COMMAND": {
                     "type": "string",
-                    "description": "Python executable override. Leave empty for automatic discovery, or set to an absolute path (e.g. C:\\Python312\\python.exe).",
+                    "description": "Python executable. Use 'auto' for automatic discovery, or set an absolute path (e.g. C:/Users/you/AppData/Local/Programs/Python/Python312/python.exe).",
                     "default": "auto"
                 }
             }
         });
 
-        let default_settings = format!(
-            "{{\n  \"MEMENTO_DB_PATH\": \"{}\",\n  \"MEMENTO_PROFILE\": \"core\",\n  \"PYTHON_COMMAND\": \"auto\"\n}}",
-            default_db_path
+        let default_settings = concat!(
+            "{\n",
+            "  \"MEMENTO_DB_PATH\": \"auto\",\n",
+            "  \"MEMENTO_PROFILE\": \"core\",\n",
+            "  \"PYTHON_COMMAND\": \"auto\"\n",
+            "}"
+        );
+
+        let installation_instructions = format!(
+            "Memento requires Python 3.8+ on your system.\n\n\
+             A small native launcher (memento-stub) discovers Python, installs\n\
+             mcp-memento if needed, and starts the MCP server automatically.\n\n\
+             Settings\n\
+             --------\n\
+             MEMENTO_DB_PATH  Path to the SQLite database.\n\
+             \t'auto' uses the OS default: {}\n\
+             \tSet a custom absolute path to override.\n\n\
+             MEMENTO_PROFILE  Tool set exposed to the AI agent.\n\
+             \tcore     — basic memory operations (default)\n\
+             \textended — + statistics and confidence decay\n\
+             \tadvanced — + graph analytics\n\n\
+             PYTHON_COMMAND   Python executable to use.\n\
+             \t'auto' tries py / python3 / python and common install paths.\n\
+             \tSet an absolute path if your Python is not on the system PATH.",
+            db_path_default_hint
         );
 
         Ok(Some(ContextServerConfiguration {
-            installation_instructions: concat!(
-                "Memento requires Python 3.8+ installed on your system.\n\n",
-                "The extension includes a small native launcher (memento-stub) that\n",
-                "discovers Python automatically and starts the mcp-memento server.\n",
-                "If the bundled launcher is not available for your platform it will\n",
-                "be downloaded automatically from the GitHub release.\n\n",
-                "If Python is not found automatically, set PYTHON_COMMAND to the full\n",
-                "path of your Python executable\n",
-                "(e.g. \"C:\\\\Users\\\\you\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\")."
-            )
-            .to_string(),
+            installation_instructions,
             settings_schema: settings_schema.to_string(),
             default_settings: default_settings.to_string(),
         }))
