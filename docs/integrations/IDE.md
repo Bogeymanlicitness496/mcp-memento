@@ -32,7 +32,22 @@ Memento uses SQLite for local storage by default. The database is automatically 
 ### Overview
 Zed is a high-performance, multiplayer code editor with native MCP support. Memento integrates seamlessly to provide contextual memory across your coding sessions.
 
-### Configuration
+### Two Integration Modes
+
+Memento supports two distinct integration modes for Zed:
+
+| Mode | How | Best for |
+|---|---|---|
+| **Manual config** (PyPI) | Add `memento` command to `settings.json` | macOS / Linux — `memento` is in PATH |
+| **Zed Extension** | Install "Memento MCP Server" from Zed marketplace | Windows (avoids stdin buffering issue) or any platform where you prefer a managed install |
+
+> **Windows note**: Zed on Windows launches context server processes via PowerShell's
+> `ShellBuilder`, which can cause stdin buffering issues when using the manual config
+> approach. The dedicated Zed extension (a native Rust stub + WASM component) solves
+> this transparently. If the manual configuration does not work on Windows, use the
+> Zed extension instead.
+
+### Configuration (Manual / PyPI install)
 
 Add to `~/.config/zed/settings.json`:
 
@@ -586,17 +601,12 @@ This means Claude Desktop can't find the Memento command. Solutions:
 **Issue**: Slow performance or corruption.
 
 **Solutions**:
-1. Run maintenance:
-   ```bash
-   memento --maintenance
-   ```
-
-2. Check database size:
+1. Check database size:
    ```bash
    du -h ~/.mcp-memento/context.db
    ```
 
-3. Backup and recreate if corrupted:
+2. Backup and recreate if corrupted:
    ```bash
    cp ~/.mcp-memento/context.db ~/.mcp-memento/context.db.backup
    rm ~/.mcp-memento/context.db
@@ -613,16 +623,10 @@ This means Claude Desktop can't find the Memento command. Solutions:
 
 ### Memory Management
 
-1. **Regular maintenance**:
+1. **Backup important memories**:
    ```bash
-   # Monthly maintenance
-   memento --maintenance
-   ```
-
-2. **Backup important memories**:
-   ```bash
-   # Export memories
-   memento export --output memories-backup.json
+   # Export memories to JSON (use --format, required)
+   memento export --format json --output memories-backup.json
    ```
 
 3. **Use appropriate profiles**:
@@ -664,8 +668,8 @@ This means Claude Desktop can't find the Memento command. Solutions:
 
 2. **Archive inactive projects**:
    ```bash
-   # Export and remove old project memories
-   memento export --output old-project.json --filter-tags "project:old-project"
+   # Export old project memories (--format is required)
+   memento export --format json --output old-project.json
    ```
 
 3. **Use appropriate profile** for your needs

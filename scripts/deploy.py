@@ -6,14 +6,15 @@ Usage:
     python scripts/deploy.py bump X.Y.Z [--ext N] [options]
     python scripts/deploy.py build
     python scripts/deploy.py publish --target {testpypi|pypi}
-    python scripts/deploy.py zed-release [--ext N]
+    python scripts/deploy.py ext-release --ext N     # alias: zed-release
+    python scripts/deploy.py ext-binaries --ext N    # alias: zed-binaries
     python scripts/deploy.py status
 
 Commands
 --------
   bump X.Y.Z        Full release cycle: bump versions, update changelog/README,
                     commit dev, merge dev→main, push both, create Python tag,
-                    build wheel, trigger Zed stub CI (if --ext given).
+                    build wheel, trigger IDE extension stub CI (if --ext given).
                     Use --dry-run to preview without making changes.
 
   build             Build sdist + wheel (no version bump).
@@ -22,24 +23,28 @@ Commands
                     --target testpypi  →  twine upload --repository testpypi dist/*
                     --target pypi      →  twine upload --repository pypi dist/*
 
-  zed-release       Push tag vX.Y.Z-ext.N to trigger GitHub Actions stub build.
+  ext-release       Push tag vX.Y.Z-ext.N to trigger GitHub Actions stub build.
                     Uses current version from pyproject.toml unless --version given.
+                    Alias: zed-release (kept for backward compatibility).
+
+  ext-binaries      Download CI-built stub binaries into stub/bin/ and commit.
+                    Alias: zed-binaries (kept for backward compatibility).
 
   status            Print current versions across all manifests.
 
 Options
 -------
   --ext N           Extension release counter (integer). Required for bump when
-                    you also want to trigger a Zed stub release.
+                    you also want to trigger an IDE extension stub release.
   --dry-run         Print all actions without executing them.
   --skip-tests      Skip pytest before release.
   --skip-merge      Do not merge dev→main (stays on dev branch only).
-  --version X.Y.Z   Override Python version (for zed-release command).
+  --version X.Y.Z   Override Python version (for ext-release command).
   --yes             Non-interactive: skip all confirmation prompts.
 
 Examples
 --------
-  # Full bump to 0.3.0, create Zed ext.2 release, publish to PyPI
+  # Full bump to 0.3.0, create extension ext.2 release, publish to PyPI
   python scripts/deploy.py bump 0.3.0 --ext 2 --yes
 
   # Dry run to preview everything
@@ -54,8 +59,11 @@ Examples
   # Publish to PyPI
   python scripts/deploy.py publish --target pypi
 
-  # Push Zed extension tag only (already on correct version)
-  python scripts/deploy.py zed-release --ext 3
+  # Push extension stub tag only (already on correct version)
+  python scripts/deploy.py ext-release --ext 3
+
+  # Download CI binaries and commit to repo
+  python scripts/deploy.py ext-binaries --ext 3
 
   # Show current version state
   python scripts/deploy.py status
@@ -616,12 +624,12 @@ def cmd_bump(
     if not skip_merge:
         git_merge_to_main(dry)
 
-    # 8. Zed stub release tag (triggers CI)
+    # 8. Extension stub release tag (triggers CI)
     if ext_n is not None:
         zed_stub_release(new_ver, ext_n, dry)
         info(
             "Wait for CI to complete, then run:\n"
-            f"  python scripts/deploy.py zed-binaries --version {new_ver} --ext {ext_n}\n"
+            f"  python scripts/deploy.py ext-binaries --version {new_ver} --ext {ext_n}\n"
             "to download built binaries into stub/bin/ and commit them."
         )
 
@@ -632,7 +640,7 @@ def cmd_bump(
             f"Next: publish to PyPI with:  python scripts/deploy.py publish --target pypi"
         )
         info(
-            f"      then download binaries: python scripts/deploy.py zed-binaries --version {new_ver} --ext {ext_n}"
+            f"      then download binaries: python scripts/deploy.py ext-binaries --version {new_ver} --ext {ext_n}"
         )
     else:
         info(
@@ -695,7 +703,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ext",
         type=int,
         metavar="N",
-        help="Extension release counter; triggers Zed stub CI.",
+        help="Extension release counter; triggers IDE extension stub CI.",
     )
     p_bump.add_argument(
         "--dry-run", action="store_true", help="Preview actions without executing."
@@ -724,34 +732,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_pub.add_argument("--dry-run", action="store_true")
 
-    # ── zed-release ───────────────────────────────────────────────────────
-    p_zed = sub.add_parser(
-        "zed-release", help="Push Zed stub release tag to trigger CI."
-    )
-    p_zed.add_argument(
-        "--ext", type=int, required=True, metavar="N", help="Extension release counter."
-    )
-    p_zed.add_argument(
-        "--version",
-        metavar="X.Y.Z",
-        help="Python version override (default: read from pyproject.toml).",
-    )
-    p_zed.add_argument("--dry-run", action="store_true")
+    # ── ext-release (alias: zed-release) ─────────────────────────────────
+    def _add_ext_release_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--ext", type=int, required=True, metavar="N", help="Extension release counter."
+        )
+        p.add_argument(
+            "--version",
+            metavar="X.Y.Z",
+            help="Python version override (default: read from pyproject.toml).",
+        )
+        p.add_argument("--dry-run", action="store_true")
 
-    # ── zed-binaries ──────────────────────────────────────────────────────
-    p_bin = sub.add_parser(
-        "zed-binaries", help="Download CI-built stub binaries and commit to repo."
+    _add_ext_release_args(
+        sub.add_parser("ext-release", help="Push IDE extension stub tag to trigger CI.")
     )
-    p_bin.add_argument(
-        "--ext", type=int, required=True, metavar="N", help="Extension release counter."
+    # backward-compat alias
+    _add_ext_release_args(
+        sub.add_parser("zed-release", help="Alias for ext-release (kept for compatibility).")
     )
-    p_bin.add_argument(
-        "--version",
-        metavar="X.Y.Z",
-        help="Python version override (default: read from pyproject.toml).",
+
+    # ── ext-binaries (alias: zed-binaries) ───────────────────────────────
+    def _add_ext_binaries_args(p: argparse.ArgumentParser) -> None:
+        p.add_argument(
+            "--ext", type=int, required=True, metavar="N", help="Extension release counter."
+        )
+        p.add_argument(
+            "--version",
+            metavar="X.Y.Z",
+            help="Python version override (default: read from pyproject.toml).",
+        )
+        p.add_argument("--dry-run", action="store_true")
+        p.add_argument("--yes", "-y", action="store_true")
+
+    _add_ext_binaries_args(
+        sub.add_parser("ext-binaries", help="Download CI stub binaries and commit to repo.")
     )
-    p_bin.add_argument("--dry-run", action="store_true")
-    p_bin.add_argument("--yes", "-y", action="store_true")
+    # backward-compat alias
+    _add_ext_binaries_args(
+        sub.add_parser("zed-binaries", help="Alias for ext-binaries (kept for compatibility).")
+    )
 
     # ── status ────────────────────────────────────────────────────────────
     sub.add_parser("status", help="Show current versions across all manifests.")
@@ -790,13 +810,13 @@ def main() -> None:
     elif args.command == "publish":
         publish(target=args.target, dry=args.dry_run)
 
-    elif args.command == "zed-release":
+    elif args.command in ("ext-release", "zed-release"):
         ver = args.version or read_pyproject_version()
         if args.ext is None:
-            die("--ext N is required for zed-release.")
+            die("--ext N is required for ext-release.")
         zed_stub_release(python_ver=ver, ext_n=args.ext, dry=args.dry_run)
 
-    elif args.command == "zed-binaries":
+    elif args.command in ("ext-binaries", "zed-binaries"):
         ver = args.version or read_pyproject_version()
         cmd_zed_binaries(
             python_ver=ver,

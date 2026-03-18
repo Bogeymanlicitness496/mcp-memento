@@ -12,8 +12,8 @@
 4. [Running Tests](#4-running-tests)
 5. [Release Workflow](#5-release-workflow)
 6. [Deploy Script Reference](#6-deploy-script-reference)
-7. [Zed Extension — Architecture](#7-zed-extension--architecture)
-8. [Zed Stub Binary — Build & Release](#8-zed-stub-binary--build--release)
+7. [Extension Architecture](#7-extension-architecture-zed--vscode-)
+8. [Extension Stub Binary — Build & Release](#8-extension-stub-binary--build--release)
 9. [GitHub Actions CI](#9-github-actions-ci)
 10. [Version Convention](#10-version-convention)
 11. [Tag Convention](#11-tag-convention)
@@ -29,7 +29,7 @@ mcp-memento/
 ├── Python package (PyPI: mcp-memento)
 │   └── src/memento/              ← MCP server logic, tools, DB engine
 │
-└── Zed IDE extension
+└── IDE extensions (Zed, VSCode, …)
     └── integrations/zed/
         ├── src/lib.rs            ← WASM extension (compiled to .wasm)
         └── stub/src/main.rs     ← native Rust binary (launcher/proxy)
@@ -40,9 +40,13 @@ The project has **two independent release tracks**:
 | Track | Language | Artifact | Published to |
 |---|---|---|---|
 | Python MCP server | Python 3.10+ | `.whl` + `.tar.gz` | PyPI |
-| Zed IDE extension | Rust (WASM + native) | `.wasm` + stub `.exe`/ELF | Zed Marketplace |
+| IDE extensions | Rust (WASM + native stub) | `.wasm` + stub `.exe`/ELF | IDE marketplaces (Zed, VSCode, …) |
 
 The two tracks are **versioned together**: the extension version always mirrors the Python package version it ships with. They are released independently only when fixing extension-only bugs (ext counter `N` increments without a Python version bump).
+
+> **Current state**: Only the Zed extension is implemented. The VSCode extension and
+> others will follow the same Rust stub pattern and use the same `vX.Y.Z-ext.N` tag
+> convention and CI workflow.
 
 ---
 
@@ -90,8 +94,6 @@ mcp-memento/
 │
 ├── scripts/
 │   ├── deploy.py                ← Unified release & deploy script (PRIMARY)
-│   ├── build_memento.py         ← Legacy build helper (kept for reference)
-│   ├── build.sh / build.bat     ← Legacy shell wrappers
 │   └── README.md                ← Scripts documentation
 │
 ├── .github/
@@ -114,6 +116,7 @@ mcp-memento/
 | Python 3.10+ | MCP server development | [python.org](https://python.org) |
 | Rust (via rustup) | Zed extension development | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | `wasm32-wasip1` target | Building the WASM extension | `rustup target add wasm32-wasip1` |
+| `cross` | Cross-compiling Linux ARM stub (CI only) | `cargo install cross` (requires Docker) |
 | `gh` CLI | Release management, CI monitoring | [cli.github.com](https://cli.github.com) |
 | `twine` | Publishing to PyPI | `pip install twine` |
 | `build` | Building wheel/sdist | `pip install build` |
@@ -207,7 +210,7 @@ gh run list --repo annibale-x/mcp-memento
 gh run watch <run-id> --repo annibale-x/mcp-memento
 
 # 4. When CI succeeds — download binaries and commit to repo
-python scripts/deploy.py zed-binaries --ext 2
+python scripts/deploy.py ext-binaries --ext 2
 
 # 5. Publish to TestPyPI first (optional but recommended)
 python scripts/deploy.py publish --target testpypi
@@ -227,10 +230,10 @@ python scripts/deploy.py publish --target pypi
 
 ```bash
 # Only push a new ext tag, no version change
-python scripts/deploy.py zed-release --ext 3
+python scripts/deploy.py ext-release --ext 3
 
 # Wait for CI, then download and commit binaries
-python scripts/deploy.py zed-binaries --ext 3
+python scripts/deploy.py ext-binaries --ext 3
 ```
 
 ### Build wheel only (no git operations)
@@ -258,20 +261,20 @@ python scripts/deploy.py status
 | `bump X.Y.Z [--ext N]` | Full release cycle |
 | `build` | Build sdist + wheel |
 | `publish --target {testpypi\|pypi}` | Upload dist/* with twine |
-| `zed-release --ext N` | Push Zed stub CI tag only |
-| `zed-binaries --ext N` | Download CI artifacts + commit |
+| `ext-release --ext N` | Push IDE extension stub CI tag only |
+| `ext-binaries --ext N` | Download CI artifacts + commit |
 | `status` | Print all version strings |
 
 ### Options
 
 | Option | Applies to | Description |
 |---|---|---|
-| `--ext N` | `bump`, `zed-release`, `zed-binaries` | Extension release counter (integer) |
+| `--ext N` | `bump`, `ext-release`, `ext-binaries` | Extension release counter (integer) |
 | `--dry-run` | all | Preview without executing |
 | `--skip-tests` | `bump` | Skip pytest |
 | `--skip-merge` | `bump` | Skip dev→main merge |
-| `--yes` / `-y` | `bump`, `zed-binaries` | Auto-confirm all prompts |
-| `--version X.Y.Z` | `zed-release`, `zed-binaries` | Override Python version |
+| `--yes` / `-y` | `bump`, `ext-binaries` | Auto-confirm all prompts |
+| `--version X.Y.Z` | `ext-release`, `ext-binaries` | Override Python version |
 
 ### Files modified by `bump`
 
@@ -287,11 +290,14 @@ python scripts/deploy.py status
 
 ---
 
-## 7. Zed Extension — Architecture
+## 7. Extension Architecture (Zed / VSCode / …)
 
 The Zed extension consists of **two Rust components** with distinct roles:
 
 ### Component 1: WASM Extension (`integrations/zed/src/lib.rs`)
+
+> This section documents the Zed extension, the first IDE extension implemented.
+> Future extensions (VSCode, etc.) will follow the same stub architecture.
 
 - Compiled to `wasm32-wasip1` (WebAssembly)
 - Runs inside Zed's sandboxed extension host
@@ -349,7 +355,7 @@ buffered it indefinitely. The native stub solves this by:
 
 ---
 
-## 8. Zed Stub Binary — Build & Release
+## 8. Extension Stub Binary — Build & Release
 
 ### Build locally (Windows only, for testing)
 
@@ -371,7 +377,7 @@ Push a Zed release tag — GitHub Actions handles everything:
 git tag v0.3.0-ext.2
 git push origin v0.3.0-ext.2
 # or via deploy script:
-python scripts/deploy.py zed-release --ext 2
+python scripts/deploy.py ext-release --ext 2
 ```
 
 CI compiles all 5 targets in parallel (~1 minute total):
@@ -395,7 +401,7 @@ After CI completes, download and commit the binaries so future extension
 installs require zero network access:
 
 ```bash
-python scripts/deploy.py zed-binaries --ext 2
+python scripts/deploy.py ext-binaries --ext 2
 # Equivalent manual command:
 gh release download v0.3.0-ext.2 --repo annibale-x/mcp-memento \
   --dir integrations/zed/stub/bin/ --clobber
@@ -459,15 +465,15 @@ This makes it unambiguous which Python version the extension was built against.
 | Tag format | Meaning | Triggers |
 |---|---|---|
 | `vX.Y.Z` | Python package release | (manual) PyPI publish |
-| `vX.Y.Z-ext.N` | Zed extension release | GitHub Actions stub CI build |
+| `vX.Y.Z-ext.N` | IDE extension release | GitHub Actions stub CI build |
 
 **Examples**:
 ```
 v0.2.6          ← Python package version
-v0.2.6-ext.1   ← First Zed extension release for Python 0.2.6
+v0.2.6-ext.1   ← First IDE extension release for Python 0.2.6 (Zed)
 v0.2.6-ext.2   ← Bugfix to extension only, same Python version
 v0.3.0          ← Next Python package version
-v0.3.0-ext.1   ← First Zed extension release for Python 0.3.0
+v0.3.0-ext.1   ← First IDE extension release for Python 0.3.0 (Zed)
 ```
 
 `N` is a monotonically increasing integer, reset to `1` when `X.Y.Z` changes.
@@ -516,7 +522,7 @@ restores the original `README.md` afterwards. No manual intervention needed.
 
 1. Open Zed → `Extensions`
 2. Scroll to `Memento MCP Server` → `Uninstall`
-3. `Install Dev Extension` → select `L:\Work\mcp-memento\integrations\zed\`
+3.  → select the  directory inside your local clone
 4. Open a project, configure the server
 5. `zed: open log` → search `[MEMENTO-STUB]` for stub output
 
