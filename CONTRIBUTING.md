@@ -167,33 +167,36 @@ docs/
 
 ### Docstring Format
 ```python
-def store_memory(
+def store_memento(
     type: str,
     title: str,
     content: str,
-    tags: Optional[List[str]] = None
+    tags: Optional[List[str]] = None,
+    importance: float = 0.5,
 ) -> str:
-    """Store a new memory in the database.
+    """Store a new memento in the database.
 
     Args:
-        type: Memory type (solution, pattern, problem, etc.)
-        title: Descriptive title for the memory
-        content: Detailed content of the memory
+        type: Memory type (solution, problem, code_pattern, fix, error, etc.)
+        title: Descriptive title for the memento
+        content: Detailed content of the memento
         tags: Optional list of tags for categorization
+        importance: Importance score 0.0-1.0 (default 0.5)
 
     Returns:
-        The ID of the newly created memory
+        The ID of the newly created memento
 
     Raises:
         ValueError: If required parameters are missing
         DatabaseError: If database operation fails
 
     Examples:
-        >>> memory_id = store_memory(
+        >>> memory_id = store_memento(
         ...     type="solution",
         ...     title="Fixed Redis timeout",
         ...     content="Increased timeout to 30s...",
-        ...     tags=["redis", "timeout"]
+        ...     tags=["redis", "timeout"],
+        ...     importance=0.8,
         ... )
     """
 ```

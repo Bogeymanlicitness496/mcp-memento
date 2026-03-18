@@ -52,7 +52,7 @@ Alternatively, you can add custom instructions to your AI (see our [Agent Config
 | Profile | Tools | Best For |
 |---------|-------|----------|
 | **Core** | 13 tools | All users - Essential operations |
-| **Extended** | 17 tools | Power users - Analytics + contextual search |
+| **Extended** | 17 tools | Power users - Statistics, contextual search, decay control |
 | **Advanced** | 25 tools | Administrators - Graph analysis |
 
 ### 🗃️ Cross-Platform Storage

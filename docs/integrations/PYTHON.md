@@ -405,8 +405,8 @@ Create `memento.yaml` in the current working directory or at
 
 ```yaml
 # memento.yaml
-sqlite_path: ~/.mcp-memento/context.db
-tool_profile: extended      # core | extended | advanced
+db_path: ~/.mcp-memento/context.db
+profile: extended           # core | extended | advanced
 log_level: INFO             # DEBUG | INFO | WARNING | ERROR
 allow_relationship_cycles: false
 ```

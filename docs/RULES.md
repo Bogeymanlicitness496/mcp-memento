@@ -191,6 +191,11 @@ Memories with these tags never decay:
 ## Search Optimization
 
 ### 1. Search Strategy
+
+> **📌 Note**: Code examples below are **MCP tool call pseudocode** — they illustrate
+> which tools to invoke and with what arguments. They are not importable Python
+> functions. See [PYTHON.md](integrations/PYTHON.md) for the MCP client pattern.
+
 ```python
 # 1. Start with natural language search
 results = recall_mementos(

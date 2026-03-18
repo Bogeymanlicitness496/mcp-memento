@@ -358,21 +358,21 @@ class CustomAgent:
     def __init__(self, profile: str = "extended"):
         self.profile = profile
         self._session: ClientSession | None = None
-        self._client_ctx = None
-        self._session_ctx = None
+        self._stack = None  # contextlib.AsyncExitStack, set in start()
 
     async def start(self):
         """Initialize the MCP client connection to a Memento server."""
+        from contextlib import AsyncExitStack
+
         server_params = StdioServerParameters(
             command="memento",
             args=["--profile", self.profile],
             env=None,
         )
 
-        read, write = await stdio_client(server_params).__aenter__()
-        self._client_ctx = (read, write)
-
-        self._session = await ClientSession(read, write).__aenter__()
+        self._stack = AsyncExitStack()
+        read, write = await self._stack.enter_async_context(stdio_client(server_params))
+        self._session = await self._stack.enter_async_context(ClientSession(read, write))
         await self._session.initialize()
         print(f"Custom agent started with Memento ({self.profile} profile)")
 
@@ -458,13 +458,10 @@ class CustomAgent:
 
     async def stop(self):
         """Clean up the MCP client connection."""
-        if self._session is not None:
-            await self._session.__aexit__(None, None, None)
-
-        if self._client_ctx is not None:
-            read, write = self._client_ctx
-            # stdio_client context is managed by the caller; just release refs
-            self._client_ctx = None
+        if self._stack is not None:
+            await self._stack.aclose()
+            self._stack = None
+            self._session = None
 
 
 async def main():

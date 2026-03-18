@@ -195,8 +195,8 @@ Memento supports multiple configuration sources. Order of precedence (highest fi
 3. **YAML configuration files** (lowest explicit priority)
    ```yaml
    # memento.yaml
-   sqlite_path: ~/.mcp-memento/context.db
-   tool_profile: extended
+   db_path: ~/.mcp-memento/context.db
+   profile: extended
    log_level: INFO
    ```
 

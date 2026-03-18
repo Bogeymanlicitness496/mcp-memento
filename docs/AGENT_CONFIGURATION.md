@@ -97,7 +97,7 @@ Consider storing memories:
 - Fixes `ADDRESS` errors
 - Patterns `APPLIES_TO` projects
 - Decisions `IMPROVE` previous approaches
-- Errors `TRIGGER` problems
+- Errors `TRIGGERS` problems
 - Changes `CAUSE` issues
 
 *Note: Memento supports 35 relationship types. For complete reference with all types and examples, see [RELATIONSHIPS.md](./RELATIONSHIPS.md).*

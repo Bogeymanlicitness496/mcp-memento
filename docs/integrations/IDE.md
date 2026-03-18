@@ -323,7 +323,7 @@ What coding standards should I follow for this project?
 Visual Studio Code can integrate with Memento through the MCP extension, providing memory capabilities within the popular editor.
 
 ### Prerequisites
-- **VS Code 1.102+** (MCP support is GA as of this version)
+- **VS Code 1.99+** (MCP support added in this release; use `1.100+` for the stable GA build)
 - **MCP Extension for VSCode** installed
 
 ### Configuration
@@ -389,7 +389,7 @@ MCP tools work with GitHub Copilot in **Agent mode**:
 ### Troubleshooting
 
 **MCP servers not available:**
-1. Check VS Code version is 1.102+
+1. Check VS Code version is 1.99+ (1.100+ recommended)
 2. Verify MCP extension is installed and enabled
 3. Command Palette > **MCP: List Servers** to check status
 
@@ -677,7 +677,7 @@ This means Claude Desktop can't find the Memento command. Solutions:
 ## Next Steps
 
 - Explore [Agent Integration Guide](./AGENT.md) for CLI tool setups
-- Review [Python API Guide](./PYTHON.md) for programmatic access
+- Review [Python Integration Guide](./PYTHON.md) for programmatic access
 - Check [Tools Reference](../TOOLS.md) for complete tool documentation
 - See [Usage Rules](../RULES.md) for best practices and conventions
 
