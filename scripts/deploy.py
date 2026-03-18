@@ -594,6 +594,70 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
         ok(f"Uploaded: {f.name}")
 
 
+def build_stub_local(dry: bool) -> None:
+    """Build the stub binary for the current platform and copy it into stub/bin/.
+
+    This is a local-only build (cargo release) for the host platform.
+    Cross-compiled binaries for other platforms are produced by CI.
+    """
+    import platform
+
+    step("Building stub binary for current platform")
+
+    stub_dir = ZED_DIR / "stub"
+    target_dir = stub_dir / "target" / "release"
+
+    run(
+        f"cargo build --release --manifest-path {stub_dir / 'Cargo.toml'}",
+        dry=dry,
+    )
+
+    # Determine the output binary name and destination asset name
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if system == "windows":
+        src_name = "memento-stub.exe"
+        dst_name = "memento-stub-x86_64-pc-windows-msvc.exe"
+    elif system == "darwin":
+        src_name = "memento-stub"
+        dst_name = (
+            "memento-stub-aarch64-apple-darwin"
+            if machine in ("arm64", "aarch64")
+            else "memento-stub-x86_64-apple-darwin"
+        )
+    else:
+        src_name = "memento-stub"
+        dst_name = (
+            "memento-stub-aarch64-unknown-linux-gnu"
+            if machine in ("arm64", "aarch64")
+            else "memento-stub-x86_64-unknown-linux-gnu"
+        )
+
+    src = target_dir / src_name
+    dst = ZED_STUB_BIN / dst_name
+
+    if not dry:
+        if not src.exists():
+            die(f"Expected stub binary not found: {src}")
+        ZED_STUB_BIN.mkdir(parents=True, exist_ok=True)
+        import shutil as _shutil
+        _shutil.copy2(src, dst)
+
+    ok(f"Stub built and copied to {dst.relative_to(ROOT)}")
+
+
+def cmd_dev_stub(dry: bool) -> None:
+    """Build the stub for the current platform and commit it to stub/bin/."""
+    build_stub_local(dry)
+
+    step("Committing stub binary on dev")
+    git_add_all(dry)
+    git_commit("chore(zed): rebuild stub binary for current platform", dry)
+    git_push("dev", dry)
+    ok("Stub binary committed and pushed to dev")
+
+
 def download_stub_binaries(python_ver: str, dry: bool) -> None:
     """Download built stub binaries from GitHub Release into stub/bin/."""
     step("Downloading stub binaries from GitHub Release")
@@ -759,12 +823,14 @@ def cmd_bump(
     if not dev_only:
         git_merge_to_main(dry)
 
-    # 8. Upload stub binaries to the GitHub release (skipped with --dev:
-    #    no GitHub Release exists yet, only the tag)
+    # 8. Stub binaries
     if not dev_only:
+        # Full release: upload pre-built binaries to the GitHub release
         upload_stub_binaries_to_release(new_ver, dry)
     else:
-        info("Stub binary upload skipped (--dev). Run without --dev to create the full release.")
+        # Dev-only: build stub for current platform and bundle it in stub/bin/
+        # so that "Install Dev Extension" in Zed always uses an up-to-date binary.
+        build_stub_local(dry)
 
     print()
     ok(f"Release v{new_ver} complete!")
@@ -857,6 +923,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_pub.add_argument("--dry-run", action="store_true")
 
+    # ── dev-stub ──────────────────────────────────────────────────────────
+    # Builds the Rust stub for the current platform and copies the binary
+    # into stub/bin/, then commits.  Use during active Zed extension development
+    # to keep the bundled binary in sync without doing a full bump.
+    p_dev_stub = sub.add_parser(
+        "dev-stub",
+        help="Build stub binary for current platform and commit to stub/bin/.",
+    )
+    p_dev_stub.add_argument("--dry-run", action="store_true")
+
     # ── ext-binaries ──────────────────────────────────────────────────────
     # Downloads CI-built stub binaries from the GitHub release vX.Y.Z and
     # commits them into stub/bin/.  Use after CI has finished building.
@@ -906,6 +982,9 @@ def main() -> None:
 
     elif args.command == "publish":
         publish(target=args.target, dry=args.dry_run)
+
+    elif args.command == "dev-stub":
+        cmd_dev_stub(dry=args.dry_run)
 
     elif args.command == "ext-binaries":
         ver = args.version or read_pyproject_version()

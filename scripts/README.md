@@ -19,6 +19,10 @@ Full release cycle: run tests, bump versions across all manifests, update
 `CHANGELOG.md` and `README.md` badges, build wheel, commit, tag, push,
 merge `dev → main`, and upload stub binaries to the GitHub release.
 
+With `--dev`, the merge and GitHub Release upload are skipped, and the stub
+binary for the **current platform** is automatically rebuilt and bundled into
+`stub/bin/` so that "Install Dev Extension" in Zed always uses an up-to-date binary.
+
 ```bash
 # Preview without side effects
 python scripts/deploy.py bump 0.3.0 --dry-run
@@ -26,7 +30,7 @@ python scripts/deploy.py bump 0.3.0 --dry-run
 # Full release (merges dev → main)
 python scripts/deploy.py bump 0.3.0 --yes
 
-# Dev-only release (no merge into main yet)
+# Dev-only release (no merge into main, rebuilds stub for current platform)
 python scripts/deploy.py bump 0.3.0 --dev --yes
 ```
 
@@ -55,6 +59,23 @@ on the main branch.
 python scripts/deploy.py publish --target testpypi
 python scripts/deploy.py publish --target pypi
 ```
+
+### `dev-stub`
+Build the Rust stub binary for the **current platform** using `cargo build --release`,
+copy it into `integrations/zed/stub/bin/`, and commit.
+
+Use this during active Zed extension development when you modify `stub/src/main.rs`
+and want the bundled binary updated without doing a full `bump`.
+
+```bash
+python scripts/deploy.py dev-stub
+python scripts/deploy.py dev-stub --dry-run   # preview only
+```
+
+> **Note**: this only updates the binary for your current OS/arch.
+> The other 4 platform binaries are produced by CI on a full release.
+
+---
 
 ### `ext-binaries`
 Download the CI-built stub binaries from the GitHub release `vX.Y.Z` and
@@ -87,7 +108,7 @@ python scripts/deploy.py status
 |---|---|---|
 | `--dry-run` | all | Preview all actions without executing |
 | `--skip-tests` | `bump` | Skip pytest before release |
-| `--dev` | `bump` | Do not merge `dev → main` after release |
+| `--dev` | `bump` | Do not merge `dev → main`; rebuild stub for current platform |
 | `--yes` / `-y` | `bump`, `ext-binaries` | Auto-confirm all prompts |
 | `--version X.Y.Z` | `ext-binaries` | Override Python version |
 
@@ -116,11 +137,22 @@ python scripts/deploy.py ext-binaries
 ### Dev-only release (publish to PyPI later)
 
 ```bash
-# 1. Release to GitHub only, stay on dev
+# 1. Release to GitHub only, stay on dev (also rebuilds stub for current platform)
 python scripts/deploy.py bump 0.3.0 --dev --yes
 
 # 2. When ready to publish — publish automatically merges dev → main first
 python scripts/deploy.py publish --target pypi
+```
+
+### Zed extension development loop
+
+```bash
+# After modifying stub/src/main.rs only (no version bump needed):
+python scripts/deploy.py dev-stub
+
+# After any change (Python server, lib.rs, stub) — full dev cycle:
+python scripts/deploy.py bump 0.3.0 --dev --yes
+# Then reload the extension in Zed via "Install Dev Extension"
 ```
 
 ---
