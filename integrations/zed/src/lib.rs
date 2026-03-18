@@ -82,13 +82,25 @@ impl MementoExtension {
         // ------------------------------------------------------------------
         // Step 1: bundled binary committed to the repository.
         // ------------------------------------------------------------------
+        let cwd_info = std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| "<unknown>".to_owned());
+
         let bundled_path = format!("{}/{}", BUNDLED_BIN_DIR, asset_name);
 
-        if std::fs::metadata(&bundled_path).is_ok() {
-            zed::make_file_executable(&bundled_path)
+        // Also try one level up (covers some Zed dev-extension CWD layouts).
+        let bundled_path_alt = format!("../{}/{}", BUNDLED_BIN_DIR, asset_name);
+
+        let found_bundled = [bundled_path.as_str(), bundled_path_alt.as_str()]
+            .iter()
+            .find(|p| std::fs::metadata(p).is_ok())
+            .map(|p| p.to_string());
+
+        if let Some(path) = found_bundled {
+            zed::make_file_executable(&path)
                 .map_err(|e| format!("Failed to make bundled stub executable: {e}"))?;
 
-            let abs = self.to_abs_path(&bundled_path);
+            let abs = self.to_abs_path(&path);
             self.cached_stub = Some(abs.clone());
             return Ok(abs);
         }
@@ -106,7 +118,10 @@ impl MementoExtension {
             );
 
             zed::download_file(&url, &download_name, DownloadedFileType::Uncompressed)
-                .map_err(|e| format!("Failed to download memento stub from {url}: {e}"))?;
+                .map_err(|e| format!(
+                    "Failed to download memento stub from {url}: {e} \
+                     [cwd={cwd_info}, bundled_path={bundled_path}, bundled_path_alt={bundled_path_alt}]"
+                ))?;
         }
 
         zed::make_file_executable(&download_name)
@@ -152,7 +167,9 @@ impl zed::Extension for MementoExtension {
                 }
 
                 if let Some(path) = map.get("MEMENTO_DB_PATH").and_then(|v| v.as_str()) {
-                    env_vars.push(("MEMENTO_DB_PATH".to_string(), path.to_string()));
+                    if !path.is_empty() {
+                        env_vars.push(("MEMENTO_DB_PATH".to_string(), path.to_string()));
+                    }
                 }
 
                 if let Some(profile) = map.get("MEMENTO_PROFILE").and_then(|v| v.as_str()) {
@@ -181,8 +198,8 @@ impl zed::Extension for MementoExtension {
             "properties": {
                 "MEMENTO_DB_PATH": {
                     "type": "string",
-                    "description": "Path to the Memento SQLite database file.",
-                    "default": "~/.mcp-memento/context.db"
+                    "description": "Path to the Memento SQLite database file. Leave empty to use the OS default (%USERPROFILE%\\.mcp-memento\\context.db on Windows, ~/.mcp-memento/context.db on macOS/Linux).",
+                    "default": ""
                 },
                 "MEMENTO_PROFILE": {
                     "type": "string",
@@ -200,7 +217,7 @@ impl zed::Extension for MementoExtension {
 
         let default_settings = concat!(
             "{\n",
-            "  \"MEMENTO_DB_PATH\": \"~/.mcp-memento/context.db\",\n",
+            "  \"MEMENTO_DB_PATH\": \"\",\n",
             "  \"MEMENTO_PROFILE\": \"core\",\n",
             "  \"PYTHON_COMMAND\": \"auto\"\n",
             "}"
