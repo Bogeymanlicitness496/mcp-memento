@@ -631,7 +631,13 @@ def publish(target: str, dry: bool) -> None:
 
 
 def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
-    """Upload the bundled stub binaries from stub/bin/ to the GitHub release vX.Y.Z."""
+    """Create the GitHub Release vX.Y.Z (if needed) and upload local stub binaries.
+
+    The CI workflow (zed-stub-release.yml) will cross-compile and upload the
+    remaining targets once the tag is on the remote; here we create the release
+    object first (so the CI has a target to upload to) and attach whatever local
+    binaries exist in stub/bin/ as a safety-net / fast-path for Windows.
+    """
     step(f"Uploading stub binaries to GitHub release v{python_ver}")
     tag = f"v{python_ver}"
     files = sorted(ZED_STUB_BIN.glob("memento-stub-*"))
@@ -639,6 +645,20 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
     if not files:
         die(f"No stub binaries found in {ZED_STUB_BIN}. Build them first.")
 
+    # Create the GitHub Release object so the CI has somewhere to attach assets.
+    # --notes-start-tag picks up everything since the previous release for the
+    # auto-generated notes.  Errors are ignored if the release already exists.
+    run(
+        f"gh release create {tag}"
+        f" --repo {GITHUB_REPO}"
+        f" --title \"v{python_ver}\""
+        f" --generate-notes"
+        f" --latest",
+        dry=dry,
+        check=False,
+    )
+
+    # Upload local binaries (at minimum the Windows stub built by deploy.py).
     for f in files:
         cmd = f"gh release upload {tag} {f} --repo {GITHUB_REPO} --clobber"
         run(cmd, dry=dry)
