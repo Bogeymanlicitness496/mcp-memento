@@ -168,7 +168,8 @@ impl zed::Extension for MementoExtension {
                 }
 
                 if let Some(path) = map.get("MEMENTO_DB_PATH").and_then(|v| v.as_str()) {
-                    if !path.is_empty() {
+                    // Skip empty strings and the placeholder shown in the UI.
+                    if !path.is_empty() && !path.starts_with("<") {
                         env_vars.push(("MEMENTO_DB_PATH".to_string(), path.to_string()));
                     }
                 }
@@ -196,27 +197,13 @@ impl zed::Extension for MementoExtension {
     ) -> Result<Option<ContextServerConfiguration>> {
         let (os, _arch) = zed::current_platform();
 
-        // Resolve the default DB path at runtime so the user sees (and gets)
-        // a fully expanded, ready-to-use path — no shell variable expansion
-        // required on their side.
+        // The WASM sandbox does not expose OS environment variables, so we
+        // cannot resolve %USERPROFILE% or $HOME at this point.
+        // We show a descriptive placeholder instead; the server Python will
+        // use its own OS-aware default when this field is left unchanged.
         let default_db_path = match os {
-            Os::Windows => {
-                let home = std::env::var("USERPROFILE")
-                    .or_else(|_| std::env::var("HOMEDRIVE").and_then(|d| {
-                        std::env::var("HOMEPATH").map(|p| format!("{}{}", d, p))
-                    }))
-                    .unwrap_or_else(|_| "C:/Users/user".to_string());
-
-                // Always use forward slashes — works on Windows and avoids
-                // JSON/TOML escaping issues with backslashes.
-                format!("{}/.mcp-memento/context.db", home.replace('\\', "/"))
-            }
-            _ => {
-                let home = std::env::var("HOME")
-                    .unwrap_or_else(|_| "~".to_string());
-
-                format!("{}/.mcp-memento/context.db", home)
-            }
+            Os::Windows => "<default: %USERPROFILE%/.mcp-memento/context.db>",
+            _ => "<default: ~/.mcp-memento/context.db>",
         };
 
         let settings_schema = zed_extension_api::serde_json::json!({
