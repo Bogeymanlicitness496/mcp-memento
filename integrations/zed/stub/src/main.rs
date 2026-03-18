@@ -28,10 +28,19 @@ use std::thread;
 // ---------------------------------------------------------------------------
 
 macro_rules! log {
-    ($($arg:tt)*) => {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
         let msg = format!($($arg)*);
         let _ = writeln!(std::io::stderr(), "[MEMENTO-STUB] {}", msg);
-    };
+
+        // Always append to a file — stderr is not visible inside Zed's sandbox.
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true).append(true)
+            .open(std::env::temp_dir().join("memento_stub_debug.log"))
+        {
+            let _ = writeln!(f, "{}", msg);
+        }
+    }};
 }
 
 // ---------------------------------------------------------------------------
@@ -256,10 +265,13 @@ fn install_memento(python: &Path) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 /// Launch `python -u -m memento` and proxy stdin/stdout.
-/// `buffered` contains lines received during the stub phase that must be
-/// replayed to the real server before forwarding new stdin.
-/// `stdin_rx` is the channel receiver from the stub-phase stdin reader thread,
-/// which must be reused to avoid double-locking stdin.
+///
+/// `buffered` contains lines received during the stub phase (including
+/// `initialize`).  We replay them all to Python so it can complete its own
+/// internal initialisation — but we suppress Python's `initialize` response
+/// (Zed already got one from the stub) and only forward subsequent output.
+///
+/// `stdin_rx` is the channel receiver from the stub-phase stdin reader thread.
 fn run_proxy(python: &Path, buffered: Vec<String>, stdin_rx: mpsc::Receiver<String>) {
     log!("Launching real server: {} -u -m memento", python.display());
 
@@ -274,7 +286,6 @@ fn run_proxy(python: &Path, buffered: Vec<String>, stdin_rx: mpsc::Receiver<Stri
         Ok(c) => c,
         Err(e) => {
             log!("Failed to launch real server: {}", e);
-            // Notify Zed so the user sees something.
             send(&format!(
                 r#"{{"jsonrpc":"2.0","method":"$/logMessage","params":{{"type":1,"message":"mcp-memento: failed to launch Python server: {}"}}}}"#,
                 e
@@ -286,7 +297,7 @@ fn run_proxy(python: &Path, buffered: Vec<String>, stdin_rx: mpsc::Receiver<Stri
     let mut child_stdin = child.stdin.take().expect("child stdin");
     let child_stdout = child.stdout.take().expect("child stdout");
 
-    // --- Replay buffered lines ---
+    // --- Replay buffered lines to Python ---
     for line in &buffered {
         if !line.is_empty() {
             log!("Replaying: {}", &line[..line.len().min(120)]);
@@ -296,37 +307,45 @@ fn run_proxy(python: &Path, buffered: Vec<String>, stdin_rx: mpsc::Receiver<Stri
     let _ = child_stdin.flush();
 
     // --- Thread: child stdout → our stdout ---
-    let (tools_tx, tools_rx) = mpsc::channel::<()>();
+    // Skip Python's initialize response (id matching buffered initialize id):
+    // the stub already sent one to Zed; forwarding a second would confuse it.
+    let init_id: Option<String> = buffered
+        .iter()
+        .find(|l| l.contains("\"initialize\""))
+        .and_then(|l| json_str_field(l, "id").map(|s| s.to_owned()));
 
     thread::spawn(move || {
         let reader = BufReader::new(child_stdout);
-        let mut notified = false;
+        let mut init_response_skipped = init_id.is_none();
 
         for line in reader.lines() {
             match line {
                 Ok(l) => {
-                    // Forward to Zed.
-                    send(&l);
-
-                    // If the real server sent its initialize response,
-                    // signal the main thread to send tools/list_changed.
-                    if !notified && l.contains("\"result\"") && l.contains("protocolVersion") {
-                        let _ = tools_tx.send(());
-                        notified = true;
+                    // Skip the initialize response from Python — Zed already
+                    // received one from the stub.
+                    if !init_response_skipped {
+                        if let Some(ref id) = init_id {
+                            if l.contains(&format!("\"id\":{}", id))
+                                || l.contains(&format!("\"id\": {}", id))
+                            {
+                                if l.contains("protocolVersion") || l.contains("serverInfo") {
+                                    log!("Suppressing Python initialize response (id={}).", id);
+                                    init_response_skipped = true;
+                                    continue;
+                                }
+                            }
+                        }
                     }
+
+                    send(&l);
                 }
                 Err(_) => break,
             }
         }
     });
 
-    // Wait for the real server's initialize response, then notify Zed.
-    if tools_rx
-        .recv_timeout(std::time::Duration::from_secs(30))
-        .is_ok()
-    {
-        notify_tools_list_changed();
-    }
+    // Send tools/list_changed so Zed fetches the real tool list from Python.
+    notify_tools_list_changed();
 
     // --- Forward new stdin lines → child stdin ---
     // We reuse the receiver from the stub phase thread to avoid double-locking
@@ -382,12 +401,16 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
         let line = match rx.recv_timeout(line_timeout) {
             Ok(l) => l,
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                // Nothing received in 55s — something is wrong, bail out.
-                log!("Stub phase timed out waiting for Zed messages.");
-                break;
+                log!("Stub phase timed out waiting for initialize from Zed.");
+                return (buffered, rx);
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                log!("Stdin closed — exiting stub phase.");
+                if !initialized {
+                    // Stdin closed before initialize arrived — nothing to do.
+                    log!("Stdin closed before initialize. Exiting.");
+                    std::process::exit(0);
+                }
+                log!("Stdin closed after initialize.");
                 break;
             }
         };
@@ -409,6 +432,11 @@ fn stub_phase() -> (Vec<String>, mpsc::Receiver<String>) {
                     respond_initialize(id);
                 }
                 initialized = true;
+                // Exit stub phase immediately after responding to initialize.
+                // Zed may not send "initialized" before forwarding further
+                // messages, and the proxy must be up to receive them.
+                log!("Stub phase complete (initialize handled).");
+                return (buffered, rx);
             }
 
             "initialized" => {
