@@ -50,9 +50,15 @@ impl MementoExtension {
                 .map_err(|e| format!("Failed to download mcp-memento bootstrap: {e}"))?;
         }
 
-        self.cached_script = Some(local_name.clone());
+        // Return the absolute path so Zed's shell wrapper can find the file
+        // regardless of what CWD it uses when spawning the process.
+        let abs_path = std::fs::canonicalize(&local_name)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or(local_name.clone());
 
-        Ok(local_name)
+        self.cached_script = Some(abs_path.clone());
+
+        Ok(abs_path)
     }
 
     /// Returns ordered Python executable candidates for the current platform.

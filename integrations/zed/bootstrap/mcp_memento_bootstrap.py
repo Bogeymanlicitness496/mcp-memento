@@ -106,6 +106,18 @@ def _log(msg: str) -> None:
     except Exception:
         pass
 
+    # Also write to a temp file so we can debug even when Zed captures stderr.
+    try:
+        import tempfile
+
+        log_path = os.path.join(tempfile.gettempdir(), "memento_bootstrap.log")
+
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"{LOG_PREFIX} {msg}\n")
+
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # JSON-RPC I/O helpers
