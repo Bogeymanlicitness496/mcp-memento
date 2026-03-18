@@ -170,17 +170,25 @@ Memento works with all major development tools:
 | **Claude Desktop** | [IDE Integration](docs/integrations/IDE.md#claude-desktop) | Desktop application |
 | **Gemini CLI** | [Agent Integration](docs/integrations/AGENT.md#gemini-cli) | Google's CLI agent |
 | **Claude CLI** | [Agent Integration](docs/integrations/AGENT.md#claude-cli) | Anthropic's CLI agent |
-| **Python API** | [Python Integration](docs/integrations/PYTHON.md) | Programmatic access |
+| **Python / MCP Client** | [Python Integration](docs/integrations/PYTHON.md) | Embed server or call via MCP client |
 | **REST API** | [API Integration](docs/integrations/API.md) | HTTP access |
 
 **See also**: [Integration Overview](docs/INTEGRATION.md) for guidance on choosing the right integration.
 
 ## 🛠️ Basic Usage Examples
 
+The examples below show the **MCP tool calls** that an AI assistant (Zed, Cursor,
+Claude, Gemini CLI, …) executes on your behalf when you ask it to remember or
+retrieve something. They are written in a Python-like pseudocode that mirrors the
+MCP tool interface — they are **not** a Python library you import directly.
+
+> To call these tools programmatically from Python, use the `mcp` client library.
+> See [Python Integration](docs/integrations/PYTHON.md) for a working example.
+
 ### Store and Retrieve Knowledge
 
 ```python
-# Store a solution
+# Store a solution — the AI calls this tool when you say "remember this fix"
 solution_id = store_memento(
     type="solution",
     title="Fixed memory leak in WebSocket handler",
@@ -189,10 +197,10 @@ solution_id = store_memento(
     importance=0.9
 )
 
-# Natural language search
+# Natural language search — called when you ask "what do you know about X"
 results = recall_mementos(query="WebSocket memory leak", limit=5)
 
-# Tag-based search
+# Tag-based search — for precise filtering
 redis_solutions = search_mementos(tags=["redis"], memory_types=["solution"])
 ```
 
@@ -344,7 +352,7 @@ log_level: INFO
 ### Integration Guides
 - **[Integration Overview](docs/INTEGRATION.md)** - Choosing the right integration
 - **[IDE Integration](docs/integrations/IDE.md)** - Zed, Cursor, Windsurf, VSCode, Claude Desktop
-- **[Python Integration](docs/integrations/PYTHON.md)** - Programmatic usage and API reference
+- **[Python Integration](docs/integrations/PYTHON.md)** - MCP client usage, server embedding, CLI export/import
 - **[Agent Integration](docs/integrations/AGENT.md)** - CLI agents and custom applications
 - **[API & Programmatic Integration](docs/integrations/API.md)** - HTTP REST API, Node.js SDK, Docker
 
