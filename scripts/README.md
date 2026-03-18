@@ -23,8 +23,11 @@ merge `dev → main`, and upload stub binaries to the GitHub release.
 # Preview without side effects
 python scripts/deploy.py bump 0.3.0 --dry-run
 
-# Execute the full release
+# Full release (merges dev → main)
 python scripts/deploy.py bump 0.3.0 --yes
+
+# Dev-only release (no merge into main — publish to PyPI separately later)
+python scripts/deploy.py bump 0.3.0 --dev --yes
 ```
 
 ### `build`
@@ -50,17 +53,20 @@ python scripts/deploy.py publish --target pypi
 ```
 
 ### `ext-binaries`
-Download the CI-built stub binaries from the GitHub Release `vX.Y.Z` and
+Download the CI-built stub binaries from the GitHub release `vX.Y.Z` and
 commit them into `integrations/zed/stub/bin/`.
 
-Use this after the CI workflow has finished building all 5 platform binaries.
+**When to use**: after `bump` has pushed the tag and the GitHub Actions CI
+workflow (`.github/workflows/zed-stub-release.yml`) has finished building all
+5 platform binaries. The CI produces fresh cross-compiled binaries (e.g. Linux
+ARM64 via `cross`, macOS Intel cross-compiled on Apple Silicon) that may differ
+from whatever was previously bundled in the repository.
 
 ```bash
+# Wait for CI to finish, then:
 python scripts/deploy.py ext-binaries
 python scripts/deploy.py ext-binaries --version 0.3.0   # explicit version
 ```
-
-> Alias `zed-binaries` is kept for backward compatibility.
 
 ### `status`
 Print the current version string from every manifest file.
@@ -77,7 +83,7 @@ python scripts/deploy.py status
 |---|---|---|
 | `--dry-run` | all | Preview all actions without executing |
 | `--skip-tests` | `bump` | Skip pytest before release |
-| `--skip-merge` | `bump` | Do not merge `dev → main` |
+| `--dev` | `bump` | Do not merge `dev → main` after release |
 | `--yes` / `-y` | `bump`, `ext-binaries` | Auto-confirm all prompts |
 | `--version X.Y.Z` | `ext-binaries` | Override Python version |
 
@@ -89,16 +95,28 @@ python scripts/deploy.py status
 # 1. Dry run — verify everything looks correct
 python scripts/deploy.py bump 0.3.0 --dry-run
 
-# 2. Full release (bumps, builds, tags, pushes, uploads stub binaries)
+# 2. Full release (bumps, builds, tags, pushes, uploads stub binaries, merges to main)
 python scripts/deploy.py bump 0.3.0 --yes
 
-# 3. Monitor CI (cross-compiles stub for all 5 platforms)
+# 3. Publish to PyPI
+python scripts/deploy.py publish --target pypi
+
+# --- Optional: refresh stub binaries from CI ---
+# Monitor CI (cross-compiles stub for all 5 platforms)
 gh run list --repo annibale-x/mcp-memento --limit 5
 
-# 4. Optional: pull fresh CI-built binaries into repo and commit
+# Pull fresh CI-built binaries into repo and commit
 python scripts/deploy.py ext-binaries
+```
 
-# 5. Publish to PyPI
+### Dev-only release (no PyPI yet)
+
+```bash
+# Release to GitHub only, stay on dev
+python scripts/deploy.py bump 0.3.0 --dev --yes
+
+# Later, when ready to publish:
+git checkout main && git merge dev --no-ff && git push origin main
 python scripts/deploy.py publish --target pypi
 ```
 

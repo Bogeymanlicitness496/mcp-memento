@@ -618,13 +618,13 @@ def cmd_status() -> None:
 def cmd_bump(
     new_ver: str,
     skip_tests: bool,
-    skip_merge: bool,
+    dev_only: bool,
     dry: bool,
     yes: bool,
 ) -> None:
     old_ver = read_pyproject_version()
 
-    step(f"Bump {old_ver} → {new_ver}")
+    step(f"Bump {old_ver} → {new_ver}" + ("  (dev only, no merge)" if dev_only else ""))
 
     if not confirm(
         f"Proceed with full release of v{new_ver}?",
@@ -680,8 +680,8 @@ def cmd_bump(
     git_push_tag(py_tag, dry)
     ok(f"Tag {py_tag} pushed")
 
-    # 7. Merge dev → main
-    if not skip_merge:
+    # 7. Merge dev → main (skipped with --dev)
+    if not dev_only:
         git_merge_to_main(dry)
 
     # 8. Upload stub binaries to the GitHub release
@@ -689,7 +689,12 @@ def cmd_bump(
 
     print()
     ok(f"Release v{new_ver} complete!")
-    info("Next: publish to PyPI with:  python scripts/deploy.py publish --target pypi")
+
+    if dev_only:
+        info("Merge skipped (--dev). When ready:")
+        info("  git checkout main && git merge dev --no-ff && git push origin main")
+
+    info("Publish to PyPI with:  python scripts/deploy.py publish --target pypi")
 
 
 # ---------------------------------------------------------------------------
@@ -751,7 +756,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-tests", action="store_true", help="Skip pytest before release."
     )
     p_bump.add_argument(
-        "--skip-merge", action="store_true", help="Do not merge dev into main."
+        "--dev",
+        action="store_true",
+        help="Stay on dev branch only — do not merge into main.",
     )
     p_bump.add_argument(
         "--yes", "-y", action="store_true", help="Auto-confirm all prompts."
@@ -771,25 +778,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_pub.add_argument("--dry-run", action="store_true")
 
-    # ── ext-binaries (alias: zed-binaries) ───────────────────────────────
+    # ── ext-binaries ──────────────────────────────────────────────────────
     # Downloads CI-built stub binaries from the GitHub release vX.Y.Z and
-    # commits them into stub/bin/ for the bundle-first lookup.
-    def _add_ext_binaries_args(p: argparse.ArgumentParser) -> None:
-        p.add_argument(
-            "--version",
-            metavar="X.Y.Z",
-            help="Python version override (default: read from pyproject.toml).",
-        )
-        p.add_argument("--dry-run", action="store_true")
-        p.add_argument("--yes", "-y", action="store_true")
-
-    _add_ext_binaries_args(
-        sub.add_parser("ext-binaries", help="Download CI stub binaries and commit to repo.")
+    # commits them into stub/bin/.  Use after CI has finished building.
+    p_ext = sub.add_parser(
+        "ext-binaries",
+        help="Download CI-built stub binaries from GitHub release and commit to repo.",
     )
-    # backward-compat alias
-    _add_ext_binaries_args(
-        sub.add_parser("zed-binaries", help="Alias for ext-binaries (kept for compatibility).")
+    p_ext.add_argument(
+        "--version",
+        metavar="X.Y.Z",
+        help="Version override (default: read from pyproject.toml).",
     )
+    p_ext.add_argument("--dry-run", action="store_true")
+    p_ext.add_argument("--yes", "-y", action="store_true")
 
     # ── status ────────────────────────────────────────────────────────────
     sub.add_parser("status", help="Show current versions across all manifests.")
@@ -810,13 +812,12 @@ def main() -> None:
         cmd_status()
 
     elif args.command == "bump":
-        # Validate version format
         if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
             die(f"Invalid version format: {args.version!r}. Expected X.Y.Z")
         cmd_bump(
             new_ver=args.version,
             skip_tests=args.skip_tests,
-            skip_merge=args.skip_merge,
+            dev_only=args.dev,
             dry=args.dry_run,
             yes=args.yes,
         )
@@ -827,7 +828,7 @@ def main() -> None:
     elif args.command == "publish":
         publish(target=args.target, dry=args.dry_run)
 
-    elif args.command in ("ext-binaries", "zed-binaries"):
+    elif args.command == "ext-binaries":
         ver = args.version or read_pyproject_version()
         cmd_zed_binaries(
             python_ver=ver,
