@@ -843,6 +843,16 @@ def cmd_dev_stub(dry: bool) -> None:
     ok("Stub binary committed and pushed to dev")
 
 
+def cmd_upload_stubs(python_ver: str, dry: bool) -> None:
+    """Create (if needed) the GitHub Release vX.Y.Z and upload local stub binaries.
+
+    Recovery command for when the full bump completed tagging and merging but
+    crashed before the stub upload step.
+    """
+    upload_stub_binaries_to_release(python_ver, dry)
+    ok(f"Stub upload for v{python_ver} complete.")
+
+
 def download_stub_binaries(python_ver: str, dry: bool) -> None:
     """Download built stub binaries from GitHub Release into stub/bin/."""
     step("Downloading stub binaries from GitHub Release")
@@ -997,22 +1007,20 @@ def cmd_bump(
                 info(f"Tag {py_tag} left unchanged.")
         else:
             # Tag exists locally but may not yet be on remote (e.g. after a --dev bump).
-            # If it is remote-only or on both, refuse to overwrite to avoid clobbering a
-            # published release.
             if git_tag_exists_remote(py_tag):
-                die(
-                    f"Tag {py_tag} already exists on the remote. Cannot overwrite a published release tag.\n"
-                    "  Bump to a new version or delete the tag manually if this was a mistake."
-                )
-
-            warn(f"Tag {py_tag} exists locally but NOT on remote (likely from a --dev bump).")
-
-            if confirm(f"Move tag {py_tag} to current HEAD and push it?", yes):
-                git_retag(py_tag, dry)
-                git_push_tag(py_tag, dry)
-                ok(f"Tag {py_tag} moved to HEAD and pushed")
+                # Tag is already on remote — this is a resume scenario (bump crashed
+                # mid-flight after the tag was pushed). Skip tagging and continue
+                # with merge + stub upload.
+                warn(f"Tag {py_tag} already on remote — skipping retag, resuming release.")
             else:
-                die("Aborted. Delete the local tag manually or bump to a new version.")
+                warn(f"Tag {py_tag} exists locally but NOT on remote (likely from a --dev bump).")
+
+                if confirm(f"Move tag {py_tag} to current HEAD and push it?", yes):
+                    git_retag(py_tag, dry)
+                    git_push_tag(py_tag, dry)
+                    ok(f"Tag {py_tag} moved to HEAD and pushed")
+                else:
+                    die("Aborted. Delete the local tag manually or bump to a new version.")
     else:
         git_tag(py_tag, dry)
         if dev_only:
@@ -1158,6 +1166,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_ext.add_argument("--dry-run", action="store_true")
     p_ext.add_argument("--yes", "-y", action="store_true")
 
+    # ── upload-stubs ──────────────────────────────────────────────────────
+    # Recovery command: create the GitHub Release if missing, then upload
+    # whatever local stub binaries exist in stub/bin/.  Useful when bump
+    # completed tagging & merging but crashed before the stub upload step.
+    p_us = sub.add_parser(
+        "upload-stubs",
+        help="Create GitHub Release (if needed) and upload local stub binaries.",
+    )
+    p_us.add_argument(
+        "--version",
+        metavar="X.Y.Z",
+        help="Version override (default: read from pyproject.toml).",
+    )
+    p_us.add_argument("--dry-run", action="store_true")
+
     # ── status ────────────────────────────────────────────────────────────
     sub.add_parser("status", help="Show current versions across all manifests.")
 
@@ -1203,6 +1226,10 @@ def main() -> None:
             dry=args.dry_run,
             yes=args.yes,
         )
+
+    elif args.command == "upload-stubs":
+        ver = args.version or read_pyproject_version()
+        cmd_upload_stubs(python_ver=ver, dry=args.dry_run)
 
 
 if __name__ == "__main__":
