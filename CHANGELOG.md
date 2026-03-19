@@ -1,5 +1,9 @@
 # Changelog
 
+* 2026-03-19: v0.2.13 - <TITLE> (Hannibal)
+  * <release notes here>
+
+
 * 2026-03-19: v0.2.12 - Release (Hannibal)
   * Version bump to 0.2.12
 
