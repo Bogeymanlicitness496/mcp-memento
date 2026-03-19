@@ -361,14 +361,26 @@ def bump_readme_badge(new_ver: str, dry: bool) -> None:
 
 
 def prepend_changelog(new_ver: str, dry: bool) -> None:
+    """Prepend a new release entry to CHANGELOG.md.
+
+    Skipped silently if an entry for this version already exists, to prevent
+    duplicates when a bump is re-run (e.g. after a mid-flight crash).
+    """
     today = datetime.date.today().strftime("%Y-%m-%d")
     entry = (
         f"* {today}: v{new_ver} - Release (Hannibal)\n  * Version bump to {new_ver}\n\n"
     )
+
     if dry:
         info(f"Would prepend to CHANGELOG.md:\n  {entry.strip()}")
         return
+
     text = CHANGELOG.read_text(encoding="utf-8")
+
+    if f": v{new_ver} -" in text:
+        info(f"CHANGELOG.md already contains an entry for v{new_ver} — skipping.")
+        return
+
     # Insert after the first line (# Changelog header)
     lines = text.split("\n", 1)
     new_text = lines[0] + "\n\n" + entry + (lines[1] if len(lines) > 1 else "")
@@ -976,9 +988,12 @@ def cmd_bump(
     bump_lib_rs_stub_release(new_ver, dev_only, dry)
     bump_readme_badge(new_ver, dry)
 
-    # 3. Changelog
-    step("Updating CHANGELOG")
-    prepend_changelog(new_ver, dry)
+    # 3. Changelog (skipped for --dev: dev bumps are not releases)
+    if not dev_only:
+        step("Updating CHANGELOG")
+        prepend_changelog(new_ver, dry)
+    else:
+        info("Skipping CHANGELOG update (--dev mode)")
 
     # 4. Build wheel
     build_package(dry)
