@@ -35,7 +35,9 @@ class SQLiteBackend(GraphBackend):
         Raises:
             DatabaseConnectionError: If SQLite connection fails
         """
-        self.db_path: str = db_path if db_path is not None else Config.DB_PATH
+        db_path = db_path if db_path is not None else Config.DB_PATH
+        # Expand tilde (~) to home directory
+        self.db_path: str = os.path.expanduser(db_path)
         self.conn: Optional[aiosqlite.Connection] = None
         self._connected = False
         self._supports_fts = False

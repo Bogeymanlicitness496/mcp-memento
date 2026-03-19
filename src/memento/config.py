@@ -112,6 +112,44 @@ class _EnvVar:
         return f"_EnvVar({', '.join(repr(n) for n in self.env_names)}, default={self.default!r})"
 
 
+class _PathEnvVar(_EnvVar):
+    """Descriptor for path environment variables that auto-expands tilde (~).
+
+    Extends _EnvVar to automatically call os.path.expanduser() on the value,
+    ensuring that paths like ~/.mcp-memento/context.db are expanded to the
+    user's home directory. Falls back to using USERPROFILE if HOME is not set.
+    """
+
+    def __get__(self, obj: object, objtype: type = None) -> object:
+        for name in self.env_names:
+            val = os.getenv(name)
+            if val is not None:
+                converted = self._convert(val)
+                if isinstance(converted, str):
+                    return self._expand_path(converted)
+                return converted
+        default = self.default
+        return self._expand_path(default) if isinstance(default, str) else default
+
+    @staticmethod
+    def _expand_path(path: str) -> str:
+        """Expand user home directory, with fallback for missing HOME on Windows."""
+        if not path.startswith("~"):
+            return path
+
+        # Standard expansion
+        expanded = os.path.expanduser(path)
+        
+        # If expanduser didn't work (e.g., HOME not set in sandbox),
+        # and we're on Windows, try USERPROFILE
+        if expanded.startswith("~") and os.name == "nt":
+            userprofile = os.environ.get("USERPROFILE")
+            if userprofile:
+                expanded = path.replace("~", userprofile, 1)
+        
+        return expanded
+
+
 def _default_db_path() -> str:
     """Return the OS-appropriate default path for the Memento database.
 
@@ -205,7 +243,8 @@ class YAMLConfig:
         """Apply environment variable overrides to configuration."""
         # SQLite configuration
         if os.getenv("MEMENTO_DB_PATH"):
-            config["sqlite_path"] = os.getenv("MEMENTO_DB_PATH")
+            db_path = os.getenv("MEMENTO_DB_PATH")
+            config["sqlite_path"] = os.path.expanduser(db_path)
 
         # Tool configuration
         if os.getenv("MEMENTO_PROFILE"):
@@ -263,7 +302,7 @@ class Config:
     _yaml_config = YAMLConfig.load_config()
 
     # Database configuration (SQLite only)
-    DB_PATH = _EnvVar(
+    DB_PATH = _PathEnvVar(
         "MEMENTO_DB_PATH",
         default=_yaml_config.get("sqlite_path", _DEFAULT_DB_PATH),
     )
@@ -367,9 +406,8 @@ class Config:
                 if attr_name == "BACKEND":
                     descriptor.default = cls._yaml_config.get("backend", "sqlite")
                 elif attr_name == "DB_PATH":
-                    descriptor.default = cls._yaml_config.get(
-                        "sqlite_path", _DEFAULT_DB_PATH
-                    )
+                    db_path = cls._yaml_config.get("sqlite_path", _DEFAULT_DB_PATH)
+                    descriptor.default = os.path.expanduser(db_path)
                 elif attr_name == "PROFILE":
                     descriptor.default = cls._yaml_config.get("tool_profile", "core")
                 elif attr_name == "LOG_LEVEL":

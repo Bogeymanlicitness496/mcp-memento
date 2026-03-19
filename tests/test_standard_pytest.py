@@ -285,6 +285,60 @@ class TestConfiguration:
                 assert Config.PROFILE == "core"
 
 
+    def test_tilde_expansion_in_db_path(self):
+        """Test that tilde (~) is expanded to home directory in DB path."""
+        import sys
+
+        # Force reload
+        modules_to_delete = [m for m in sys.modules.keys() if m.startswith("memento.")]
+        for m in modules_to_delete:
+            del sys.modules[m]
+        if "memento" in sys.modules:
+            del sys.modules["memento"]
+
+        from memento.config import Config, YAMLConfig
+
+        # Test with tilde in environment variable
+        # Note: clear=True removes all env vars, so we need to set HOME/USERPROFILE
+        env_dict = {"MEMENTO_DB_PATH": "~/.mcp-memento/context.db"}
+        if os.name == "nt":
+            env_dict["USERPROFILE"] = str(Path.home())
+        else:
+            env_dict["HOME"] = str(Path.home())
+        
+        with patch.dict(os.environ, env_dict, clear=True):
+            YAMLConfig._config_cache.clear()
+            with patch.object(
+                YAMLConfig, "load_config", return_value=YAMLConfig._get_defaults()
+            ):
+                Config.reload_config()
+
+                # Path should be expanded (not contain tilde)
+                assert "~" not in Config.DB_PATH
+                assert Config.DB_PATH.startswith(str(Path.home()))
+                assert Config.DB_PATH.endswith("context.db")
+
+    def test_tilde_expansion_in_backend_init(self):
+        """Test that SQLiteBackend expands tilde when initializing."""
+        from memento.database.engine import SQLiteBackend
+
+        # Test with tilde path
+        tilde_path = "~/.test-mcp-memento/test.db"
+        backend = SQLiteBackend(tilde_path)
+
+        # Path should be expanded
+        assert "~" not in backend.db_path
+        assert backend.db_path.startswith(str(Path.home()))
+        assert backend.db_path.endswith("test.db")
+
+        # Cleanup
+        if os.path.exists(backend.db_path):
+            os.unlink(backend.db_path)
+        parent = Path(backend.db_path).parent
+        if parent.exists():
+            parent.rmdir()
+
+
 class TestModels:
     """Test data models and validation."""
 
