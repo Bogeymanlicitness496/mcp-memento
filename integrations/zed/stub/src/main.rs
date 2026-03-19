@@ -140,8 +140,8 @@ fn memento_is_installed(python: &Path) -> bool {
 }
 
 fn install_memento(python: &Path) -> Result<(), String> {
-    log!("Running: pip install --upgrade mcp-memento");
-
+    // Strategy 1: standard pip install
+    log!("Trying: pip install --upgrade mcp-memento");
     let status = Command::new(python)
         .args(["-m", "pip", "install", "--upgrade", "mcp-memento"])
         .stdout(std::process::Stdio::null())
@@ -150,11 +150,60 @@ fn install_memento(python: &Path) -> Result<(), String> {
         .map_err(|e| format!("Failed to launch pip: {e}"))?;
 
     if status.success() {
-        log!("mcp-memento installed successfully.");
-        Ok(())
-    } else {
-        Err(format!("pip exited with status: {status}"))
+        log!("mcp-memento installed successfully (standard pip).");
+        return Ok(());
     }
+    log!("Standard pip failed (status: {status}), trying --user...");
+
+    // Strategy 2: pip install --user (no venv required, works on most systems)
+    let status = Command::new(python)
+        .args(["-m", "pip", "install", "--upgrade", "--user", "mcp-memento"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("Failed to launch pip --user: {e}"))?;
+
+    if status.success() {
+        log!("mcp-memento installed successfully (pip --user).");
+        return Ok(());
+    }
+    log!("pip --user failed (status: {status}), trying --break-system-packages...");
+
+    // Strategy 3: --break-system-packages (Debian/Ubuntu PEP 668 workaround)
+    let status = Command::new(python)
+        .args([
+            "-m", "pip", "install", "--upgrade",
+            "--break-system-packages",
+            "mcp-memento",
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("Failed to launch pip --break-system-packages: {e}"))?;
+
+    if status.success() {
+        log!("mcp-memento installed successfully (--break-system-packages).");
+        return Ok(());
+    }
+    log!("--break-system-packages failed (status: {status}), trying pipx...");
+
+    // Strategy 4: pipx (common on modern Linux desktops)
+    let pipx_status = Command::new("pipx")
+        .args(["install", "mcp-memento"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    match pipx_status {
+        Ok(s) if s.success() => {
+            log!("mcp-memento installed successfully via pipx.");
+            return Ok(());
+        }
+        Ok(s) => log!("pipx failed (status: {s})"),
+        Err(e) => log!("pipx not available: {e}"),
+    }
+
+    Err("All install strategies failed. Please install mcp-memento manually: pip install --user mcp-memento".to_string())
 }
 
 // ---------------------------------------------------------------------------
