@@ -361,14 +361,26 @@ def bump_readme_badge(new_ver: str, dry: bool) -> None:
 
 
 def prepend_changelog(new_ver: str, dry: bool) -> None:
+    """Prepend a new release entry to CHANGELOG.md.
+
+    Skipped silently if an entry for this version already exists, to prevent
+    duplicates when a bump is re-run (e.g. after a mid-flight crash).
+    """
     today = datetime.date.today().strftime("%Y-%m-%d")
     entry = (
         f"* {today}: v{new_ver} - Release (Hannibal)\n  * Version bump to {new_ver}\n\n"
     )
+
     if dry:
         info(f"Would prepend to CHANGELOG.md:\n  {entry.strip()}")
         return
+
     text = CHANGELOG.read_text(encoding="utf-8")
+
+    if f": v{new_ver} -" in text:
+        info(f"CHANGELOG.md already contains an entry for v{new_ver} — skipping.")
+        return
+
     # Insert after the first line (# Changelog header)
     lines = text.split("\n", 1)
     new_text = lines[0] + "\n\n" + entry + (lines[1] if len(lines) > 1 else "")
@@ -510,7 +522,32 @@ def git_add_all(dry: bool) -> None:
 
 
 def git_commit(message: str, dry: bool) -> None:
-    run(f'git commit -m "{message}"', dry=dry)
+    """Commit staged changes. A no-op (not an error) if nothing is staged."""
+    if dry:
+        run(f'git commit -m "{message}"', dry=True)
+        return
+
+    result = subprocess.run(
+        f'git commit -m "{message}"',
+        shell=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode == 0:
+        print(result.stdout.strip())
+        return
+
+    combined = (result.stdout + result.stderr).lower()
+
+    if "nothing to commit" in combined or "nothing added to commit" in combined:
+        info("Nothing new to commit — already up to date.")
+        return
+
+    # Real failure
+    err(result.stderr.strip())
+    die(f"Command failed (exit {result.returncode}): git commit -m \"{message}\"")
 
 
 def git_push(branch: str, dry: bool) -> None:
@@ -826,8 +863,27 @@ def build_stub_local(dry: bool) -> None:
     zed_stub_dst_dir = zed_work_dir / "stub" / "bin"
 
     if not dry:
+        import os as _os
+
         zed_stub_dst_dir.mkdir(parents=True, exist_ok=True)
-        _shutil.copy2(src, zed_stub_dst_dir / dst_name)
+
+        dst_final = zed_stub_dst_dir / dst_name
+        dst_tmp = zed_stub_dst_dir / (dst_name + ".tmp")
+
+        try:
+            # Copy to a temp name first, then atomically replace the target.
+            # On Windows the destination binary may be memory-mapped by Zed's
+            # WASM runtime; a direct overwrite raises PermissionError, but
+            # replacing via a temporary file succeeds because Windows allows
+            # renaming over an in-use file when the new inode is distinct.
+            _shutil.copy2(src, dst_tmp)
+            _os.replace(dst_tmp, dst_final)
+        except PermissionError:
+            dst_tmp.unlink(missing_ok=True)
+            warn("Could not update stub in Zed work dir (file locked by Zed).")
+            warn("Reload the extension inside Zed to pick up the new binary:")
+            warn("  Ctrl+Shift+P → 'zed: extensions' → Reload mcp-memento")
+            return
 
     ok(f"Stub copied to Zed work dir: {zed_stub_dst_dir / dst_name}")
 
@@ -976,9 +1032,12 @@ def cmd_bump(
     bump_lib_rs_stub_release(new_ver, dev_only, dry)
     bump_readme_badge(new_ver, dry)
 
-    # 3. Changelog
-    step("Updating CHANGELOG")
-    prepend_changelog(new_ver, dry)
+    # 3. Changelog (skipped for --dev: dev bumps are not releases)
+    if not dev_only:
+        step("Updating CHANGELOG")
+        prepend_changelog(new_ver, dry)
+    else:
+        info("Skipping CHANGELOG update (--dev mode)")
 
     # 4. Build wheel
     build_package(dry)
