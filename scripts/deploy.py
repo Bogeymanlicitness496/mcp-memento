@@ -109,6 +109,7 @@ ZED_CARGO = ZED_DIR / "Cargo.toml"
 ZED_EXTENSION = ZED_DIR / "extension.toml"
 ZED_LIB_RS = ZED_DIR / "src" / "lib.rs"
 ZED_STUB_CARGO = ZED_DIR / "stub" / "Cargo.toml"
+ZED_STUB_MAIN_RS = ZED_DIR / "stub" / "src" / "main.rs"
 ZED_STUB_BIN = ZED_DIR / "stub" / "bin"
 
 GITHUB_REPO = "annibale-x/mcp-memento"
@@ -320,7 +321,7 @@ def bump_extension_toml(new_ver: str, dry: bool) -> None:
 
 
 def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
-    """Update STUB_EXT_RELEASE and STUB_CHANNEL in lib.rs."""
+    """Update STUB_EXT_RELEASE and STUB_CHANNEL in lib.rs; STUB_VERSION in main.rs."""
 
     tag = f"v{new_ver}"
     _replace_in_file(
@@ -335,6 +336,13 @@ def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
         ZED_LIB_RS,
         r'(STUB_CHANNEL:\s*&str\s*=\s*)"[^"]+"',
         rf'\g<1>"{channel}"',
+        dry,
+    )
+
+    _replace_in_file(
+        ZED_STUB_MAIN_RS,
+        r'(STUB_VERSION:\s*&str\s*=\s*)"[^"]+"',
+        rf'\g<1>"{tag}"',
         dry,
     )
 

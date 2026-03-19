@@ -17,12 +17,12 @@ use zed_extension_api::{
 // ---------------------------------------------------------------------------
 
 /// GitHub release tag for the current stub binaries (matches Python version tag).
-const STUB_EXT_RELEASE: &str = "v0.2.16";
+const STUB_EXT_RELEASE: &str = "v0.2.17";
 
 /// Distribution channel: "prod" downloads from the vX.Y.Z GitHub Release;
 /// "dev" downloads from the rolling pre-release tag "dev-latest".
 /// Set automatically by scripts/deploy.py during a version bump.
-const STUB_CHANNEL: &str = "prod";
+const STUB_CHANNEL: &str = "dev";
 
 /// GitHub repository (owner/name) hosting the releases.
 const REPO: &str = "annibale-x/mcp-memento";
@@ -281,6 +281,21 @@ impl zed::Extension for MementoExtension {
             Err(e) => {
                 log(&format!(
                     "WARNING: Could not load settings ({}), using defaults",
+                    e
+                ));
+            }
+        }
+
+        // --- Pass extension work directory so stub can place venv there ---
+        match std::env::current_dir() {
+            Ok(cwd) => {
+                let work_dir = cwd.to_string_lossy().into_owned();
+                log(&format!("Passing MEMENTO_WORK_DIR: {}", work_dir));
+                env_vars.push(("MEMENTO_WORK_DIR".to_string(), work_dir));
+            }
+            Err(e) => {
+                log(&format!(
+                    "WARNING: current_dir() failed ({}), stub will use fallback venv location",
                     e
                 ));
             }

@@ -1,5 +1,13 @@
 # Changelog
 
+* 2026-03-19: v0.2.17 - Isolated venv for Zed extension stub (Hannibal)
+  * Zed stub now creates and manages an isolated Python venv inside the Zed extension work directory (~/.local/share/zed/extensions/work/mcp-memento/venv/)
+  * mcp-memento is installed exclusively inside the venv — no longer touches system Python or user site-packages
+  * Venv is validated at every startup via a version marker file; rebuilt automatically on extension update
+  * WASM extension passes MEMENTO_WORK_DIR env var to stub so venv location is always inside Zed's sandbox
+  * Removed pipx fallback strategy (superseded by venv isolation)
+  * deploy.py bump now keeps STUB_VERSION in main.rs in sync with STUB_EXT_RELEASE in lib.rs
+
 * 2026-03-19: v0.2.16 - Tilde expansion fix for MEMENTO_DB_PATH on all platforms (Hannibal)
   * Fixed tilde (~) not expanding to home directory on Linux/Darwin when using MEMENTO_DB_PATH env var
   * Added _PathEnvVar descriptor for automatic tilde expansion in path-based config options
