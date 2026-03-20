@@ -45,6 +45,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
 // ---------------------------------------------------------------------------
 // Version marker — must match STUB_EXT_RELEASE in lib.rs.
 // ---------------------------------------------------------------------------
@@ -296,7 +299,7 @@ fn install_memento(python: &Path) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 fn launch_python(venv_py: &Path) -> ! {
-    log!("Fast path: exec {} -u -m memento", venv_py.display());
+    log!("exec() Python: {} -u -m memento", venv_py.display());
 
     let mut cmd = Command::new(venv_py);
     cmd.args(["-u", "-m", "memento"]);
@@ -308,14 +311,25 @@ fn launch_python(venv_py: &Path) -> ! {
         }
     }
 
-    // Inherited stdin/stdout/stderr — Python talks directly to Zed.
+    // On Unix: replace this process image with Python (exec syscall).
+    // stdin/stdout/stderr are inherited — Python talks directly to Zed
+    // as if the stub never existed. No proxy, no buffering, no MCP replay.
+    #[cfg(unix)]
+    {
+        let err = cmd.exec();
+        log!("exec() failed: {err}");
+        std::process::exit(1);
+    }
+
+    // Windows fallback: spawn + wait.
+    #[cfg(not(unix))]
     match cmd.status() {
         Ok(s) => {
             log!("Python exited: {s}");
             std::process::exit(s.code().unwrap_or(1));
         }
         Err(e) => {
-            log!("Failed to exec Python: {e}");
+            log!("Failed to spawn Python: {e}");
             std::process::exit(1);
         }
     }
@@ -662,7 +676,7 @@ enum SetupState {
 // On relaunch the stub hits the fast path and exec()s Python directly.
 // ---------------------------------------------------------------------------
 
-fn run_bootstrap_server(state: Arc<Mutex<SetupState>>) -> ! {
+fn run_bootstrap_server(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     log!("Bootstrap server started (pid={}).", std::process::id());
 
     let stdin = io::stdin();
@@ -675,14 +689,17 @@ fn run_bootstrap_server(state: Arc<Mutex<SetupState>>) -> ! {
         {
             let s = state.lock().unwrap();
 
-            if *s != SetupState::Running {
-                let msg = match &*s {
-                    SetupState::Done => "Setup complete — exiting so Zed relaunches.".to_string(),
-                    SetupState::Failed(e) => format!("Setup failed: {e}"),
-                    SetupState::Running => unreachable!(),
-                };
-                log!("{}", msg);
-                std::process::exit(0);
+            match &*s {
+                SetupState::Running => {}
+                SetupState::Done => {
+                    log!("Setup complete — exec()ing Python.");
+                    drop(s);
+                    launch_python(&venv_py);
+                }
+                SetupState::Failed(e) => {
+                    log!("Setup failed: {e}");
+                    std::process::exit(1);
+                }
             }
         }
 
@@ -964,5 +981,5 @@ fn main() {
 
     // Run bootstrap server — responds to Zed while setup runs in background.
     // Exits with code 0 when setup is done so Zed relaunches.
-    run_bootstrap_server(state);
+    run_bootstrap_server(state, venv_python(&venv));
 }
