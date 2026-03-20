@@ -565,12 +565,15 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
         log!("Replay done — forwarding live messages.");
 
         while let Ok(Some(msg)) = rx.recv() {
+            log!("Proxy → Python: {}", &msg[..msg.len().min(200)]);
             let frame = format!("Content-Length: {}\r\n\r\n{}", msg.len(), msg);
 
             if child_stdin.write_all(frame.as_bytes()).is_err() {
+                log!("Write error forwarding to Python.");
                 break;
             }
         }
+        log!("Forwarder thread exiting.");
     });
 
     // Forward Python stdout → our stdout.
@@ -581,9 +584,12 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
 
         loop {
             match py_out.read(&mut buf) {
-                Ok(0) | Err(_) => break,
+                Ok(0) => { log!("Python stdout EOF."); break; }
+                Err(e) => { log!("Python stdout read error: {e}"); break; }
                 Ok(n) => {
+                    log!("Python → Zed: {} bytes", n);
                     if out.write_all(&buf[..n]).is_err() || out.flush().is_err() {
+                        log!("Write error forwarding to Zed.");
                         break;
                     }
                 }
