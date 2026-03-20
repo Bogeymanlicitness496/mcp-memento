@@ -129,7 +129,7 @@ async def handle_get_recent_memento_activity(
 
             with ThreadPoolExecutor(max_workers=1) as executor:
                 future = loop.run_in_executor(executor, detect_project_context)
-                project_info = await asyncio.wait_for(future, timeout=3.0)
+                project_info = await asyncio.wait_for(future, timeout=0.8)
 
             if project_info:
                 project = project_info.get("project_path")
@@ -188,7 +188,7 @@ async def handle_get_recent_memento_activity(
     result_text += "**💡 Next Steps**:\n"
     if activity["unresolved_problems"]:
         result_text += "- Review unresolved problems and consider solutions\n"
-        result_text += '- Use `get_memory(memory_id="...")` for details\n'
+        result_text += '- Use `get_memento(memory_id="...")` for details\n'
     else:
         result_text += "- All problems have been addressed!\n"
 

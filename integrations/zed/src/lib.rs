@@ -17,12 +17,12 @@ use zed_extension_api::{
 // ---------------------------------------------------------------------------
 
 /// GitHub release tag for the current stub binaries (matches Python version tag).
-const STUB_EXT_RELEASE: &str = "v0.2.25";
+const STUB_EXT_RELEASE: &str = "v0.2.26";
 
 /// Distribution channel: "prod" downloads from the vX.Y.Z GitHub Release;
 /// "dev" downloads from the rolling pre-release tag "dev-latest".
 /// Set automatically by scripts/deploy.py during a version bump.
-const STUB_CHANNEL: &str = "prod";
+const STUB_CHANNEL: &str = "dev";
 
 /// GitHub repository (owner/name) hosting the releases.
 const REPO: &str = "annibale-x/mcp-memento";
@@ -292,13 +292,6 @@ impl zed::Extension for MementoExtension {
                         log(&format!("Using MEMENTO_PROFILE: {}", profile));
                         env_vars.push(("MEMENTO_PROFILE".to_string(), profile.to_string()));
                     }
-
-                    if let Some(wheel) = map.get("MEMENTO_LOCAL_WHEEL").and_then(|v| v.as_str()) {
-                        if !wheel.is_empty() && wheel != "none" {
-                            log(&format!("Using MEMENTO_LOCAL_WHEEL: {}", wheel));
-                            env_vars.push(("MEMENTO_LOCAL_WHEEL".to_string(), wheel.to_string()));
-                        }
-                    }
                 } else {
                     log("WARNING: settings.settings is None or not an Object");
                 }
@@ -376,11 +369,7 @@ impl zed::Extension for MementoExtension {
                     "description": "Python executable. Use 'default' for automatic discovery, or set an absolute path (e.g. C:/Users/you/AppData/Local/Programs/Python/Python312/python.exe).",
                     "default": "default"
                 },
-                "MEMENTO_LOCAL_WHEEL": {
-                    "type": "string",
-                    "description": "Dev mode: absolute path to a local .whl file to install instead of downloading from PyPI. Leave empty (or 'none') for normal PyPI install.",
-                    "default": ""
-                }
+
             }
         });
 
@@ -394,11 +383,11 @@ impl zed::Extension for MementoExtension {
 
         let installation_instructions = format!(
             r#"
-> **First install / update note:** On the very first install (and sometimes after an
-> update), Memento may initially report only **1 tool available** — this is expected.
-> The launcher is downloading and installing the Python package in the background.
-> Once installation completes (usually a few seconds), Zed will automatically refresh
-> and expose all tools for the selected profile.
+**First install / update:** On the very first install (and sometimes after an
+update), Memento may initially report only **1 tool available** — this is expected.
+The launcher is downloading and installing the Python package in the background.
+Once installation completes (usually a few seconds), Zed will automatically refresh
+and expose all tools for the selected profile.
 
 ---
 
@@ -425,11 +414,6 @@ __**Configuration parameters:**__
 
   (_Set an absolute path if your Python is not on the system **PATH**._)
 
-- **MEMENTO_LOCAL_WHEEL** _(dev / testing only)_: Absolute path to a local `.whl` file.
-  When set, the launcher installs from that file instead of downloading from PyPI.
-  Every time the path changes the venv is automatically rebuilt.
-
-  Example: `L:/Work/mcp-memento/dist/mcp_memento-0.2.25-py3-none-any.whl`
 	        "#,
             db_path_default_hint
         );

@@ -1,5 +1,9 @@
 # Changelog
 
+* 2026-03-21: v0.2.26 - <TITLE> (Hannibal)
+  * <release notes here>
+
+
 * 2026-03-20: v0.2.25 - Bug fixes: 8 critical tool regressions + 37 new regression tests (Hannibal)
   * fix(tools): find_memento_patterns — handler was using wrong arguments (from_memory_id); replaced with real SQL-based pattern detection
   * fix(tools): analyze_memento_graph — handler was using wrong argument (category); replaced with real graph analytics (density, degree, category coverage)

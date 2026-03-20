@@ -68,7 +68,7 @@ def _generate_distinction_guide() -> str:
     """Generate guide focusing on the distinction between memento and session memory."""
     return """# MEMENTO vs SESSION MEMORY - CRITICAL DISTINCTION
 
-## MEMENTO (mcp-memento tools with '_persistent' suffix)
+## MEMENTO (mcp-memento tools)
 - Scope: Global - accessible from ANY project or session
 - Persistence: Long-term - survives across ALL sessions
 - Purpose: Store reusable knowledge, solutions, patterns
@@ -76,8 +76,9 @@ def _generate_distinction_guide() -> str:
   - store_memento - Store long-term solutions
   - get_memento - Retrieve cross-session knowledge
   - search_mementos - Search global patterns
+  - recall_mementos - Natural language search
 
-## SESSION MEMORY (Serena Context Server tools WITHOUT suffix)
+## SESSION MEMORY (Serena Context Server tools)
 - Scope: Project-specific - only accessible within current project
 - Persistence: Temporary - lasts only for current session
 - Purpose: Store ephemeral context, temporary variables
@@ -107,8 +108,9 @@ def _generate_distinction_guide() -> str:
    Use search_mementos instead
 
 ## KEY TAKEAWAY
-ALWAYS CHECK FOR '_persistent' SUFFIX when you need knowledge to survive across sessions.
-No suffix = session-only, temporary storage."""
+Memento tools are named store_memento, get_memento, search_mementos, etc.
+Session tools (Serena) are named store_memory, get_memory, search_memories, etc.
+The suffix '-o' (memento) vs no suffix (memory) is the quick differentiator."""
 
 
 def _generate_examples_guide() -> str:

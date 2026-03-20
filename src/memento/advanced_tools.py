@@ -144,56 +144,105 @@ class AdvancedRelationshipHandlers:
     async def handle_find_path_between_mementos(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Find shortest path between two mementos."""
+        """Find shortest path between two mementos using BFS."""
         try:
             from_id = arguments["from_memory_id"]
             to_id = arguments["to_memory_id"]
             max_depth = arguments.get("max_depth", 5)
             rel_types = arguments.get("relationship_types")
 
-            # Convert string types to enums if provided
             relationship_types = None
             if rel_types:
                 relationship_types = [RelationshipType(t) for t in rel_types]
 
-            # Get all memories and relationships
-            # (In production, this should be optimized to only fetch relevant subset)
-            all_memories = []
-            all_relationships = []
+            # BFS: predecessor map stores {node_id: (parent_id, relationship_type)}
+            visited = {from_id}
+            predecessor: dict = {from_id: None}
+            queue = [from_id]
+            found = False
 
-            # For now, we'll use the related memories query as an approximation
-            related = await self.memory_db.get_related_memories(
-                from_id, relationship_types=relationship_types, max_depth=max_depth
-            )
+            for _depth in range(max_depth):
+                if not queue:
+                    break
 
-            if not related:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=f"No path found between {from_id} and {to_id}",
-                        )
-                    ]
-                )
+                next_queue = []
 
-            # Check if target is in related memories
-            found_target = any(m.id == to_id for m, _ in related)
+                for current_id in queue:
+                    neighbors = await self.memory_db.get_related_memories(
+                        current_id,
+                        relationship_types=relationship_types,
+                        max_depth=1,
+                    )
 
-            if found_target:
-                path_info = {
-                    "found": True,
-                    "from_memory_id": from_id,
-                    "to_memory_id": to_id,
-                    "hops": len([m for m, _ in related if m.id == to_id]),
-                    "related_memories": len(related),
-                }
-            else:
+                    for neighbor_memory, relationship in neighbors:
+                        nid = neighbor_memory.id
+
+                        if nid in visited:
+                            continue
+
+                        visited.add(nid)
+                        rel_label = relationship.type.value if relationship and hasattr(relationship, "type") else "RELATED_TO"
+                        predecessor[nid] = (current_id, rel_label, neighbor_memory.title)
+
+                        if nid == to_id:
+                            found = True
+                            break
+
+                        next_queue.append(nid)
+
+                    if found:
+                        break
+
+                if found:
+                    break
+
+                queue = next_queue
+
+            if not found:
                 path_info = {
                     "found": False,
                     "from_memory_id": from_id,
                     "to_memory_id": to_id,
                     "searched_depth": max_depth,
+                    "visited_count": len(visited),
                 }
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(path_info, indent=2))]
+                )
+
+            # Reconstruct path by walking back through predecessor map
+            path_nodes = []
+            current = to_id
+
+            while current is not None:
+                entry = predecessor[current]
+
+                if entry is None:
+                    path_nodes.append({"id": current, "via_relationship": None})
+                else:
+                    parent_id, rel_label, node_title = entry
+                    path_nodes.append(
+                        {"id": current, "title": node_title, "via_relationship": rel_label}
+                    )
+                    current = parent_id
+                    continue
+
+                break
+
+            path_nodes.reverse()
+
+            # Fetch start node title
+            start_memory = await self.memory_db.get_memory_by_id(from_id)
+            if path_nodes and path_nodes[0].get("id") == from_id:
+                path_nodes[0]["title"] = start_memory.title if start_memory else from_id
+
+            path_info = {
+                "found": True,
+                "from_memory_id": from_id,
+                "to_memory_id": to_id,
+                "hops": len(path_nodes) - 1,
+                "path": path_nodes,
+            }
 
             return CallToolResult(
                 content=[TextContent(type="text", text=json.dumps(path_info, indent=2))]

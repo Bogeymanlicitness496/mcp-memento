@@ -4,11 +4,12 @@ deploy.py — MCP Memento unified release & deploy script.
 
 Workflow
 --------
-  bump [X.Y.Z]  →  fix / test  →  bump  →  ...  →  promote  →  publish
+  rebuild  →  fix / test  →  rebuild  →  ...  →  bump [X.Y.Z]  →  promote  →  publish
 
 Usage:
+    python scripts/deploy.py rebuild
     python scripts/deploy.py bump [X.Y.Z]
-    python scripts/deploy.py promote [--yes]
+    python scripts/deploy.py promote
     python scripts/deploy.py publish [-t]
     python scripts/deploy.py build
     python scripts/deploy.py build-zed-stub
@@ -19,33 +20,39 @@ Usage:
 
 Commands
 --------
-  bump [X.Y.Z]      Dev bump: update versions in all manifests, build stub for
-                    current platform, upload to the dev-latest pre-release on
-                    GitHub, build the Python wheel, and install it into the Zed
-                    extension venv (MEMENTO_LOCAL_WHEEL).
-                    Version is optional — omitting it re-runs on the current
-                    version (useful to rebuild stub/wheel without a version change).
-                    Tag is local only — CI is NOT triggered. Always non-interactive.
+  rebuild           Fast dev rebuild: build stub for current platform + copy into
+                    Zed work dir + build Python wheel + invalidate Zed venv marker.
+                    No commit, no tag, no GitHub interaction.
+                    Use this in the inner fix/test loop.
+
+  bump [X.Y.Z]      Snapshot the current state as a dev version: update all
+                    version manifests, commit, create a local tag (not pushed),
+                    build stub + upload to dev-latest pre-release on GitHub,
+                    build wheel, install into Zed venv.
+                    X.Y.Z is optional — omitting it auto-increments the patch
+                    component (X.Y.Z+1). CI is NOT triggered.
 
   promote           Promote the current dev version to an official release:
                     verify CHANGELOG, merge dev→main, push tag vX.Y.Z (triggers
                     CI stub cross-compile), upload stub binaries to GitHub Release.
                     Version is read from pyproject.toml automatically.
+                    Always interactive — confirms before destructive actions.
 
   publish           Upload dist/* to PyPI.
                     Use -t / --test to upload to TestPyPI instead.
 
   build             Build sdist + wheel (no version bump).
 
+Advanced
+--------
   build-zed-stub    Build the native stub binary for the current platform, copy
                     it into integrations/zed/stub/bin/ and into the Zed extension
                     work directory, then commit and push.
                     Use when you modify stub/src/main.rs without a full bump.
 
-  dev-install       Build the local wheel and configure the Zed extension venv
-                    to use it instead of PyPI. Prints the MEMENTO_LOCAL_WHEEL
-                    snippet to paste into Zed settings if needed.
-                    Called automatically by bump — only run manually if needed.
+  dev-install       Invalidate the Zed extension venv marker so the stub
+                    reinstalls from MEMENTO_LOCAL_WHEEL on next Zed startup.
+                    Called automatically by rebuild — only run manually if needed.
 
   ext-binaries      Download CI-built stub binaries from the GitHub Release
                     vX.Y.Z into stub/bin/ and commit them to the repo.
@@ -60,24 +67,26 @@ Commands
 Options
 --------
   --dry-run         Print all actions without executing them.
-  --skip-tests      Skip pytest before release.
+  --skip-tests      Skip pytest before release (bump and promote).
   --version X.Y.Z   Override version (for ext-binaries and upload-stubs).
-  --yes, -y         Auto-confirm prompts (promote only).
   --test, -t        Upload to TestPyPI instead of PyPI (publish only).
 
 Examples
 --------
-  # Start a new version
-  python scripts/deploy.py bump 0.3.0
+  # Inner dev loop: rebuild after every code change
+  python scripts/deploy.py rebuild
 
-  # Rebuild stub + wheel on the current version (no version change)
+  # Snapshot current state as a new patch version (auto-increments Z)
   python scripts/deploy.py bump
 
-  # Preview bump without executing
-  python scripts/deploy.py bump 0.3.0 --dry-run
+  # Snapshot as a specific version
+  python scripts/deploy.py bump 0.3.0
 
-  # Promote current dev version to official release
-  python scripts/deploy.py promote --yes
+  # Preview without executing
+  python scripts/deploy.py rebuild --dry-run
+
+  # Promote to official release (interactive)
+  python scripts/deploy.py promote
 
   # Publish to PyPI
   python scripts/deploy.py publish
@@ -87,6 +96,7 @@ Examples
 
   # Show current version state
   python scripts/deploy.py status
+
 """
 
 from __future__ import annotations
@@ -396,10 +406,7 @@ def scaffold_changelog(new_ver: str, dry: bool) -> None:
     The developer is expected to fill in the release notes before the prod bump.
     """
     today = datetime.date.today().strftime("%Y-%m-%d")
-    entry = (
-        f"* {today}: v{new_ver} - <TITLE> (Hannibal)\n"
-        f"  * <release notes here>\n\n"
-    )
+    entry = f"* {today}: v{new_ver} - <TITLE> (Hannibal)\n  * <release notes here>\n\n"
 
     if dry:
         info(f"Would scaffold CHANGELOG.md entry for v{new_ver}")
@@ -414,7 +421,9 @@ def scaffold_changelog(new_ver: str, dry: bool) -> None:
     lines = text.split("\n", 1)
     new_text = lines[0] + "\n\n" + entry + (lines[1] if len(lines) > 1 else "")
     CHANGELOG.write_text(new_text, encoding="utf-8")
-    ok(f"Scaffolded CHANGELOG.md entry for v{new_ver} — fill in the release notes before the prod bump!")
+    ok(
+        f"Scaffolded CHANGELOG.md entry for v{new_ver} — fill in the release notes before the prod bump!"
+    )
 
 
 def check_changelog(new_ver: str, dry: bool) -> None:
@@ -609,7 +618,7 @@ def git_commit(message: str, dry: bool) -> None:
 
     # Real failure
     err(result.stderr.strip())
-    die(f"Command failed (exit {result.returncode}): git commit -m \"{message}\"")
+    die(f'Command failed (exit {result.returncode}): git commit -m "{message}"')
 
 
 def git_push(branch: str, dry: bool) -> None:
@@ -750,7 +759,7 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
     run(
         f"gh release create {tag}"
         f" --repo {GITHUB_REPO}"
-        f" --title \"v{python_ver}\""
+        f' --title "v{python_ver}"'
         f" --generate-notes"
         f" --latest",
         dry=dry,
@@ -797,8 +806,8 @@ def upload_stub_binaries_to_dev_prerelease(dry: bool) -> None:
     run(
         f"gh release create dev-latest"
         f" --repo {GITHUB_REPO}"
-        f" --title \"Dev stub binaries (rolling)\""
-        f" --notes \"Auto-updated on every dev bump. Not for production use.\""
+        f' --title "Dev stub binaries (rolling)"'
+        f' --notes "Auto-updated on every dev bump. Not for production use."'
         f" --prerelease"
         f" --latest=false"
         f" {file_args}",
@@ -806,7 +815,6 @@ def upload_stub_binaries_to_dev_prerelease(dry: bool) -> None:
     )
 
     ok("Pre-release 'dev-latest' created and stubs uploaded.")
-
 
 
 def _zed_work_dir() -> "Path | None":
@@ -919,7 +927,9 @@ def build_stub_local(dry: bool) -> None:
 
     if zed_work_dir is None:
         warn("Could not locate Zed data directory; skipping work-dir copy.")
-        warn("Run 'python scripts/deploy.py build-zed-stub' again after installing Zed.")
+        warn(
+            "Run 'python scripts/deploy.py build-zed-stub' again after installing Zed."
+        )
         return
 
     zed_stub_dst_dir = zed_work_dir / "stub" / "bin"
@@ -972,11 +982,13 @@ def cmd_upload_stubs(python_ver: str, dry: bool) -> None:
 
 
 def cmd_dev_install(dry: bool) -> None:
-    """Install the local wheel into the Zed dev-extension venv.
+    """Write local_wheel.txt sentinel and invalidate the Zed venv marker.
 
-    Finds the latest .whl in dist/, deletes the venv marker so the stub
-    rebuilds the venv on next Zed startup, then prints the JSON snippet
-    to paste into Zed settings for MEMENTO_LOCAL_WHEEL.
+    - Finds the latest .whl in dist/.
+    - Writes <zed_work_dir>/local_wheel.txt with the absolute wheel path so
+      the stub installs from it instead of PyPI (no Zed settings needed).
+    - Deletes the venv marker so the stub rebuilds the venv on next startup.
+    - Prints the pip install command for optional local testing.
     """
     step("Locating latest wheel in dist/")
 
@@ -989,17 +1001,34 @@ def cmd_dev_install(dry: bool) -> None:
         )
 
     wheel = wheels[-1]
+    wheel_posix = wheel.as_posix()
     ok(f"Wheel: {wheel}")
-
-    # ------------------------------------------------------------------
-    # Invalidate the existing venv by deleting its marker file so the stub
-    # is forced to reinstall from the local wheel on the next Zed startup.
-    # ------------------------------------------------------------------
-    step("Invalidating Zed extension venv marker")
 
     zed_work = _zed_work_dir()
 
-    if zed_work:
+    if not zed_work:
+        warn("Could not locate Zed data directory; skipping sentinel and marker steps.")
+    else:
+        # ------------------------------------------------------------------
+        # Write the local_wheel.txt sentinel file.
+        # The stub reads this at boot; if present it installs from the wheel
+        # instead of PyPI.  Absent in production installs — zero user impact.
+        # ------------------------------------------------------------------
+        step("Writing local_wheel.txt sentinel")
+        sentinel = zed_work / "local_wheel.txt"
+
+        if not dry:
+            zed_work.mkdir(parents=True, exist_ok=True)
+            sentinel.write_text(wheel_posix, encoding="utf-8")
+            ok(f"Written: {sentinel}")
+        else:
+            info(f"[dry-run] Would write: {sentinel}  ← {wheel_posix}")
+
+        # ------------------------------------------------------------------
+        # Invalidate the venv marker so the stub rebuilds the venv and picks
+        # up the new wheel on next Zed startup.
+        # ------------------------------------------------------------------
+        step("Invalidating Zed extension venv marker")
         marker = zed_work / "venv" / "memento_version.txt"
 
         if not dry:
@@ -1010,21 +1039,42 @@ def cmd_dev_install(dry: bool) -> None:
                 info(f"Marker not found (venv may not exist yet): {marker}")
         else:
             info(f"[dry-run] Would delete venv marker: {marker}")
-    else:
-        warn("Could not locate Zed data directory; skipping marker deletion.")
 
     # ------------------------------------------------------------------
-    # Print the JSON snippet the user must paste in Zed settings.
+    # Print next steps.
     # ------------------------------------------------------------------
-    wheel_posix = wheel.as_posix()
+    print()
+    print("─" * 60)
+    print("  Next steps")
+    print("─" * 60)
+    print()
+    print("  1. Reload the Zed extension:")
+    print("     Ctrl+Shift+P → 'zed: extensions' → Reload mcp-memento")
+    print()
+    print("  2. Local pip test (optional):")
+    print(f"     pip install --force-reinstall {wheel_posix}")
+    print()
+    print("─" * 60)
 
-    step("Zed settings snippet")
-    print()
-    print("  Paste the following into your Zed extension settings")
-    print("  (Ctrl+Shift+P → 'zed: open settings', find the 'memento' block):\n")
-    print('  "MEMENTO_LOCAL_WHEEL": "' + wheel_posix + '",')
-    print()
-    ok("Done. Restart / reload the Zed mcp-memento extension to pick up the new wheel.")
+
+def _bump_patch_version(ver: str) -> str:
+    """Return ver with the patch component incremented by 1."""
+    major, minor, patch = ver.split(".")
+    return f"{major}.{minor}.{int(patch) + 1}"
+
+
+def cmd_rebuild(dry: bool) -> None:
+    """Fast dev rebuild: stub + wheel + Zed venv invalidation. No git interaction.
+
+    After this command:
+    - The stub binary is updated in the Zed extension work dir (survives reinstall).
+    - The Python wheel is built in dist/.
+    - The Zed venv marker is deleted so the stub reinstalls from the local wheel.
+    - Next steps are printed (Zed reload + pip install for local testing).
+    """
+    build_stub_local(dry)
+    build_package(dry)
+    cmd_dev_install(dry)
 
 
 def download_stub_binaries(python_ver: str, dry: bool) -> None:
@@ -1109,19 +1159,12 @@ def cmd_status() -> None:
 def cmd_bump(
     new_ver: str,
     skip_tests: bool,
-    dev_only: bool,
     dry: bool,
-    yes: bool,
 ) -> None:
+    """Dev snapshot: bump versions, commit, local tag, build stub+wheel, install in Zed."""
     old_ver = read_pyproject_version()
 
-    step(f"Bump {old_ver} → {new_ver}" + ("  (dev only, no merge)" if dev_only else ""))
-
-    if not confirm(
-        f"Proceed with full release of v{new_ver}?",
-        yes=yes or dry,
-    ):
-        die("Aborted.")
+    step(f"Bump {old_ver} → {new_ver}  (dev snapshot, no merge)")
 
     # 0. Ensure we are on dev branch
     branch = git_current_branch()
@@ -1129,19 +1172,11 @@ def cmd_bump(
     if branch != "dev" and not dry:
         die(f"Must be on 'dev' branch (currently on '{branch}'). Checkout dev first.")
 
-    # 0b. For prod bumps: verify CHANGELOG before touching anything else.
-    # Must run before the working-tree check so that edits to CHANGELOG.md
-    # (which are uncommitted by design) are read from disk, not stashed away.
-    if not dev_only:
-        step("Verifying CHANGELOG entry")
-        check_changelog(new_ver, dry)
-
-    # 0c. Ensure working tree is clean.
-    # For prod bumps, uncommitted edits to CHANGELOG.md are expected (the developer
-    # wrote release notes but didn't commit them yet) — git add -A at step 5 will
-    # pick them up.  We only stash on --dev bumps where an unclean tree is unexpected.
+    # 0b. Warn on dirty working tree (changes will be included in the commit)
     if not git_is_clean() and not dry:
-        warn("Working tree has uncommitted changes (likely CHANGELOG.md edits) — will be included in the release commit.")
+        warn(
+            "Working tree has uncommitted changes — will be included in the release commit."
+        )
 
     # 1. Tests
     if not skip_tests:
@@ -1153,15 +1188,12 @@ def cmd_bump(
     bump_init(new_ver, dry)
     bump_zed_cargo(new_ver, dry)
     bump_extension_toml(new_ver, dry)
-    bump_lib_rs_stub_release(new_ver, dev_only, dry)
+    bump_lib_rs_stub_release(new_ver, dev_only=True, dry=dry)
     bump_readme_badge(new_ver, dry)
 
-    # 3. Changelog
-    if dev_only:
-        # First --dev bump: scaffold a placeholder entry for the developer to fill in.
-        # Re-runs of --dev on the same version skip this silently.
-        step("Scaffolding CHANGELOG entry")
-        scaffold_changelog(new_ver, dry)
+    # 3. Scaffold CHANGELOG placeholder (skipped silently if entry already exists)
+    step("Scaffolding CHANGELOG entry")
+    scaffold_changelog(new_ver, dry)
 
     # 4. Build wheel
     build_package(dry)
@@ -1173,74 +1205,32 @@ def cmd_bump(
     git_push("dev", dry)
     ok("dev branch updated and pushed")
 
-    # 6. Python release tag
-    # With --dev: tag locally only — do NOT push to origin.
+    # 6. Local tag only — do NOT push.
     # Pushing a vX.Y.Z tag triggers CI workflows (stub build + GitHub Release
-    # creation), which must only happen on a full official release.
-    step(f"Tagging v{new_ver}" + (" (local only — not pushed)" if dev_only else ""))
+    # creation), which must only happen on promote.
+    step(f"Tagging v{new_ver} (local only — not pushed)")
     py_tag = f"v{new_ver}"
 
     if not dry and git_tag_exists_local(py_tag):
-        if dev_only:
-            warn(f"Tag {py_tag} already exists locally.")
-            if confirm(f"Move tag {py_tag} to current HEAD (retag)?", yes):
-                git_retag(py_tag, dry)
-                ok(f"Tag {py_tag} moved to HEAD (local only, not pushed)")
-            else:
-                info(f"Tag {py_tag} left unchanged.")
-        else:
-            # Tag exists locally but may not yet be on remote (e.g. after a --dev bump).
-            if git_tag_exists_remote(py_tag):
-                # Tag is already on remote — this is a resume scenario (bump crashed
-                # mid-flight after the tag was pushed). Skip tagging and continue
-                # with merge + stub upload.
-                warn(f"Tag {py_tag} already on remote — skipping retag, resuming release.")
-            else:
-                warn(f"Tag {py_tag} exists locally but NOT on remote (likely from a --dev bump).")
-
-                if confirm(f"Move tag {py_tag} to current HEAD and push it?", yes):
-                    git_retag(py_tag, dry)
-                    git_push_tag(py_tag, dry)
-                    ok(f"Tag {py_tag} moved to HEAD and pushed")
-                else:
-                    die("Aborted. Delete the local tag manually or bump to a new version.")
+        warn(f"Tag {py_tag} already exists locally — moving to HEAD (retag).")
+        git_retag(py_tag, dry)
+        ok(f"Tag {py_tag} moved to HEAD (local only)")
     else:
         git_tag(py_tag, dry)
-        if dev_only:
-            ok(f"Tag {py_tag} created locally (not pushed)")
-        else:
-            git_push_tag(py_tag, dry)
-            ok(f"Tag {py_tag} pushed")
+        ok(f"Tag {py_tag} created locally (not pushed)")
 
-    # 7. Merge dev → main (skipped with --dev)
-    if not dev_only:
-        git_merge_to_main(dry)
+    # 7. Build stub + upload to dev-latest pre-release
+    build_stub_local(dry)
+    upload_stub_binaries_to_dev_prerelease(dry)
 
-    # 8. Stub binaries
-    if not dev_only:
-        # Full release: upload pre-built binaries to the GitHub release vX.Y.Z.
-        # The CI workflow (zed-stub-release.yml) cross-compiles all 5 targets
-        # and uploads them; here we also upload the locally pre-built ones from
-        # stub/bin/ as a safety net.
-        upload_stub_binaries_to_release(new_ver, dry)
-    else:
-        # Dev-only: build stub for the current platform and upload it to the
-        # rolling pre-release "dev-latest" on GitHub.
-        # The CI workflow (zed-stub-dev.yml) cross-compiles the remaining 4
-        # targets and uploads them to the same pre-release.
-        build_stub_local(dry)
-        upload_stub_binaries_to_dev_prerelease(dry)
+    # 8. Install wheel into Zed venv
+    cmd_dev_install(dry)
 
     print()
-    ok(f"Release v{new_ver} complete!")
-
-    if dev_only:
-        info("Dev-only bump complete. Tag is local only — CI was NOT triggered.")
-        info("When ready for the official release:")
-        info("  python scripts/deploy.py promote")
-        info("  python scripts/deploy.py publish")
-    else:
-        info("Publish to PyPI with:  python scripts/deploy.py publish")
+    ok(f"Dev snapshot v{new_ver} complete. Tag is local only — CI was NOT triggered.")
+    info("When ready for the official release:")
+    info("  python scripts/deploy.py promote")
+    info("  python scripts/deploy.py publish")
 
 
 # ---------------------------------------------------------------------------
@@ -1277,6 +1267,63 @@ def cmd_zed_binaries(python_ver: str, dry: bool, yes: bool) -> None:
     ok("Stub binaries committed and pushed to dev")
 
 
+def cmd_promote(new_ver: str, skip_tests: bool, dry: bool) -> None:
+    """Promote the current dev version to an official release.
+
+    Verifies CHANGELOG, runs tests, merges dev→main, pushes tag vX.Y.Z
+    (triggers CI stub cross-compile), uploads stub binaries to GitHub Release.
+    Always interactive.
+    """
+    step(f"Promote v{new_ver} to official release")
+
+    # 0. Ensure we are on dev branch
+    branch = git_current_branch()
+
+    if branch != "dev" and not dry:
+        die(f"Must be on 'dev' branch (currently on '{branch}'). Checkout dev first.")
+
+    # 1. Verify CHANGELOG before touching anything
+    step("Verifying CHANGELOG entry")
+    check_changelog(new_ver, dry)
+
+    # 2. Tests
+    if not skip_tests:
+        run_tests(dry)
+
+    # 3. Push tag (or move it from local-only to remote)
+    py_tag = f"v{new_ver}"
+
+    step(f"Pushing tag {py_tag} to origin (triggers CI)")
+
+    if not dry and git_tag_exists_local(py_tag):
+        if git_tag_exists_remote(py_tag):
+            warn(f"Tag {py_tag} already on remote — skipping retag, resuming.")
+        else:
+            warn(
+                f"Tag {py_tag} exists locally but not on remote (from a previous bump)."
+            )
+            git_retag(py_tag, dry)
+            git_push_tag(py_tag, dry)
+            ok(f"Tag {py_tag} pushed to origin")
+    else:
+        if not dry:
+            die(
+                f"Tag {py_tag} not found locally. "
+                "Run 'python scripts/deploy.py bump' first to create the snapshot."
+            )
+        git_push_tag(py_tag, dry)
+
+    # 4. Merge dev → main
+    git_merge_to_main(dry)
+
+    # 5. Upload stub binaries to the GitHub Release
+    upload_stub_binaries_to_release(new_ver, dry)
+
+    print()
+    ok(f"v{new_ver} promoted to official release!")
+    info("Publish to PyPI with:  python scripts/deploy.py publish")
+
+
 # ---------------------------------------------------------------------------
 # CLI argument parser
 # ---------------------------------------------------------------------------
@@ -1292,18 +1339,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # ── rebuild ───────────────────────────────────────────────────────────
+    # Fast inner dev loop: build stub + wheel + invalidate Zed venv.
+    # No git interaction whatsoever.
+    p_rebuild = sub.add_parser(
+        "rebuild",
+        help="Fast dev rebuild: stub + wheel + Zed venv. No git interaction.",
+    )
+    p_rebuild.add_argument(
+        "--dry-run", action="store_true", help="Preview actions without executing."
+    )
+
     # ── bump ──────────────────────────────────────────────────────────────
-    # Dev-only bump: local tag, no merge to main, no CI trigger.
-    # Also builds the wheel and configures the Zed venv (dev-install).
+    # Dev snapshot: bump versions, commit, local tag, stub upload to dev-latest,
+    # wheel build, Zed venv install.
     p_bump = sub.add_parser(
         "bump",
-        help="Dev bump: update versions, build stub+wheel, install into Zed venv.",
+        help="Dev snapshot: bump versions, commit, local tag, stub+wheel, Zed venv.",
     )
     p_bump.add_argument(
         "version",
         nargs="?",
         default=None,
-        help="New version string (e.g. 0.3.0). Defaults to current version in pyproject.toml.",
+        help="New version X.Y.Z. Omit to auto-increment patch (Z+1).",
     )
     p_bump.add_argument(
         "--dry-run", action="store_true", help="Preview actions without executing."
@@ -1315,6 +1373,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── promote ───────────────────────────────────────────────────────────
     # Promotes the current dev version to an official release:
     # verifies CHANGELOG, merges dev→main, pushes tag, triggers CI.
+    # Always interactive.
     p_promote = sub.add_parser(
         "promote",
         help="Promote current dev version to official release (merge, tag push, CI).",
@@ -1325,18 +1384,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_promote.add_argument(
         "--skip-tests", action="store_true", help="Skip pytest before release."
     )
-    p_promote.add_argument(
-        "--yes", "-y", action="store_true", help="Auto-confirm all prompts."
-    )
 
     # ── build ─────────────────────────────────────────────────────────────
     p_build = sub.add_parser("build", help="Build sdist + wheel.")
     p_build.add_argument("--dry-run", action="store_true")
 
     # ── publish ───────────────────────────────────────────────────────────
-    p_pub = sub.add_parser("publish", help="Upload dist/* to PyPI (or TestPyPI with -t).")
+    p_pub = sub.add_parser(
+        "publish", help="Upload dist/* to PyPI (or TestPyPI with -t)."
+    )
     p_pub.add_argument(
-        "--test", "-t",
+        "--test",
+        "-t",
         action="store_true",
         help="Upload to TestPyPI instead of PyPI.",
     )
@@ -1377,7 +1436,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ── dev-install ───────────────────────────────────────────────────────
     p_dev_install = sub.add_parser(
         "dev-install",
-        help="Install local wheel into Zed venv (no PyPI). For dev/testing.",
+        help="Invalidate Zed venv marker (MEMENTO_LOCAL_WHEEL). Called by rebuild.",
     )
     p_dev_install.add_argument("--dry-run", action="store_true")
 
@@ -1399,8 +1458,19 @@ def main() -> None:
     if args.command == "status":
         cmd_status()
 
+    elif args.command == "rebuild":
+        cmd_rebuild(dry=args.dry_run)
+
     elif args.command == "bump":
-        new_ver = args.version or read_pyproject_version()
+        cur_ver = read_pyproject_version()
+
+        if args.version:
+            new_ver = args.version
+        else:
+            new_ver = _bump_patch_version(cur_ver)
+            info(
+                f"No version specified — auto-incrementing patch: {cur_ver} → {new_ver}"
+            )
 
         if not re.fullmatch(r"\d+\.\d+\.\d+", new_ver):
             die(f"Invalid version format: {new_ver!r}. Expected X.Y.Z")
@@ -1408,20 +1478,15 @@ def main() -> None:
         cmd_bump(
             new_ver=new_ver,
             skip_tests=args.skip_tests,
-            dev_only=True,
             dry=args.dry_run,
-            yes=True,
         )
-        cmd_dev_install(dry=args.dry_run)
 
     elif args.command == "promote":
         new_ver = read_pyproject_version()
-        cmd_bump(
+        cmd_promote(
             new_ver=new_ver,
             skip_tests=args.skip_tests,
-            dev_only=False,
             dry=args.dry_run,
-            yes=args.yes,
         )
 
     elif args.command == "build":
