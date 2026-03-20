@@ -223,9 +223,25 @@ fn try_flock_exclusive(file: &fs::File) -> bool {
     ret == 0
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn try_flock_exclusive(file: &fs::File) -> bool {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::HANDLE;
+    use windows_sys::Win32::Storage::FileSystem::{
+        LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
+    };
+    use windows_sys::Win32::System::IO::OVERLAPPED;
+
+    let handle = file.as_raw_handle() as HANDLE;
+    let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
+    let flags = LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY;
+    let ret = unsafe { LockFileEx(handle, flags, 0, 1, 0, &mut overlapped) };
+    ret != 0
+}
+
+#[cfg(not(any(unix, windows)))]
 fn try_flock_exclusive(_file: &fs::File) -> bool {
-    // Windows: flock not available — fall back to always acquiring
+    // Unknown platform — optimistically assume we own the lock.
     true
 }
 
@@ -583,7 +599,7 @@ fn run_bootstrap_and_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> !
                 let resp = make_response(
                     &id,
                     &format!(
-                        r#"{{"protocolVersion":"2024-11-05","serverInfo":{{"name":"mcp-memento-bootstrap","version":"{STUB_VERSION}"}},"capabilities":{{"tools":{{}}}}}}"#
+                        r#"{{"protocolVersion":"2024-11-05","serverInfo":{{"name":"mcp-memento-bootstrap","version":"{STUB_VERSION}"}},"capabilities":{{"tools":{{"listChanged":true}}}}}}"#
                     ),
                 );
                 send_json(&resp);
@@ -655,7 +671,11 @@ fn proxy_to_python(venv_py: &Path, buffered: Vec<String>) -> ! {
     let mut py_stdin = child.stdin.take().expect("child stdin");
     let py_stdout = child.stdout.take().expect("child stdout");
 
-    // Replay buffered messages + forward future ones from the reader channel
+    // Synchronisation: replay thread signals main thread when done, so we
+    // can inject listChanged before forwarding Python's output to Zed.
+    let (ready_tx, ready_rx) = mpsc::sync_channel::<()>(1);
+
+    // Replay buffered messages + forward future ones from the reader channel.
     thread::spawn(move || {
         log!(
             "Replaying {} buffered message(s) to Python.",
@@ -664,29 +684,36 @@ fn proxy_to_python(venv_py: &Path, buffered: Vec<String>) -> ! {
 
         for msg in &buffered {
             log!("Replay → Python: {}", &msg[..msg.len().min(120)]);
+
             if writeln!(py_stdin, "{}", msg).is_err() {
                 log!("Write error during replay.");
+                let _ = ready_tx.send(());
                 return;
             }
         }
 
         if py_stdin.flush().is_err() {
             log!("Flush error after replay.");
+            let _ = ready_tx.send(());
             return;
         }
 
-        log!("Replay done — forwarding live messages.");
+        log!("Replay done.");
 
-        // Forward remaining live messages from Zed → Python
+        // Signal main thread that replay is complete.
+        let _ = ready_tx.send(());
+
+        // Forward remaining live messages from Zed → Python.
         loop {
             match recv_line(Duration::from_secs(60)) {
-                None => continue, // timeout, keep waiting
+                None => continue,
                 Some(Err(())) => {
                     log!("stdin EOF in proxy forwarder.");
                     break;
                 }
                 Some(Ok(msg)) => {
                     log!("Proxy → Python: {}", &msg[..msg.len().min(120)]);
+
                     if writeln!(py_stdin, "{}", msg).is_err() {
                         log!("Write error in proxy forwarder.");
                         break;
@@ -698,7 +725,19 @@ fn proxy_to_python(venv_py: &Path, buffered: Vec<String>) -> ! {
         log!("Forwarder thread done.");
     });
 
-    // Forward Python stdout → Zed stdout
+    // Wait for replay to finish, then inject a tools/listChanged notification
+    // so Zed re-fetches tools/list from Python (our bootstrap only had 1 tool).
+    // We are the sole writer on Zed stdout at this point — no race condition.
+    let _ = ready_rx.recv();
+    {
+        let notif = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/listChanged\"}\n";
+        let mut zed_out = io::stdout();
+        let _ = zed_out.write_all(notif.as_bytes());
+        let _ = zed_out.flush();
+        log!("Injected notifications/tools/listChanged → Zed.");
+    }
+
+    // Forward Python stdout → Zed stdout.
     {
         let mut buf = [0u8; 4096];
         let mut py_out = py_stdout;
@@ -716,6 +755,7 @@ fn proxy_to_python(venv_py: &Path, buffered: Vec<String>) -> ! {
                 }
                 Ok(n) => {
                     log!("Python → Zed: {} bytes", n);
+
                     if zed_out.write_all(&buf[..n]).is_err() || zed_out.flush().is_err() {
                         log!("Write error forwarding to Zed.");
                         break;
