@@ -432,23 +432,18 @@ fn json_get_id(json: &str) -> Option<String> {
 /// Run the bootstrap MCP proxy on stdin/stdout, then seamlessly hand off
 /// to Python once the venv setup completes.
 ///
-/// Phase 1 — Bootstrap: answer Zed's `initialize` (and any other messages)
-///   while the venv setup runs in a background thread.
+/// Phase 1 — Bootstrap: answer Zed's `initialize` while setup runs.
+///   All messages received (including `initialize`) are buffered so they
+///   can be replayed to Python in Phase 3.
 ///
-/// Phase 2 — Proxy: spawn Python as a child with piped stdio, then forward
-///   bytes bidirectionally between Zed (our stdin/stdout) and Python.
-///   This keeps the same stdin/stdout pipe that Zed opened — no re-exec,
-///   no lost messages.
+/// Phase 2 — Python proxy: spawn Python, replay buffered messages first,
+///   then forward subsequent stdin → Python and Python stdout → stdout.
 fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     use std::sync::mpsc;
     use std::time::Duration;
 
     log!("Bootstrap proxy started.");
 
-    // -----------------------------------------------------------------------
-    // Phase 1: read messages from stdin on a dedicated thread, handle them
-    // in the main thread with a 200 ms poll so we notice when setup finishes.
-    // -----------------------------------------------------------------------
     let (tx, rx) = mpsc::channel::<Option<String>>();
 
     thread::spawn(move || {
@@ -470,6 +465,9 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
         }
     });
 
+    // Buffer of ALL messages received during bootstrap (to replay to Python).
+    let mut buffered: Vec<String> = Vec::new();
+
     {
         let stdout = io::stdout();
         let mut writer = stdout.lock();
@@ -486,6 +484,9 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
 
                     let method = json_get_str(&msg, "method").unwrap_or("").to_string();
                     let id = json_get_id(&msg);
+
+                    // Buffer every message for replay to Python.
+                    buffered.push(msg.clone());
 
                     if method.starts_with("notifications/") || method == "$/cancelRequest" {
                         log!("Bootstrap: ignoring notification '{}'", method);
@@ -519,11 +520,8 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
                 break 'bootstrap;
             }
         }
-    } // release stdout lock before proxy
+    }
 
-    // -----------------------------------------------------------------------
-    // Phase 2: check setup outcome.
-    // -----------------------------------------------------------------------
     let final_state = state.lock().unwrap().clone();
 
     if let SetupState::Failed(e) = final_state {
@@ -531,13 +529,6 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
         std::process::exit(1);
     }
 
-    // -----------------------------------------------------------------------
-    // Phase 3: spawn Python and proxy stdin/stdout.
-    //
-    // The channel `rx` already owns the reader thread that holds stdin.
-    // We forward messages from the channel → Python's stdin, and forward
-    // Python's stdout → our stdout.
-    // -----------------------------------------------------------------------
     log!("Spawning Python for proxy: {}", venv_py.display());
 
     let mut child = match Command::new(&venv_py)
@@ -558,17 +549,28 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     let mut child_stdin = child.stdin.take().expect("child stdin");
     let child_stdout = child.stdout.take().expect("child stdout");
 
-    // Forward channel messages → Python stdin.
+    // Replay buffered messages first, then forward live messages.
     thread::spawn(move || {
+        log!("Replaying {} buffered message(s) to Python.", buffered.len());
+
+        for msg in &buffered {
+            let frame = format!("Content-Length: {}\r\n\r\n{}", msg.len(), msg);
+
+            if child_stdin.write_all(frame.as_bytes()).is_err() {
+                log!("Write error during replay.");
+                return;
+            }
+        }
+
+        log!("Replay done — forwarding live messages.");
+
         while let Ok(Some(msg)) = rx.recv() {
-            // Re-frame as Content-Length message for Python's MCP reader.
             let frame = format!("Content-Length: {}\r\n\r\n{}", msg.len(), msg);
 
             if child_stdin.write_all(frame.as_bytes()).is_err() {
                 break;
             }
         }
-        // When channel closes (stdin EOF), child_stdin drop closes Python's stdin.
     });
 
     // Forward Python stdout → our stdout.
