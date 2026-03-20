@@ -186,18 +186,26 @@ fn lock_path(venv: &Path) -> PathBuf {
     venv.parent().unwrap_or(venv).join("memento_setup.lock")
 }
 
+fn expected_marker() -> String {
+    match env::var("MEMENTO_LOCAL_WHEEL") {
+        Ok(w) if !w.is_empty() => format!("{}+local:{}", STUB_VERSION, w),
+        _ => STUB_VERSION.to_string(),
+    }
+}
+
 fn venv_is_valid(venv: &Path) -> bool {
     if !venv_python(venv).exists() {
         return false;
     }
 
+    let expected = expected_marker();
     match fs::read_to_string(marker_path(venv)) {
-        Ok(c) if c.trim() == STUB_VERSION => true,
+        Ok(c) if c.trim() == expected => true,
         Ok(c) => {
             log!(
                 "Venv version mismatch: marker='{}' expected='{}'.",
                 c.trim(),
-                STUB_VERSION
+                expected
             );
             false
         }
@@ -292,13 +300,44 @@ fn setup_venv(system_python: &Path, venv: &Path) -> Result<(), String> {
 
     install_memento(&venv_python(venv))?;
 
-    fs::write(marker_path(venv), STUB_VERSION).map_err(|e| format!("write marker: {e}"))?;
+    let marker = expected_marker();
+    fs::write(marker_path(venv), &marker).map_err(|e| format!("write marker: {e}"))?;
 
-    log!("Venv ready. Marker written: {}", STUB_VERSION);
+    log!("Venv ready. Marker written: {}", marker);
     Ok(())
 }
 
 fn install_memento(python: &Path) -> Result<(), String> {
+    // Dev-mode: if a local wheel path is provided, install from it directly.
+    if let Ok(wheel) = env::var("MEMENTO_LOCAL_WHEEL") {
+        if !wheel.is_empty() {
+            log!("MEMENTO_LOCAL_WHEEL set — installing from local wheel: {}", wheel);
+
+            let s = Command::new(python)
+                .args([
+                    "-m",
+                    "pip",
+                    "install",
+                    "--force-reinstall",
+                    "--no-deps",
+                    &wheel,
+                ])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map_err(|e| format!("pip (local wheel): {e}"))?;
+
+            if s.success() {
+                log!("mcp-memento installed from local wheel.");
+                return Ok(());
+            }
+
+            return Err(format!(
+                "pip install from local wheel failed ({s}). Check MEMENTO_LOCAL_WHEEL path: {wheel}"
+            ));
+        }
+    }
+
     log!("pip install --upgrade mcp-memento (standard)");
 
     let s = Command::new(python)
@@ -358,7 +397,7 @@ fn exec_python(venv_py: &Path) -> ! {
     cmd.args(["-u", "-m", "memento"])
         .env("PYTHONUNBUFFERED", "1");
 
-    for var in &["MEMENTO_DB_PATH", "MEMENTO_PROFILE", "PYTHON_COMMAND"] {
+    for var in &["MEMENTO_DB_PATH", "MEMENTO_PROFILE", "PYTHON_COMMAND", "MEMENTO_LOCAL_WHEEL"] {
         if let Ok(val) = env::var(var) {
             cmd.env(var, val);
         }

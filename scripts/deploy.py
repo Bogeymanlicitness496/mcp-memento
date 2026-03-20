@@ -12,6 +12,7 @@ Usage:
     python scripts/deploy.py publish [-t]
     python scripts/deploy.py build
     python scripts/deploy.py build-zed-stub
+    python scripts/deploy.py dev-install
     python scripts/deploy.py ext-binaries [--version X.Y.Z]
     python scripts/deploy.py upload-stubs [--version X.Y.Z]
     python scripts/deploy.py status
@@ -38,6 +39,13 @@ Commands
                     work directory, then commit and push.
                     Use during active Zed extension development after editing
                     stub/src/main.rs.
+
+  dev-install       Install the local wheel (from dist/) into the Zed extension
+                    venv without publishing to PyPI. Deletes the venv marker so
+                    the stub rebuilds the venv on next Zed reload, and prints
+                    the MEMENTO_LOCAL_WHEEL JSON snippet to paste into settings.
+                    Use this during active Python development to test the Zed
+                    extension against local code changes.
 
   ext-binaries      Download CI-built stub binaries from the GitHub Release
                     vX.Y.Z into stub/bin/ and commit them to the repo.
@@ -79,6 +87,9 @@ Examples
 
   # Rebuild stub for current platform and update stub/bin/
   python scripts/deploy.py build-zed-stub
+
+  # Dev: install local wheel into Zed venv without publishing to PyPI
+  python scripts/deploy.py dev-install
 
   # Download CI-built binaries after CI completes and commit to repo
   python scripts/deploy.py ext-binaries --version 0.3.0
@@ -972,6 +983,62 @@ def cmd_upload_stubs(python_ver: str, dry: bool) -> None:
     ok(f"Stub upload for v{python_ver} complete.")
 
 
+def cmd_dev_install(dry: bool) -> None:
+    """Install the local wheel into the Zed dev-extension venv.
+
+    Finds the latest .whl in dist/, deletes the venv marker so the stub
+    rebuilds the venv on next Zed startup, then prints the JSON snippet
+    to paste into Zed settings for MEMENTO_LOCAL_WHEEL.
+    """
+    step("Locating latest wheel in dist/")
+
+    wheels = sorted(DIST_DIR.glob("mcp_memento-*.whl"))
+
+    if not wheels:
+        die(
+            "No wheel found in dist/. Run:\n"
+            "  python scripts/deploy.py build"
+        )
+
+    wheel = wheels[-1]
+    ok(f"Wheel: {wheel}")
+
+    # ------------------------------------------------------------------
+    # Invalidate the existing venv by deleting its marker file so the stub
+    # is forced to reinstall from the local wheel on the next Zed startup.
+    # ------------------------------------------------------------------
+    step("Invalidating Zed extension venv marker")
+
+    zed_work = _zed_work_dir()
+
+    if zed_work:
+        marker = zed_work / "venv" / "memento_version.txt"
+
+        if not dry:
+            if marker.exists():
+                marker.unlink()
+                ok(f"Deleted venv marker: {marker}")
+            else:
+                info(f"Marker not found (venv may not exist yet): {marker}")
+        else:
+            info(f"[dry-run] Would delete venv marker: {marker}")
+    else:
+        warn("Could not locate Zed data directory; skipping marker deletion.")
+
+    # ------------------------------------------------------------------
+    # Print the JSON snippet the user must paste in Zed settings.
+    # ------------------------------------------------------------------
+    wheel_posix = wheel.as_posix()
+
+    step("Zed settings snippet")
+    print()
+    print("  Paste the following into your Zed extension settings")
+    print("  (Ctrl+Shift+P → 'zed: open settings', find the 'memento' block):\n")
+    print('  "MEMENTO_LOCAL_WHEEL": "' + wheel_posix + '",')
+    print()
+    ok("Done. Restart / reload the Zed mcp-memento extension to pick up the new wheel.")
+
+
 def download_stub_binaries(python_ver: str, dry: bool) -> None:
     """Download built stub binaries from GitHub Release into stub/bin/."""
     step("Downloading stub binaries from GitHub Release")
@@ -1313,6 +1380,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_us.add_argument("--dry-run", action="store_true")
 
+    # ── dev-install ───────────────────────────────────────────────────────
+    p_dev_install = sub.add_parser(
+        "dev-install",
+        help="Install local wheel into Zed venv (no PyPI). For dev/testing.",
+    )
+    p_dev_install.add_argument("--dry-run", action="store_true")
+
     # ── status ────────────────────────────────────────────────────────────
     sub.add_parser("status", help="Show current versions across all manifests.")
 
@@ -1373,6 +1447,9 @@ def main() -> None:
     elif args.command == "upload-stubs":
         ver = args.version or read_pyproject_version()
         cmd_upload_stubs(python_ver=ver, dry=args.dry_run)
+
+    elif args.command == "dev-install":
+        cmd_dev_install(dry=args.dry_run)
 
 
 if __name__ == "__main__":
