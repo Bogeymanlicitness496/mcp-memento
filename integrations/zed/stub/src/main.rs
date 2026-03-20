@@ -447,17 +447,22 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     let (tx, rx) = mpsc::channel::<Option<String>>();
 
     thread::spawn(move || {
+        log!("Reader thread started.");
         let stdin = io::stdin();
         let mut reader = io::BufReader::new(stdin.lock());
 
         loop {
+            log!("Reader thread: waiting for next message…");
             match read_jsonrpc_message(&mut reader) {
                 Some(msg) => {
+                    log!("Reader thread RX: {}", &msg[..msg.len().min(200)]);
                     if tx.send(Some(msg)).is_err() {
+                        log!("Reader thread: channel closed, exiting.");
                         break;
                     }
                 }
                 None => {
+                    log!("Reader thread: stdin EOF.");
                     let _ = tx.send(None);
                     break;
                 }
