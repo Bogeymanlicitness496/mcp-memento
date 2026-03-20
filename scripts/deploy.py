@@ -2,68 +2,89 @@
 """
 deploy.py — MCP Memento unified release & deploy script.
 
+Workflow
+--------
+  sviluppo → bump → test & fix → bump → promote → publish
+
 Usage:
-    python scripts/deploy.py bump X.Y.Z [--ext N] [options]
+    python scripts/deploy.py bump X.Y.Z
+    python scripts/deploy.py promote [--yes]
+    python scripts/deploy.py publish [-t]
     python scripts/deploy.py build
-    python scripts/deploy.py publish --target {testpypi|pypi}
-    python scripts/deploy.py ext-release --ext N     # alias: zed-release
-    python scripts/deploy.py ext-binaries --ext N    # alias: zed-binaries
+    python scripts/deploy.py build-zed-stub
+    python scripts/deploy.py ext-binaries [--version X.Y.Z]
+    python scripts/deploy.py upload-stubs [--version X.Y.Z]
     python scripts/deploy.py status
 
 Commands
 --------
-  bump X.Y.Z        Full release cycle: bump versions, update changelog/README,
-                    commit dev, merge dev→main, push both, create Python tag,
-                    build wheel, trigger IDE extension stub CI (if --ext given).
+  bump X.Y.Z        Dev bump: update versions in all manifests, build stub for
+                    current platform, upload to dev-latest pre-release on GitHub.
+                    Tag is local only — CI is NOT triggered. Always non-interactive.
                     Use --dry-run to preview without making changes.
+
+  promote           Promote the current dev version to an official release:
+                    verify CHANGELOG, merge dev→main, push tag vX.Y.Z (triggers
+                    CI stub cross-compile), upload stub binaries to GitHub Release.
+                    Version is read from pyproject.toml automatically.
+
+  publish           Upload dist/* to PyPI.
+                    Use -t / --test to upload to TestPyPI instead.
 
   build             Build sdist + wheel (no version bump).
 
-  publish           Upload to TestPyPI or PyPI with twine.
-                    --target testpypi  →  twine upload --repository testpypi dist/*
-                    --target pypi      →  twine upload --repository pypi dist/*
+  build-zed-stub    Build the native stub binary for the current platform, copy
+                    it into integrations/zed/stub/bin/ and into the Zed extension
+                    work directory, then commit and push.
+                    Use during active Zed extension development after editing
+                    stub/src/main.rs.
 
-  ext-release       Push tag vX.Y.Z-ext.N to trigger GitHub Actions stub build.
-                    Uses current version from pyproject.toml unless --version given.
-                    Alias: zed-release (kept for backward compatibility).
+  ext-binaries      Download CI-built stub binaries from the GitHub Release
+                    vX.Y.Z into stub/bin/ and commit them to the repo.
+                    Run after the CI workflow has completed successfully.
 
-  ext-binaries      Download CI-built stub binaries into stub/bin/ and commit.
-                    Alias: zed-binaries (kept for backward compatibility).
+  upload-stubs      Create the GitHub Release vX.Y.Z (if it does not exist) and
+                    upload the local stub binaries from stub/bin/ as release assets.
+                    Use as a manual fallback if the CI upload step failed.
 
   status            Print current versions across all manifests.
 
 Options
--------
-  --ext N           Extension release counter (integer). Required for bump when
-                    you also want to trigger an IDE extension stub release.
+--------
   --dry-run         Print all actions without executing them.
   --skip-tests      Skip pytest before release.
-  --skip-merge      Do not merge dev→main (stays on dev branch only).
-  --version X.Y.Z   Override Python version (for ext-release command).
-  --yes             Non-interactive: skip all confirmation prompts.
+  --version X.Y.Z   Override version (for ext-binaries and upload-stubs).
+  --yes, -y         Auto-confirm prompts (promote only).
+  --test, -t        Upload to TestPyPI instead of PyPI (publish only).
 
 Examples
 --------
-  # Full bump to 0.3.0, create extension ext.2 release, publish to PyPI
-  python scripts/deploy.py bump 0.3.0 --ext 2 --yes
+  # Bump to 0.3.0 (dev only, non-interactive)
+  python scripts/deploy.py bump 0.3.0
 
-  # Dry run to preview everything
-  python scripts/deploy.py bump 0.3.0 --ext 2 --dry-run
+  # Preview bump without executing
+  python scripts/deploy.py bump 0.3.0 --dry-run
+
+  # Promote current dev version to official release
+  python scripts/deploy.py promote --yes
 
   # Build wheel only
   python scripts/deploy.py build
 
-  # Publish to TestPyPI
-  python scripts/deploy.py publish --target testpypi
-
   # Publish to PyPI
-  python scripts/deploy.py publish --target pypi
+  python scripts/deploy.py publish
 
-  # Push extension stub tag only (already on correct version)
-  python scripts/deploy.py ext-release --ext 3
+  # Publish to TestPyPI
+  python scripts/deploy.py publish --test
 
-  # Download CI binaries and commit to repo
-  python scripts/deploy.py ext-binaries --ext 3
+  # Rebuild stub for current platform and update stub/bin/
+  python scripts/deploy.py build-zed-stub
+
+  # Download CI-built binaries after CI completes and commit to repo
+  python scripts/deploy.py ext-binaries --version 0.3.0
+
+  # Manually create release and upload local binaries (CI upload fallback)
+  python scripts/deploy.py upload-stubs --version 0.3.0
 
   # Show current version state
   python scripts/deploy.py status
@@ -109,6 +130,7 @@ ZED_CARGO = ZED_DIR / "Cargo.toml"
 ZED_EXTENSION = ZED_DIR / "extension.toml"
 ZED_LIB_RS = ZED_DIR / "src" / "lib.rs"
 ZED_STUB_CARGO = ZED_DIR / "stub" / "Cargo.toml"
+ZED_STUB_MAIN_RS = ZED_DIR / "stub" / "src" / "main.rs"
 ZED_STUB_BIN = ZED_DIR / "stub" / "bin"
 
 GITHUB_REPO = "annibale-x/mcp-memento"
@@ -320,7 +342,7 @@ def bump_extension_toml(new_ver: str, dry: bool) -> None:
 
 
 def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
-    """Update STUB_EXT_RELEASE and STUB_CHANNEL in lib.rs."""
+    """Update STUB_EXT_RELEASE and STUB_CHANNEL in lib.rs; STUB_VERSION in main.rs."""
 
     tag = f"v{new_ver}"
     _replace_in_file(
@@ -335,6 +357,13 @@ def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
         ZED_LIB_RS,
         r'(STUB_CHANNEL:\s*&str\s*=\s*)"[^"]+"',
         rf'\g<1>"{channel}"',
+        dry,
+    )
+
+    _replace_in_file(
+        ZED_STUB_MAIN_RS,
+        r'(STUB_VERSION:\s*&str\s*=\s*)"[^"]+"',
+        rf'\g<1>"{tag}"',
         dry,
     )
 
@@ -748,7 +777,7 @@ def upload_stub_binaries_to_dev_prerelease(dry: bool) -> None:
     files = sorted(ZED_STUB_BIN.glob("memento-stub-*"))
 
     if not files:
-        die(f"No stub binaries found in {ZED_STUB_BIN}. Run 'dev-stub' first.")
+        die(f"No stub binaries found in {ZED_STUB_BIN}. Run 'build-zed-stub' first.")
 
     # Delete existing release+tag so we can recreate cleanly.
     # Errors are ignored — the release may not exist yet.
@@ -891,7 +920,7 @@ def build_stub_local(dry: bool) -> None:
 
     if zed_work_dir is None:
         warn("Could not locate Zed data directory; skipping work-dir copy.")
-        warn("Run 'python scripts/deploy.py dev-stub' again after installing Zed.")
+        warn("Run 'python scripts/deploy.py build-zed-stub' again after installing Zed.")
         return
 
     zed_stub_dst_dir = zed_work_dir / "stub" / "bin"
@@ -1035,7 +1064,7 @@ def cmd_bump(
 
     if not confirm(
         f"Proceed with full release of v{new_ver}?",
-        yes=yes,
+        yes=yes or dry,
     ):
         die("Aborted.")
 
@@ -1151,12 +1180,12 @@ def cmd_bump(
     ok(f"Release v{new_ver} complete!")
 
     if dev_only:
-        info("Dev-only release complete. Tag is local only — CI was NOT triggered.")
-        info("When ready for the full release:")
-        info("  python scripts/deploy.py publish --target pypi")
-        info("  (publish will merge dev→main and push the tag automatically)")
+        info("Dev-only bump complete. Tag is local only — CI was NOT triggered.")
+        info("When ready for the official release:")
+        info("  python scripts/deploy.py promote")
+        info("  python scripts/deploy.py publish")
     else:
-        info("Publish to PyPI with:  python scripts/deploy.py publish --target pypi")
+        info("Publish to PyPI with:  python scripts/deploy.py publish")
 
 
 # ---------------------------------------------------------------------------
@@ -1209,7 +1238,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     # ── bump ──────────────────────────────────────────────────────────────
-    p_bump = sub.add_parser("bump", help="Full release cycle: bump, build, tag, push.")
+    # Always a dev-only bump: local tag, no merge to main, no CI trigger.
+    p_bump = sub.add_parser(
+        "bump",
+        help="Dev bump: update versions locally, build stub, upload to dev-latest.",
+    )
     p_bump.add_argument("version", help="New version string (e.g. 0.3.0)")
     p_bump.add_argument(
         "--dry-run", action="store_true", help="Preview actions without executing."
@@ -1217,12 +1250,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_bump.add_argument(
         "--skip-tests", action="store_true", help="Skip pytest before release."
     )
-    p_bump.add_argument(
-        "--dev",
-        action="store_true",
-        help="Stay on dev branch only — do not merge into main.",
+
+    # ── promote ───────────────────────────────────────────────────────────
+    # Promotes the current dev version to an official release:
+    # verifies CHANGELOG, merges dev→main, pushes tag, triggers CI.
+    p_promote = sub.add_parser(
+        "promote",
+        help="Promote current dev version to official release (merge, tag push, CI).",
     )
-    p_bump.add_argument(
+    p_promote.add_argument(
+        "--dry-run", action="store_true", help="Preview actions without executing."
+    )
+    p_promote.add_argument(
+        "--skip-tests", action="store_true", help="Skip pytest before release."
+    )
+    p_promote.add_argument(
         "--yes", "-y", action="store_true", help="Auto-confirm all prompts."
     )
 
@@ -1231,28 +1273,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_build.add_argument("--dry-run", action="store_true")
 
     # ── publish ───────────────────────────────────────────────────────────
-    p_pub = sub.add_parser("publish", help="Upload dist/* to TestPyPI or PyPI.")
+    p_pub = sub.add_parser("publish", help="Upload dist/* to PyPI (or TestPyPI with -t).")
     p_pub.add_argument(
-        "--target",
-        required=True,
-        choices=["testpypi", "pypi"],
-        help="Upload destination.",
+        "--test", "-t",
+        action="store_true",
+        help="Upload to TestPyPI instead of PyPI.",
     )
     p_pub.add_argument("--dry-run", action="store_true")
 
-    # ── dev-stub ──────────────────────────────────────────────────────────
-    # Builds the Rust stub for the current platform and copies the binary
-    # into stub/bin/, then commits.  Use during active Zed extension development
-    # to keep the bundled binary in sync without doing a full bump.
-    p_dev_stub = sub.add_parser(
-        "dev-stub",
+    # ── build-zed-stub ────────────────────────────────────────────────────
+    p_build_zed_stub = sub.add_parser(
+        "build-zed-stub",
         help="Build stub binary for current platform and commit to stub/bin/.",
     )
-    p_dev_stub.add_argument("--dry-run", action="store_true")
+    p_build_zed_stub.add_argument("--dry-run", action="store_true")
 
     # ── ext-binaries ──────────────────────────────────────────────────────
-    # Downloads CI-built stub binaries from the GitHub release vX.Y.Z and
-    # commits them into stub/bin/.  Use after CI has finished building.
     p_ext = sub.add_parser(
         "ext-binaries",
         help="Download CI-built stub binaries from GitHub release and commit to repo.",
@@ -1266,9 +1302,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_ext.add_argument("--yes", "-y", action="store_true")
 
     # ── upload-stubs ──────────────────────────────────────────────────────
-    # Recovery command: create the GitHub Release if missing, then upload
-    # whatever local stub binaries exist in stub/bin/.  Useful when bump
-    # completed tagging & merging but crashed before the stub upload step.
     p_us = sub.add_parser(
         "upload-stubs",
         help="Create GitHub Release (if needed) and upload local stub binaries.",
@@ -1304,7 +1337,17 @@ def main() -> None:
         cmd_bump(
             new_ver=args.version,
             skip_tests=args.skip_tests,
-            dev_only=args.dev,
+            dev_only=True,
+            dry=args.dry_run,
+            yes=True,
+        )
+
+    elif args.command == "promote":
+        new_ver = read_pyproject_version()
+        cmd_bump(
+            new_ver=new_ver,
+            skip_tests=args.skip_tests,
+            dev_only=False,
             dry=args.dry_run,
             yes=args.yes,
         )
@@ -1313,9 +1356,10 @@ def main() -> None:
         build_package(dry=args.dry_run)
 
     elif args.command == "publish":
-        publish(target=args.target, dry=args.dry_run)
+        target = "testpypi" if args.test else "pypi"
+        publish(target=target, dry=args.dry_run)
 
-    elif args.command == "dev-stub":
+    elif args.command == "build-zed-stub":
         cmd_dev_stub(dry=args.dry_run)
 
     elif args.command == "ext-binaries":

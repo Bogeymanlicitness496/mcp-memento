@@ -38,11 +38,17 @@ a `Command` to Zed. It uses a **download-first with local cache** strategy:
 
 | Priority | Location | When present |
 |----------|----------|--------------|
-| 1 | `stub/bin/<asset>` relative to WASM CWD | Placed there by `deploy.py dev-stub` (dev) or by Zed from the extension package (marketplace) |
+| 1 | `stub/bin/<asset>` relative to WASM CWD | Placed there by `deploy.py build-zed-stub` (dev) or by Zed from the extension package (marketplace) |
 | 2 | `<download-name>` in WASM CWD | Cached from a previous download |
 | 3 | GitHub Release `vX.Y.Z` | Downloaded on first run, cached for future runs |
 
-The WASM CWD is `%LOCALAPPDATA%\Zed\extensions\work\mcp-memento\` on Windows.
+The WASM CWD is:
+
+| Platform | WASM CWD |
+|----------|----------|
+| Windows | `%LOCALAPPDATA%\Zed\extensions\work\mcp-memento\` |
+| macOS | `~/Library/Application Support/Zed/extensions/work/mcp-memento/` |
+| Linux | `~/.local/share/zed/extensions/work/mcp-memento/` |
 
 #### 2. Native stub (`stub/src/main.rs`)
 
@@ -97,7 +103,7 @@ They are used by the marketplace install path (Zed copies them into the work dir
   rustup target add wasm32-wasip1
   ```
 - **Zed Editor** installed.
-- **Python 3.8+** on the host system.
+- **Python 3.10+** on the host system.
 
 ---
 
@@ -108,7 +114,7 @@ They are used by the marketplace install path (Zed copies them into the work dir
 After cloning, run:
 
 ```
-python scripts/deploy.py dev-stub
+python scripts/deploy.py build-zed-stub
 ```
 
 This command:
@@ -137,7 +143,7 @@ Zed compiles the WASM and loads the extension. No rebuild needed after editing
 ### After modifying `stub/src/main.rs`
 
 ```
-python scripts/deploy.py dev-stub
+python scripts/deploy.py build-zed-stub
 ```
 
 Rebuild, copy to both locations, commit, push.
@@ -168,24 +174,95 @@ const BUNDLED_BIN_DIR: &str = "stub/bin";   // Relative to WASM CWD
 
 ## 7. Release Workflow
 
-The full release is handled by `scripts/deploy.py`. See `scripts/README.md` for details.
+The full release is handled by `scripts/deploy.py`. See [`scripts/README.md`](../../scripts/README.md)
+for the authoritative command reference.
+
+### Typical flow
 
 ```
-# Official release (triggers CI cross-compile for all 5 platforms):
+# 1. Dry run — verify everything looks correct
+python scripts/deploy.py bump X.Y.Z --dry-run
+
+# 2. Full release (bumps versions, builds, tags, pushes, uploads stub binaries, merges dev → main)
 python scripts/deploy.py bump X.Y.Z --yes
 
-# Dev bump (local tag only, no CI, no PyPI):
-python scripts/deploy.py bump X.Y.Z --dev --yes
+# 3. Publish to PyPI (merge dev → main is done automatically if not already merged)
+python scripts/deploy.py publish --target pypi
 ```
 
-On an official release:
-- GitHub Actions (`.github/workflows/zed-stub-release.yml`) cross-compiles stub
-  binaries for all 5 targets and uploads them as assets to the release.
-- `deploy.py` uploads the binaries from `stub/bin/` to the GitHub Release as well.
+### Dev-only release (publish to PyPI later)
+
+```
+# Release to GitHub only, stay on dev (also rebuilds stub for current platform):
+python scripts/deploy.py bump X.Y.Z --dev --yes
+
+# When ready to publish — publish automatically merges dev → main first:
+python scripts/deploy.py publish --target pypi
+```
+
+### Zed extension development loop
+
+```
+# After modifying stub/src/main.rs only (no version bump needed):
+python scripts/deploy.py build-zed-stub
+
+# After any change (Python server, lib.rs, stub) — full dev cycle:
+python scripts/deploy.py bump X.Y.Z --dev --yes
+# Then reload the extension in Zed via "Install Dev Extension"
+```
+
+On a full `bump` (without `--dev`):
+- Versions are bumped across all manifests (`pyproject.toml`, `extension.toml`, `Cargo.toml`, `lib.rs`).
+- `CHANGELOG.md` and `README.md` badges are updated.
+- `dev` is merged into `main`, tag `vX.Y.Z` is pushed.
+- GitHub Actions (`.github/workflows/zed-stub-release.yml`) cross-compiles stub binaries
+  for all 5 targets and uploads them to the GitHub Release.
+- Local binaries from `stub/bin/` are also uploaded as a safety net.
+
+After CI finishes, optionally pull fresh CI-built binaries into the repo:
+
+```
+python scripts/deploy.py ext-binaries
+```
 
 ---
 
-## 8. Settings Reference
+## 8. Debug Logging
+
+Logging is **disabled by default** in production. Both the WASM extension and the
+native stub use the **same mechanism**: a `debug.enable` marker file in the Zed
+extension work directory.
+
+| Platform | Work directory |
+|---|---|
+| Linux | `~/.local/share/zed/extensions/work/mcp-memento/` |
+| macOS | `~/Library/Application Support/Zed/extensions/work/mcp-memento/` |
+| Windows | `%LOCALAPPDATA%\Zed\extensions\work\mcp-memento\` |
+
+**To enable logging:**
+
+```bash
+# Linux/macOS
+touch ~/.local/share/zed/extensions/work/mcp-memento/debug.enable
+
+# Windows (PowerShell)
+New-Item "$env:LOCALAPPDATA\Zed\extensions\work\mcp-memento\debug.enable"
+```
+
+**To disable:** delete the `debug.enable` file.
+
+**Log output:**
+
+| Component | Log file |
+|---|---|
+| WASM extension | `memento-zed.log` in OS temp dir |
+| Native stub | `memento_stub_debug.log` in OS temp dir |
+
+OS temp dir: `/tmp/` on Linux/macOS, `%TEMP%\` on Windows.
+
+---
+
+## 9. Settings Reference
 
 | Setting | Default | Description |
 |---|---|---|
@@ -197,7 +274,7 @@ On an official release:
 
 ---
 
-## 9. Cargo Workspace Layout
+## 10. Cargo Workspace Layout
 
 The workspace root is `integrations/zed/Cargo.toml` with two members:
 
@@ -218,7 +295,7 @@ cargo build --release --manifest-path integrations/zed/stub/Cargo.toml
 
 ---
 
-## 10. Coding Standards
+## 11. Coding Standards
 
 - **Airy Code Style**: 1 empty line before `if`/`else`/`match`, 2 empty lines before `fn`/`struct`/`impl`.
 - **Conventional Commits**: `type(scope): description` — e.g. `fix(zed): correct stub path on Windows`.
