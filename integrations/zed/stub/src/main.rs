@@ -747,7 +747,7 @@ fn proxy_to_python(venv_py: &Path, buffered: Vec<String>) -> ! {
     // We are the sole writer on Zed stdout at this point — no race condition.
     let _ = ready_rx.recv();
     {
-        let notif = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/listChanged\"}\n";
+        let notif = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n";
         let mut zed_out = io::stdout();
         let _ = zed_out.write_all(notif.as_bytes());
         let _ = zed_out.flush();
