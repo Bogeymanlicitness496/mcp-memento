@@ -1,7 +1,12 @@
 # Changelog
 
-* 2026-03-20: v0.2.23 - <TITLE> (Hannibal)
-  * <release notes here>
+* 2026-03-20: v0.2.23 - Stub: race condition fixes + slow-path tool discovery (Hannibal)
+  * Stub: replace PID-based lockfile with flock advisory lock — kernel auto-releases on SIGKILL, eliminates zombie-PID stale lock bug
+  * Stub: Windows lock via LockFileEx with LOCKFILE_FAIL_IMMEDIATELY (windows-sys 0.59)
+  * Stub: inject notifications/tools/list_changed after proxy handoff so Zed discovers all 13 tools without restart
+  * Stub: replay initialize to Python with synthetic id:-1 to avoid colliding with bootstrap-answered id:1
+  * Stub: filter replay to initialize + notifications only — skip requests already answered by bootstrap
+  * Stub: bootstrap initialize declares capabilities.tools.listChanged=true
 
 
 * 2026-03-20: v0.2.22 - MCP bootstrap proxy: fix "Context Server Stopped" on Linux (Hannibal)
