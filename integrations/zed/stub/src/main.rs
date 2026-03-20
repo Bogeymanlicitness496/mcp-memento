@@ -26,7 +26,7 @@ use std::process::Command;
 
 /// Injected by scripts/deploy.py during a version bump.  Matches the PyPI
 /// package version and the Zed extension marketplace version.
-const STUB_VERSION: &str = "v0.2.19";
+const STUB_VERSION: &str = "v0.2.21";
 
 // ---------------------------------------------------------------------------
 // Logging — stderr + persistent file (stderr not visible inside Zed sandbox)
@@ -240,8 +240,7 @@ fn setup_venv(system_python: &Path, venv: &Path) -> Result<(), String> {
     // Remove stale venv if present.
     if venv.exists() {
         log!("Removing stale venv at: {}", venv.display());
-        fs::remove_dir_all(venv)
-            .map_err(|e| format!("Failed to remove stale venv: {e}"))?;
+        fs::remove_dir_all(venv).map_err(|e| format!("Failed to remove stale venv: {e}"))?;
     }
 
     // Create fresh venv.
@@ -272,12 +271,18 @@ fn setup_venv(system_python: &Path, venv: &Path) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 fn install_memento(python: &Path) -> Result<(), String> {
-    // Strategy 1: standard pip install
-    log!("Trying: pip install --upgrade mcp-memento");
+    // Strategy 1: standard pip install (--timeout 60 to survive slow PyPI connections)
+    log!("Trying: pip install --upgrade --timeout 60 mcp-memento");
     let status = Command::new(python)
-        .args(["-m", "pip", "install", "--upgrade", "mcp-memento"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .args([
+            "-m",
+            "pip",
+            "install",
+            "--upgrade",
+            "--timeout",
+            "60",
+            "mcp-memento",
+        ])
         .status()
         .map_err(|e| format!("Failed to launch pip: {e}"))?;
 
@@ -290,12 +295,15 @@ fn install_memento(python: &Path) -> Result<(), String> {
     // Strategy 2: PEP 668 override (Debian/Ubuntu/Fedora)
     let status = Command::new(python)
         .args([
-            "-m", "pip", "install", "--upgrade",
+            "-m",
+            "pip",
+            "install",
+            "--upgrade",
+            "--timeout",
+            "60",
             "--break-system-packages",
             "mcp-memento",
         ])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
         .status()
         .map_err(|e| format!("Failed to launch pip --break-system-packages: {e}"))?;
 
@@ -308,7 +316,7 @@ fn install_memento(python: &Path) -> Result<(), String> {
         "All install strategies failed. Please install mcp-memento manually:\n  \
          pip install mcp-memento\n  \
          pip install --break-system-packages mcp-memento  (if PEP 668 blocks)"
-        .to_string(),
+            .to_string(),
     )
 }
 
