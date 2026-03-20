@@ -179,6 +179,85 @@ fn marker_path(venv: &Path) -> PathBuf {
     venv.join("memento_version.txt")
 }
 
+fn lock_path(venv: &Path) -> PathBuf {
+    venv.parent()
+        .unwrap_or(venv)
+        .join("memento_setup.lock")
+}
+
+/// Acquire an exclusive file lock on `lock_path(venv)`, run `f`, release.
+///
+/// If another stub process holds the lock, this call blocks until it is
+/// released — at which point the venv will be ready and `venv_is_valid`
+/// will return true, so the caller can skip setup entirely.
+///
+/// Uses `fcntl` LOCK_EX on Unix; a creation-based spin-lock on Windows.
+fn with_setup_lock<F, T>(venv: &Path, f: F) -> T
+where
+    F: FnOnce() -> T,
+{
+    let lock = lock_path(venv);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&lock)
+            .expect("cannot open setup lock file");
+
+        // LOCK_EX | LOCK_NB first; fall back to blocking LOCK_EX.
+        let fd = file.as_raw_fd();
+        unsafe {
+            libc_flock(fd, 2); // LOCK_EX = 2
+        }
+
+        log!("Setup lock acquired (pid={}).", std::process::id());
+        let result = f();
+        log!("Setup lock released (pid={}).", std::process::id());
+
+        // Lock is released when `file` drops.
+        drop(file);
+        result
+    }
+
+    #[cfg(not(unix))]
+    {
+        use std::time::Duration;
+
+        // Spin until we can create the lock file exclusively.
+        loop {
+            match fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&lock)
+            {
+                Ok(f) => {
+                    log!("Setup lock acquired (pid={}).", std::process::id());
+                    let result = f();
+                    drop(f);
+                    let _ = fs::remove_file(&lock);
+                    log!("Setup lock released (pid={}).", std::process::id());
+                    return result;
+                }
+                Err(_) => {
+                    thread::sleep(Duration::from_millis(500));
+                }
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+unsafe fn libc_flock(fd: i32, op: i32) {
+    unsafe extern "C" {
+        fn flock(fd: i32, operation: i32) -> i32;
+    }
+    unsafe { flock(fd, op) };
+}
+
 fn venv_is_valid(venv: &Path) -> bool {
     if !venv_python(venv).exists() {
         log!("Venv missing or incomplete at: {}", venv.display());
@@ -667,32 +746,54 @@ fn main() {
         launch_python(&venv_python(&venv));
     }
 
-    log!("Slow path: venv not ready, starting bootstrap proxy + setup thread.");
+    // Venv not ready — acquire setup lock before doing anything destructive.
+    // If another stub instance is already setting up, we block here until it
+    // finishes. After the lock is released, re-check validity: we may be able
+    // to skip setup entirely and go straight to the fast path.
+    log!("Slow path: acquiring setup lock…");
+
+    // We need to run the bootstrap proxy while waiting for the lock (or while
+    // running setup), so the proxy + setup both happen inside the lock scope.
+    let venv_py = venv_python(&venv);
+
+    // Check again inside the lock — another process may have finished setup
+    // while we were waiting. Use a flag to communicate the outcome.
+    let already_done = Arc::new(Mutex::new(false));
+    let already_done_inner = Arc::clone(&already_done);
+    let venv_for_lock = venv.clone();
+    let system_python_for_lock = system_python.clone();
 
     let state = Arc::new(Mutex::new(SetupState::Running));
-    let state_bg = Arc::clone(&state);
-    let venv_bg = venv.clone();
-    let python_bg = system_python.clone();
+    let state_for_setup = Arc::clone(&state);
 
     thread::spawn(move || {
-        log!("Setup thread started.");
-
-        let result = setup_venv(&python_bg, &venv_bg);
-        let mut s = state_bg.lock().unwrap();
-
-        match result {
-            Ok(()) => {
-                log!("Setup thread: setup complete.");
-                *s = SetupState::Done;
+        with_setup_lock(&venv_for_lock, || {
+            // Re-check: another process may have finished setup while we waited.
+            if venv_is_valid(&venv_for_lock) {
+                log!("Setup lock acquired — venv already valid, skipping setup.");
+                *already_done_inner.lock().unwrap() = true;
+                *state_for_setup.lock().unwrap() = SetupState::Done;
+                return;
             }
-            Err(e) => {
-                log!("Setup thread: setup failed: {e}");
-                *s = SetupState::Failed(e);
+
+            log!("Setup lock acquired — running setup.");
+            let result = setup_venv(&system_python_for_lock, &venv_for_lock);
+            let mut s = state_for_setup.lock().unwrap();
+
+            match result {
+                Ok(()) => {
+                    log!("Setup thread: setup complete.");
+                    *s = SetupState::Done;
+                }
+                Err(e) => {
+                    log!("Setup thread: setup failed: {e}");
+                    *s = SetupState::Failed(e);
+                }
             }
-        }
+        });
     });
 
-    run_bootstrap_proxy(Arc::clone(&state), venv_python(&venv));
+    run_bootstrap_proxy(Arc::clone(&state), venv_py);
 }
 
 // ---------------------------------------------------------------------------
