@@ -331,6 +331,29 @@ fn install_memento(python: &Path) -> Result<(), String> {
     if let Some(wheel) = local_wheel_path(&venv) {
         log!("local_wheel.txt found — installing from local wheel: {}", wheel);
 
+        // Step 1: install dependencies from PyPI using the wheel's metadata
+        // (--only-deps is not a real flag; we install the wheel normally first
+        //  to pull deps, then reinstall from local to get the exact code)
+        let s_deps = Command::new(python)
+            .args([
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "--timeout",
+                "120",
+                "mcp-memento",
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|e| format!("pip (deps from PyPI): {e}"))?;
+
+        if !s_deps.success() {
+            log!("Warning: could not pre-install deps from PyPI ({s_deps}). Continuing anyway.");
+        }
+
+        // Step 2: overwrite with the local wheel (no-deps: deps already installed)
         let s = Command::new(python)
             .args([
                 "-m",
