@@ -347,81 +347,20 @@ fn read_jsonrpc_message(reader: &mut impl BufRead) -> Option<String> {
     }
 }
 
-/// Write one JSON-RPC message to stdout (newline-delimited, matching Zed's transport).
-fn write_jsonrpc_message(writer: &mut impl Write, body: &str) -> io::Result<()> {
-    writeln!(writer, "{}", body)?;
-    writer.flush()
-}
 
-/// Tiny JSON string escaper — avoids pulling in serde.
-fn json_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 4);
 
-    for ch in s.chars() {
-        match ch {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 => {
-                out.push_str(&format!("\\u{:04x}", c as u32));
-            }
-            c => out.push(c),
-        }
-    }
 
-    out
-}
-
-/// Extract the string value of a key from a flat JSON object (best-effort,
-/// no full parser needed — we only deal with small Zed-generated messages).
-fn json_get_str<'a>(json: &'a str, key: &str) -> Option<&'a str> {
-    let needle = format!("\"{}\"", key);
-    let pos = json.find(&needle)?;
-    let after_key = &json[pos + needle.len()..];
-    let colon = after_key.find(':')? + 1;
-    let value_start = &after_key[colon..].trim_start();
-
-    if value_start.starts_with('"') {
-        let inner = &value_start[1..];
-        let end = inner.find('"')?;
-        Some(&inner[..end])
-    } else {
-        None
-    }
-}
-
-/// Extract a raw (possibly non-string) value for a key — used for `id`
-/// which may be a number or a string.
-fn json_get_id(json: &str) -> Option<String> {
-    let needle = "\"id\"";
-    let pos = json.find(needle)?;
-    let after = &json[pos + needle.len()..];
-    let colon = after.find(':')? + 1;
-    let value = after[colon..].trim_start();
-
-    if value.starts_with('"') {
-        let inner = &value[1..];
-        let end = inner.find('"')?;
-        Some(format!("\"{}\"", &inner[..end]))
-    } else {
-        let end = value
-            .find([',', '}', ']', ' ', '\n', '\r', '\t'])
-            .unwrap_or(value.len());
-        Some(value[..end].to_string())
-    }
-}
 
 /// Run the bootstrap MCP proxy on stdin/stdout, then seamlessly hand off
 /// to Python once the venv setup completes.
 ///
-/// Phase 1 — Bootstrap: answer Zed's `initialize` while setup runs.
-///   All messages received (including `initialize`) are buffered so they
-///   can be replayed to Python in Phase 3.
+/// Strategy: buffer ALL messages from Zed without responding to any of them.
+/// This keeps Zed's 60-second initialize timeout counting but does not
+/// corrupt the MCP handshake.  Once Python is ready, replay every buffered
+/// message so Python handles the real initialize and responds authoritatively.
 ///
-/// Phase 2 — Python proxy: spawn Python, replay buffered messages first,
-///   then forward subsequent stdin → Python and Python stdout → stdout.
+/// Constraint: pip install must complete within Zed's 60-second window.
+/// On a warm pip cache this takes 5-15 seconds; on a cold network ~30-60s.
 fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     use std::sync::mpsc;
     use std::time::Duration;
@@ -437,9 +376,11 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
 
         loop {
             log!("Reader thread: waiting for next message…");
+
             match read_jsonrpc_message(&mut reader) {
                 Some(msg) => {
                     log!("Reader thread RX: {}", &msg[..msg.len().min(200)]);
+
                     if tx.send(Some(msg)).is_err() {
                         log!("Reader thread: channel closed, exiting.");
                         break;
@@ -454,60 +395,35 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
         }
     });
 
-    // Buffer of ALL messages received during bootstrap (to replay to Python).
+    // Buffer ALL messages — do not respond to anything.
+    // Python will handle the full handshake once it starts.
     let mut buffered: Vec<String> = Vec::new();
 
-    {
-        let stdout = io::stdout();
-        let mut writer = stdout.lock();
-
-        'bootstrap: loop {
-            match rx.recv_timeout(Duration::from_millis(200)) {
-                Ok(None) => {
-                    log!("stdin closed during bootstrap — exiting.");
-                    std::process::exit(0);
-                }
-
-                Ok(Some(msg)) => {
-                    log!("Bootstrap RX: {}", &msg[..msg.len().min(200)]);
-
-                    let method = json_get_str(&msg, "method").unwrap_or("").to_string();
-                    let id = json_get_id(&msg);
-
-                    // Buffer every message for replay to Python.
-                    buffered.push(msg.clone());
-
-                    if method.starts_with("notifications/") || method == "$/cancelRequest" {
-                        log!("Bootstrap: ignoring notification '{}'", method);
-                    }
-                    else if let Some(id) = id {
-                        let response = build_response(&method, &id, &state);
-                        log!("Bootstrap TX: {}", &response[..response.len().min(200)]);
-
-                        if let Err(e) = write_jsonrpc_message(&mut writer, &response) {
-                            log!("Bootstrap write error: {e}");
-                            std::process::exit(1);
-                        }
-                    }
-                    else {
-                        log!("Bootstrap: no id, skipping '{}'", method);
-                    }
-                }
-
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    log!("Reader thread disconnected — exiting.");
-                    std::process::exit(1);
-                }
+    loop {
+        match rx.recv_timeout(Duration::from_millis(200)) {
+            Ok(None) => {
+                log!("stdin closed during bootstrap — exiting.");
+                std::process::exit(0);
             }
 
-            let s = state.lock().unwrap();
-
-            if *s != SetupState::Running {
-                log!("Setup finished — moving to proxy phase.");
-                break 'bootstrap;
+            Ok(Some(msg)) => {
+                log!("Bootstrap buffering: {}", &msg[..msg.len().min(120)]);
+                buffered.push(msg);
             }
+
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                log!("Reader thread disconnected — exiting.");
+                std::process::exit(1);
+            }
+        }
+
+        let s = state.lock().unwrap();
+
+        if *s != SetupState::Running {
+            log!("Setup finished — moving to proxy phase.");
+            break;
         }
     }
 
@@ -538,34 +454,39 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     let mut child_stdin = child.stdin.take().expect("child stdin");
     let child_stdout = child.stdout.take().expect("child stdout");
 
-    // Replay buffered messages first, then forward live messages.
+    // Replay buffered messages → Python, then forward live messages.
     thread::spawn(move || {
         log!("Replaying {} buffered message(s) to Python.", buffered.len());
 
         for msg in &buffered {
-            let frame = format!("{}\n", msg);
+            log!("Replay → Python: {}", &msg[..msg.len().min(120)]);
 
-            if child_stdin.write_all(frame.as_bytes()).is_err() {
+            if writeln!(child_stdin, "{}", msg).is_err() {
                 log!("Write error during replay.");
                 return;
             }
         }
 
+        if let Err(e) = child_stdin.flush() {
+            log!("Flush error after replay: {e}");
+            return;
+        }
+
         log!("Replay done — forwarding live messages.");
 
         while let Ok(Some(msg)) = rx.recv() {
-            log!("Proxy → Python: {}", &msg[..msg.len().min(200)]);
-            let frame = format!("{}\n", msg);
+            log!("Proxy → Python: {}", &msg[..msg.len().min(120)]);
 
-            if child_stdin.write_all(frame.as_bytes()).is_err() {
+            if writeln!(child_stdin, "{}", msg).is_err() {
                 log!("Write error forwarding to Python.");
                 break;
             }
         }
+
         log!("Forwarder thread exiting.");
     });
 
-    // Forward Python stdout → our stdout.
+    // Forward Python stdout → Zed stdout.
     {
         let mut buf = [0u8; 4096];
         let mut py_out = child_stdout;
@@ -577,6 +498,7 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
                 Err(e) => { log!("Python stdout read error: {e}"); break; }
                 Ok(n) => {
                     log!("Python → Zed: {} bytes", n);
+
                     if out.write_all(&buf[..n]).is_err() || out.flush().is_err() {
                         log!("Write error forwarding to Zed.");
                         break;
@@ -591,63 +513,11 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
     std::process::exit(code);
 }
 
-fn build_response(method: &str, id: &str, state: &Arc<Mutex<SetupState>>) -> String {
-    match method {
-        "initialize" => {
-            format!(
-                r#"{{"jsonrpc":"2.0","id":{id},"result":{{"protocolVersion":"2024-11-05","capabilities":{{"tools":{{}}}},"serverInfo":{{"name":"memento-bootstrap","version":"{ver}"}}}}}}"#,
-                id = id,
-                ver = json_escape(STUB_VERSION),
-            )
-        }
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
 
-        "tools/list" => {
-            format!(
-                r#"{{"jsonrpc":"2.0","id":{id},"result":{{"tools":[{{"name":"memento_status","description":"Returns the current Memento server setup status.","inputSchema":{{"type":"object","properties":{{}}}}}}]}}}}"#,
-                id = id,
-            )
-        }
 
-        "tools/call" => {
-            let status_text = {
-                let s = state.lock().unwrap();
-
-                match &*s {
-                    SetupState::Running => {
-                        "Memento is being set up (installing mcp-memento via pip). \
-                         This usually takes 10-60 seconds on first run. \
-                         The server will restart automatically when ready."
-                            .to_string()
-                    }
-                    SetupState::Done => "Memento setup complete. Restarting\u{2026}".to_string(),
-                    SetupState::Failed(e) => format!(
-                        "Memento setup failed: {}. Please check your Python installation.",
-                        e
-                    ),
-                }
-            };
-
-            format!(
-                r#"{{"jsonrpc":"2.0","id":{id},"result":{{"content":[{{"type":"text","text":"{text}"}}]}}}}"#,
-                id = id,
-                text = json_escape(&status_text),
-            )
-        }
-
-        "ping" => {
-            format!(r#"{{"jsonrpc":"2.0","id":{id},"result":{{}}}}"#, id = id)
-        }
-
-        _ => {
-            log!("Bootstrap: unknown method '{}' -> method-not-found", method);
-            format!(
-                r#"{{"jsonrpc":"2.0","id":{id},"error":{{"code":-32601,"message":"Method not found: {method}"}}}}"#,
-                id = id,
-                method = json_escape(method),
-            )
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Entry point
