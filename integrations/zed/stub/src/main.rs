@@ -327,16 +327,11 @@ enum SetupState {
     Failed(String),
 }
 
-/// Read one JSON-RPC frame from stdin.
+/// Read one JSON-RPC message from stdin.
 ///
-/// The MCP stdio transport uses Content-Length framing identical to LSP:
-///
-///   Content-Length: <N>\r\n
-///   \r\n
-///   <N bytes of JSON>
+/// Zed's MCP stdio transport sends newline-delimited JSON (one JSON object
+/// per line), NOT Content-Length framing.
 fn read_jsonrpc_message(reader: &mut impl BufRead) -> Option<String> {
-    let mut content_length: Option<usize> = None;
-
     loop {
         let mut line = String::new();
 
@@ -346,26 +341,15 @@ fn read_jsonrpc_message(reader: &mut impl BufRead) -> Option<String> {
 
         let trimmed = line.trim_end_matches(['\r', '\n']);
 
-        if trimmed.is_empty() {
-            break;
-        }
-
-        if let Some(rest) = trimmed.strip_prefix("Content-Length:") {
-            if let Ok(n) = rest.trim().parse::<usize>() {
-                content_length = Some(n);
-            }
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
         }
     }
-
-    let n = content_length?;
-    let mut buf = vec![0u8; n];
-    reader.read_exact(&mut buf).ok()?;
-    String::from_utf8(buf).ok()
 }
 
-/// Write one JSON-RPC frame to stdout (Content-Length framing).
+/// Write one JSON-RPC message to stdout (newline-delimited, matching Zed's transport).
 fn write_jsonrpc_message(writer: &mut impl Write, body: &str) -> io::Result<()> {
-    write!(writer, "Content-Length: {}\r\n\r\n{}", body.len(), body)?;
+    writeln!(writer, "{}", body)?;
     writer.flush()
 }
 
@@ -559,7 +543,7 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
         log!("Replaying {} buffered message(s) to Python.", buffered.len());
 
         for msg in &buffered {
-            let frame = format!("Content-Length: {}\r\n\r\n{}", msg.len(), msg);
+            let frame = format!("{}\n", msg);
 
             if child_stdin.write_all(frame.as_bytes()).is_err() {
                 log!("Write error during replay.");
@@ -571,7 +555,7 @@ fn run_bootstrap_proxy(state: Arc<Mutex<SetupState>>, venv_py: PathBuf) -> ! {
 
         while let Ok(Some(msg)) = rx.recv() {
             log!("Proxy → Python: {}", &msg[..msg.len().min(200)]);
-            let frame = format!("Content-Length: {}\r\n\r\n{}", msg.len(), msg);
+            let frame = format!("{}\n", msg);
 
             if child_stdin.write_all(frame.as_bytes()).is_err() {
                 log!("Write error forwarding to Python.");
