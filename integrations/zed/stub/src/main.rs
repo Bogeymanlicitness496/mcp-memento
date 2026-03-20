@@ -802,7 +802,26 @@ fn main() {
             loop {
                 thread::sleep(Duration::from_millis(500));
 
-                if venv_is_valid(&venv_for_thread) {
+                let venv_valid = venv_is_valid(&venv_for_thread);
+                let lock = lock_path(&venv_for_thread);
+                let lock_exists = lock.exists();
+                let lock_content = fs::read_to_string(&lock).unwrap_or_else(|_| "ERR".to_string());
+                let lock_content_trim = lock_content.trim().to_string();
+                let owner_pid: u32 = lock_content_trim.parse().unwrap_or(0);
+                let owner_alive = pid_is_alive(owner_pid);
+                let stale_check = !lock_exists || !owner_alive;
+
+                log!(
+                    "Poll: venv_valid={} lock_exists={} lock_content={:?} owner_pid={} owner_alive={} stale={}",
+                    venv_valid,
+                    lock_exists,
+                    lock_content_trim,
+                    owner_pid,
+                    owner_alive,
+                    stale_check
+                );
+
+                if venv_valid {
                     log!(
                         "Other process finished — venv valid (pid={}).",
                         std::process::id()
@@ -812,8 +831,7 @@ fn main() {
                 }
 
                 // Try to take over if the owner is dead
-                let lock = lock_path(&venv_for_thread);
-                let stale = !lock.exists() || lock_is_stale(&lock);
+                let stale = stale_check;
 
                 if stale {
                     log!(
