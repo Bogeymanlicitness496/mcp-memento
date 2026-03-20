@@ -155,6 +155,35 @@ python scripts/deploy.py bump 0.3.0 --dev --yes
 # Then reload the extension in Zed via "Install Dev Extension"
 ```
 
+### Dev: test Python changes without publishing to PyPI
+
+When you modify the Python server (`src/memento/`) and want to test via the
+Zed extension **without** publishing to PyPI:
+
+```bash
+# 1. Build the local wheel
+python scripts/deploy.py build
+
+# 2. Invalidate the Zed venv and get the settings snippet
+python scripts/deploy.py dev-install
+#    → prints: "MEMENTO_LOCAL_WHEEL": "L:/Work/mcp-memento/dist/mcp_memento-X.Y.Z-py3-none-any.whl"
+
+# 3. Paste the printed JSON line into Zed settings (Ctrl+Shift+P → "zed: open settings")
+#    inside your memento context_server settings block.
+
+# 4. Reload the extension in Zed:
+#    Ctrl+Shift+P → "zed: extensions" → reload mcp-memento
+#    (or simply restart Zed)
+```
+
+**How it works**: when `MEMENTO_LOCAL_WHEEL` is set in the extension settings,
+the stub installs from that `.whl` instead of downloading from PyPI.
+Every time the wheel path changes (or `dev-install` deletes the marker),
+the venv is automatically rebuilt on the next Zed startup.
+
+To revert to PyPI releases, remove `MEMENTO_LOCAL_WHEEL` from your settings
+(or set it to `""` / `"none"`).
+
 ---
 
 ## Files Modified by `bump`
