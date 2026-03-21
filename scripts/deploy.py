@@ -1041,20 +1041,84 @@ def cmd_dev_install(dry: bool) -> None:
             info(f"[dry-run] Would write: {sentinel}  ← {sentinel_value}")
 
         # ------------------------------------------------------------------
-        # Invalidate the venv marker so the stub rebuilds the venv and picks
-        # up the new wheel on next Zed startup.
+        # Direct pip install into the Zed venv (if it already exists).
+        #
+        # When the venv exists we install immediately — no need to wait for
+        # the stub to do it on the next boot.  This makes the new code
+        # available as soon as the user reloads the extension in Zed.
         # ------------------------------------------------------------------
-        step("Invalidating Zed extension venv marker")
+        step("Installing wheel directly into Zed venv (if present)")
+        import sys as _sys
+        import subprocess as _sp
+
+        venv_dir = zed_work / "venv"
+
+        if _sys.platform == "win32":
+            venv_python = venv_dir / "Scripts" / "python.exe"
+        else:
+            venv_python = venv_dir / "bin" / "python"
+
+        if venv_python.exists():
+            if not dry:
+                result = _sp.run(
+                    [
+                        str(venv_python), "-m", "pip", "install",
+                        "--force-reinstall", "--no-deps", "--quiet",
+                        wheel_posix,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+
+                if result.returncode == 0:
+                    ok(f"Installed into Zed venv: {wheel_posix}")
+                else:
+                    warn(f"pip install into Zed venv failed:")
+                    warn(result.stderr.strip()[:300])
+            else:
+                info(f"[dry-run] Would pip install {wheel_posix} into {venv_python}")
+        else:
+            info("Zed venv not found — stub will install on next boot.")
+
+        # ------------------------------------------------------------------
+        # Update the venv marker to the expected value so the stub's fast
+        # path finds it valid on the next boot (skips reinstall).
+        # When the venv doesn't exist yet the marker is simply deleted so
+        # the stub will create + install from scratch.
+        # ------------------------------------------------------------------
+        step("Updating Zed venv marker")
         marker = zed_work / "venv" / "memento_version.txt"
 
+        # The expected marker mirrors what the Rust stub writes:
+        #   STUB_VERSION + "+local:" + sentinel_value
+        # We read STUB_VERSION from the stub's main.rs to stay in sync.
+        import re as _re
+
+        stub_main = ROOT / "integrations" / "zed" / "stub" / "src" / "main.rs"
+        stub_version = "v" + read_pyproject_version()  # fallback
+
+        try:
+            src = stub_main.read_text(encoding="utf-8")
+            m = _re.search(r'const STUB_VERSION:\s*&str\s*=\s*"([^"]+)"', src)
+
+            if m:
+                stub_version = m.group(1)
+        except Exception:
+            pass
+
+        expected_marker = f"{stub_version}+local:{sentinel_value}"
+
         if not dry:
-            if marker.exists():
-                marker.unlink()
-                ok(f"Deleted venv marker: {marker}")
+            if venv_python.exists():
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_text(expected_marker, encoding="utf-8")
+                ok(f"Marker updated: {expected_marker}")
             else:
-                info(f"Marker not found (venv may not exist yet): {marker}")
+                if marker.exists():
+                    marker.unlink()
+                info("Venv absent — marker cleared; stub will rebuild on next boot.")
         else:
-            info(f"[dry-run] Would delete venv marker: {marker}")
+            info(f"[dry-run] Would write marker: {expected_marker}")
 
     # ------------------------------------------------------------------
     # Print next steps.
@@ -1064,8 +1128,8 @@ def cmd_dev_install(dry: bool) -> None:
     print("  Next steps")
     print("─" * 60)
     print()
-    print("  1. Reload the Zed extension:")
-    print("     Ctrl+Shift+P → 'zed: extensions' → Reload mcp-memento")
+    print("  1. Restart the MCP server in Zed:")
+    print("     Ctrl+Shift+P → 'agent: restart mcp server'  (or reload the extension)")
     print()
     print("  2. Local pip test (optional):")
     print(f"     pip install --force-reinstall {wheel_posix}")
