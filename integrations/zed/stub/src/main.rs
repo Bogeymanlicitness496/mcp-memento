@@ -201,12 +201,15 @@ fn local_wheel_path(venv: &Path) -> Option<LocalWheel> {
             if trimmed.is_empty() {
                 return None;
             }
-            // Format: "<path>:<hash>"  or legacy "<path>" (no colon).
-            let path = trimmed
-                .splitn(2, ':')
-                .next()
-                .unwrap_or(&trimmed)
-                .to_string();
+            // Format: "<path>|<hash>"  (pipe separator — safe on all platforms).
+            // Legacy format "<path>" (no separator) is also accepted.
+            // NOTE: we do NOT split on ':' because Windows drive letters
+            // (e.g. "C:/foo") contain a colon and would be mis-parsed.
+            let path = if let Some((p, _)) = trimmed.split_once('|') {
+                p.to_string()
+            } else {
+                trimmed.clone()
+            };
             Some(LocalWheel {
                 path,
                 fingerprint: trimmed,

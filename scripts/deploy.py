@@ -1017,7 +1017,8 @@ def cmd_dev_install(dry: bool) -> None:
     wheel = wheels[-1]
     wheel_posix = wheel.as_posix()
     wheel_hash = _wheel_sha256(wheel)
-    sentinel_value = f"{wheel_posix}:{wheel_hash}"
+    # Use '|' as separator — ':' is unsafe on Windows (drive letters like C:/...)
+    sentinel_value = f"{wheel_posix}|{wheel_hash}"
     ok(f"Wheel: {wheel}  (sha256:{wheel_hash})")
 
     zed_work = _zed_work_dir()
@@ -1058,8 +1059,30 @@ def cmd_dev_install(dry: bool) -> None:
         else:
             venv_python = venv_dir / "bin" / "python"
 
+        # Track whether the wheel was successfully installed into the venv.
+        # Used later to decide whether to write the marker.
+        direct_install_ok = False
+
         if venv_python.exists():
-            if not dry:
+            # Sanity-check: verify pip is available before attempting install.
+            # A freshly-downloaded venv created by the stub bootstrapper may
+            # exist on disk but lack pip (setup still in progress or incomplete).
+            pip_check = _sp.run(
+                [str(venv_python), "-m", "pip", "--version"],
+                capture_output=True,
+            )
+            pip_ok = pip_check.returncode == 0
+
+            if not pip_ok:
+                warn("Zed venv exists but pip is not available — clearing stale venv.")
+                warn("The stub will recreate it from the local wheel on next boot.")
+                # Remove the entire venv so the stub's venv_is_valid() is false
+                # and it rebuilds from scratch via setup_venv().
+                import shutil as _sh
+                if not dry:
+                    _sh.rmtree(venv_dir, ignore_errors=True)
+                    info(f"Removed: {venv_dir}")
+            elif not dry:
                 result = _sp.run(
                     [
                         str(venv_python), "-m", "pip", "install",
@@ -1072,11 +1095,13 @@ def cmd_dev_install(dry: bool) -> None:
 
                 if result.returncode == 0:
                     ok(f"Installed into Zed venv: {wheel_posix}")
+                    direct_install_ok = True
                 else:
-                    warn(f"pip install into Zed venv failed:")
+                    warn("pip install into Zed venv failed:")
                     warn(result.stderr.strip()[:300])
             else:
                 info(f"[dry-run] Would pip install {wheel_posix} into {venv_python}")
+                direct_install_ok = True  # dry-run: assume success
         else:
             info("Zed venv not found — stub will install on next boot.")
 
@@ -1108,8 +1133,11 @@ def cmd_dev_install(dry: bool) -> None:
 
         expected_marker = f"{stub_version}+local:{sentinel_value}"
 
+        # Write marker only when the package was actually installed in the venv.
+        # If pip was unavailable or install failed, leave the marker absent so
+        # the stub's slow path recreates the venv from scratch on next boot.
         if not dry:
-            if venv_python.exists():
+            if direct_install_ok:
                 marker.parent.mkdir(parents=True, exist_ok=True)
                 marker.write_text(expected_marker, encoding="utf-8")
                 ok(f"Marker updated: {expected_marker}")
@@ -1117,7 +1145,7 @@ def cmd_dev_install(dry: bool) -> None:
                 if marker.exists():
                     marker.unlink()
                 info("Venv absent — marker cleared; stub will rebuild on next boot.")
-        else:
+        elif dry:
             info(f"[dry-run] Would write marker: {expected_marker}")
 
     # ------------------------------------------------------------------
