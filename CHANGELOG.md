@@ -1,15 +1,29 @@
 # Changelog
 
-* 2026-03-21: v0.2.28 - <TITLE> (Hannibal)
-  * <release notes here>
+* 2026-03-21: v0.2.28 - Windows path parsing fix + venv fingerprint + deploy rebuild command (Hannibal)
+  * fix(stub): changed sentinel separator in local_wheel.txt from `:` to `|` — colon collided with Windows drive letters causing splitn(2, ':') to parse the drive letter as filename, crashing pip install
+  * fix(stub): venv marker now stores full sentinel fingerprint (path|hash) instead of STUB_VERSION — wheel content change forces venv rebuild, eliminating stale-server bug
+  * fix(deploy): dev-install now verifies pip exists before install, detects broken venvs, deletes them entirely so stub performs a clean rebuild on next boot
+  * fix(deploy): success marker written only if direct pip install actually succeeds
+  * feat(deploy): add `rebuild` command — fast dev cycle: build stub + wheel + invalidate Zed venv in one step, no git interaction required
+  * docs(dev): document `rebuild` workflow, `|` separator, fingerprint sentinel logic in dev/README.md
 
 
-* 2026-03-21: v0.2.27 - <TITLE> (Hannibal)
-  * <release notes here>
+* 2026-03-21: v0.2.27 - Regression test suite: 25/25 tools verified on live MCP server (Hannibal)
+  * test: executed 25-tool regression suite on live Zed MCP server
+  * fix(tools): get_memento — missing "Relationships" section in output added
+  * fix(tools): find_path_between_mementos — missing path array and incorrect hop count fixed
+  * fix(tools): recall_mementos — duplicate results eliminated
+  * fix(tools): search_mementos — match_mode=all and min_importance filters now work correctly
+  * fix(tools): apply_memento_confidence_decay — output formatting corrected
+  * fix(tools): get_memento_network — now returns nodes/edges topology instead of raw statistics
 
 
-* 2026-03-21: v0.2.26 - <TITLE> (Hannibal)
-  * <release notes here>
+* 2026-03-21: v0.2.26 - Zed extension: stale server version root cause fix (Hannibal)
+  * fix(stub): resolved stale server version issue where Zed extension launched old Python server after rebuild
+  * fix(stub): venv marker logic updated to detect PyPI vs local wheel reinstalls correctly
+  * fix(deploy): dev-install enhanced with pip verification and broken venv detection
+  * chore: updated release_workflow memory with new deploy workflow
 
 
 * 2026-03-20: v0.2.25 - Bug fixes: 8 critical tool regressions + 37 new regression tests (Hannibal)

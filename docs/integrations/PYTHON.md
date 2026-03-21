@@ -258,6 +258,7 @@ async def main():
             print(f"Stored memory: {memory_id}")
 
             # --- Recall memories ---
+            # Note: recall_mementos returns formatted text, not JSON
             result = await session.call_tool(
                 "recall_mementos",
                 arguments={
@@ -265,9 +266,7 @@ async def main():
                     "limit": 5,
                 },
             )
-            memories = json.loads(result.content[0].text)
-            for m in memories.get("results", []):
-                print(f"  - {m['title']} (importance: {m['importance']})")
+            print(result.content[0].text)  # Human-readable formatted output
 
             # --- Get a specific memory ---
             result = await session.call_tool(

@@ -63,7 +63,7 @@ These tools manage confidence scores and decay for relationship quality maintena
 |------|-------------|----------------|
 | `adjust_memento_confidence` | Manually adjust confidence of a relationship | `relationship_id`, `new_confidence`, `reason` |
 | `get_low_confidence_mementos` | Find mementos with low confidence scores | `threshold`, `limit` |
-| `apply_memento_confidence_decay` | Apply automatic confidence decay based on last access | (no parameters) |
+| `apply_memento_confidence_decay` | Apply automatic confidence decay based on last access | `memory_id` (optional) |
 | `boost_memento_confidence` | Boost confidence when a memento is successfully used | `memory_id`, `boost_amount`, `reason` |
 | `set_memento_decay_factor` | Set custom decay factor for specific mementos | `memory_id`, `decay_factor`, `reason` |
 
@@ -214,6 +214,11 @@ Common error scenarios:
 
 ## Integration Patterns
 
+> **Note**: The patterns below show tool calls inside `async def` functions using
+> `await` — this is the style used when calling Memento via the Python MCP client
+> library. The rest of this document uses synchronous pseudocode for brevity.
+> Both styles represent the same underlying tool call.
+
 ### With AI Assistants
 ```python
 async def process_with_context(query: str):
@@ -278,7 +283,7 @@ async def store_test_results(test_name: str, results: dict):
 |------|---------------------|---------------------|
 | `adjust_memento_confidence` | `relationship_id`, `new_confidence` | `reason` |
 | `get_low_confidence_mementos` | (none) | `threshold`, `limit` |
-| `apply_memento_confidence_decay` | (none) | (none) |
+| `apply_memento_confidence_decay` | (none) | `memory_id` |
 | `boost_memento_confidence` | `memory_id` | `boost_amount`, `reason` |
 | `set_memento_decay_factor` | `memory_id` | `decay_factor`, `reason` |
 

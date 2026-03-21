@@ -263,7 +263,7 @@ Optional parameter:
 When `memory_id` is provided, decay is applied only to the relationships of that memory, and the `decay_factor` is recalculated from the memory's importance and tags before being applied.
 
 ### 4. `boost_memento_confidence`
-**Purpose**: Boost confidence after successful usage
+**Purpose**: Boost confidence of a memory's relationships after successful usage
 **Profile**: Core (available in all profiles)
 **When to use**: After implementing a solution or validating knowledge
 ```json
@@ -273,6 +273,12 @@ When `memory_id` is provided, decay is applied only to the relationships of that
   "reason": "Successfully implemented in project X"
 }
 ```
+
+> **Note**: This tool boosts confidence on all **relationships** associated with the
+> given memory, not on the memory node itself (which has no confidence value of its
+> own). If the memory has no relationships, the call returns "Boosted 0 relationships"
+> and is a no-op. Use `create_memento_relationship` first if you need confidence
+> tracking on a newly created memory.
 
 ### 5. `set_memento_decay_factor`
 **Purpose**: Set custom decay rates

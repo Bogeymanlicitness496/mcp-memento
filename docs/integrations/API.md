@@ -91,14 +91,12 @@ async def main():
             memory_id = response["id"]
 
             # Recall memories by semantic query
+            # Note: recall_mementos returns formatted text, not JSON
             result = await session.call_tool(
                 "recall_mementos",
                 arguments={"query": "Redis connection issues", "limit": 5},
             )
-            memories = json.loads(result.content[0].text)
-
-            for m in memories.get("results", []):
-                print(f"  - {m['title']} (importance: {m['importance']})")
+            print(result.content[0].text)  # Human-readable formatted output
 
             # Get a specific memory with relationships
             result = await session.call_tool(
@@ -161,8 +159,6 @@ inside a container. Because the transport is stdio, the container must be run wi
 
 ```yaml
 # docker-compose.yml (already present in the repository root)
-version: "3.8"
-
 services:
   memorygraph:
     build:

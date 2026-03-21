@@ -18,13 +18,19 @@ Build a personal or team knowledge base that grows smarter over time, accessible
 ## Table of Contents
 
 - [🌱 A Gentle Introduction](#a-gentle-introduction)
+- [✨ Key Features](#key-features)
 - [🚀 Quick Start](#quick-start)
 - [⚙️ Configuration](#configuration)
-- [💬 Natural Language Interaction](#basic-usage-examples)
-- [🔗 Integrations](#integrations)
 - [📖 Core Concepts](#core-concepts)
+- [🔗 Integrations](#integrations)
+- [🛠️ Basic Usage Examples](#basic-usage-examples)
+- [📚 Documentation Structure](#documentation-structure)
+- [🏗️ Architecture Overview](#architecture-overview)
 - [📜 Background](#background)
 - [🙏 Acknowledgments](#acknowledgments)
+- [🤝 Contributing](#contributing)
+- [📄 License](#license)
+- [🔗 Links](#links)
 
 <a name="a-gentle-introduction"></a>
 ## 🌱 A Gentle Introduction
