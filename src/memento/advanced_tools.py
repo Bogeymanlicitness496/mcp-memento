@@ -719,13 +719,58 @@ class AdvancedRelationshipHandlers:
     async def handle_get_memento_network(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Get memento network structure."""
+        """Get the complete memento network: nodes, edges and system metadata."""
         try:
-            # Get database statistics
+            # Database statistics (same as get_memento_statistics)
             stats = await self.memory_db.get_memory_statistics()
 
-            # Enhance with relationship metadata
+            # Fetch all nodes (memories) — capped at 200
+            node_rows = await self.memory_db._execute_sql(
+                """
+                SELECT id,
+                       json_extract(properties, '$.title')      AS title,
+                       json_extract(properties, '$.type')       AS type,
+                       json_extract(properties, '$.importance') AS importance
+                FROM nodes
+                WHERE label = 'Memory'
+                LIMIT 200
+                """
+            )
+            nodes = [
+                {
+                    "id": r["id"],
+                    "title": r["title"],
+                    "type": r["type"],
+                    "importance": r["importance"],
+                }
+                for r in node_rows
+            ]
+
+            # Fetch all edges (relationships) — capped at 200
+            edge_rows = await self.memory_db._execute_sql(
+                """
+                SELECT id, from_id, to_id, rel_type, confidence
+                FROM relationships
+                LIMIT 200
+                """
+            )
+            edges = [
+                {
+                    "id": r["id"],
+                    "from": r["from_id"],
+                    "to": r["to_id"],
+                    "type": r["rel_type"],
+                    "confidence": r["confidence"],
+                }
+                for r in edge_rows
+            ]
+
             result = {
+                "nodes": nodes,
+                "edges": edges,
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+                "truncated": len(nodes) == 200 or len(edges) == 200,
                 "database_statistics": stats,
                 "relationship_system": {
                     "total_relationship_types": 35,
@@ -746,7 +791,7 @@ class AdvancedRelationshipHandlers:
             )
 
         except Exception as e:
-            logger.error(f"Error getting graph metrics: {e}")
+            logger.error(f"Error getting memento network: {e}")
             return CallToolResult(
                 content=[TextContent(type="text", text=f"Error: {str(e)}")],
                 isError=True,
