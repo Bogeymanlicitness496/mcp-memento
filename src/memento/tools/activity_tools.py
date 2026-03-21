@@ -9,7 +9,7 @@ This module contains handlers for activity and statistics operations:
 
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Union
 
 from mcp.types import CallToolResult, TextContent
@@ -119,22 +119,29 @@ async def handle_get_recent_memento_activity(
     days = arguments.get("days", 7)
     project = arguments.get("project")
 
-    # Auto-detect project if not specified; run in a thread with a hard timeout
-    # so that subprocess git calls cannot block the MCP stdio transport.
+    # Auto-detect project only when explicitly not provided.
+    # Run in a thread with a hard timeout; on Windows git subprocesses can
+    # linger after TimeoutExpired, so we cap the whole operation at 0.5 s
+    # and discard the result on any failure — project detection is best-effort.
     if not project:
         try:
             from ..utils.project_detection import detect_project_context
 
             loop = asyncio.get_event_loop()
+            executor = ThreadPoolExecutor(max_workers=1)
 
-            with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
                 future = loop.run_in_executor(executor, detect_project_context)
-                project_info = await asyncio.wait_for(future, timeout=0.8)
+                project_info = await asyncio.wait_for(future, timeout=0.5)
 
-            if project_info:
-                project = project_info.get("project_path")
+                if project_info:
+                    project = project_info.get("project_path")
 
-        except (asyncio.TimeoutError, FuturesTimeoutError, Exception):
+            finally:
+                # Shut down without waiting so zombie git processes don't block
+                executor.shutdown(wait=False, cancel_futures=True)
+
+        except Exception:
             # Project detection is best-effort; continue without it
             pass
 
@@ -152,10 +159,12 @@ async def handle_get_recent_memento_activity(
     # Memories by type
     if activity["memories_by_type"]:
         result_text += "**Breakdown by Type**:\n"
+
         for mem_type, count in sorted(
             activity["memories_by_type"].items(), key=lambda x: x[1], reverse=True
         ):
             result_text += f"- {mem_type.replace('_', ' ').title()}: {count}\n"
+
         result_text += "\n"
 
     # Unresolved problems
@@ -163,29 +172,36 @@ async def handle_get_recent_memento_activity(
         result_text += (
             f"**⚠️ Unresolved Problems ({len(activity['unresolved_problems'])})**:\n"
         )
+
         for problem in activity["unresolved_problems"]:
             title = _get_memory_attr(problem, "title", "Unknown")
             importance = _get_memory_attr(problem, "importance", 0.5)
             summary = _get_memory_attr(problem, "summary")
             result_text += f"- **{title}** (importance: {importance:.1f})\n"
+
             if summary:
                 result_text += f"  {summary}\n"
+
         result_text += "\n"
 
     # Recent memories
     if activity["recent_memories"]:
         result_text += f"**Recent Memories** (showing {min(10, len(activity['recent_memories']))}):\n"
+
         for i, memory in enumerate(activity["recent_memories"][:10], 1):
             title = _get_memory_attr(memory, "title", "Unknown")
             mem_type = _get_memory_attr(memory, "type", "general")
             summary = _get_memory_attr(memory, "summary")
             result_text += f"{i}. **{title}** ({mem_type})\n"
+
             if summary:
                 result_text += f"   {summary}\n"
+
         result_text += "\n"
 
     # Next steps suggestion
     result_text += "**💡 Next Steps**:\n"
+
     if activity["unresolved_problems"]:
         result_text += "- Review unresolved problems and consider solutions\n"
         result_text += '- Use `get_memento(memory_id="...")` for details\n'

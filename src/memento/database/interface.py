@@ -481,12 +481,21 @@ class SQLiteMemoryDatabase:
         """Search using SQLite FTS5 full-text search."""
         search_terms = self._prepare_fts_query(query.query)
 
+        # Build optional extra WHERE clauses
+        extra_where = ""
+        extra_params_list = []
+
+        if getattr(query, "min_importance", None) is not None:
+            extra_where = "  AND CAST(json_extract(n.properties, '$.importance') AS REAL) >= ?"
+            extra_params_list = [query.min_importance]
+
         fts_query = f"""
             SELECT DISTINCT n.id, n.properties
             FROM nodes n
             JOIN nodes_fts fts ON n.id = fts.id
             WHERE n.label = 'Memory'
               AND fts.nodes_fts MATCH ?
+              {extra_where}
             ORDER BY
                 (json_extract(n.properties, '$.confidence') * json_extract(n.properties, '$.importance')) DESC,
                 rank
@@ -500,13 +509,18 @@ class SQLiteMemoryDatabase:
             JOIN nodes_fts fts ON n.id = fts.id
             WHERE n.label = 'Memory'
               AND fts.nodes_fts MATCH ?
+              {extra_where}
         """
 
         limit = query.limit or 100
 
         # Execute queries
-        results = await self._execute_sql(fts_query, (search_terms, limit))
-        count_result = await self._execute_sql(count_query, (search_terms,))
+        results = await self._execute_sql(
+            fts_query, (search_terms, *extra_params_list, limit)
+        )
+        count_result = await self._execute_sql(
+            count_query, (search_terms, *extra_params_list)
+        )
         total_count = count_result[0]["COUNT(DISTINCT n.id)"] if count_result else 0
 
         # Convert to Memory objects
@@ -544,10 +558,20 @@ class SQLiteMemoryDatabase:
         # Filter by tags if specified
         if query.tags:
             tag_conditions = []
+
             for tag in query.tags:
                 tag_conditions.append("json_extract(properties, '$.tags') LIKE ?")
                 params.append(f'%"{tag}"%')
-            where_clauses.append(f"({' OR '.join(tag_conditions)})")
+
+            join_op = " AND " if getattr(query, "match_mode", "any") == "all" else " OR "
+            where_clauses.append(f"({join_op.join(tag_conditions)})")
+
+        # Filter by min_importance if specified
+        if getattr(query, "min_importance", None) is not None:
+            where_clauses.append(
+                "CAST(json_extract(properties, '$.importance') AS REAL) >= ?"
+            )
+            params.append(query.min_importance)
 
         # Filter by memory type if specified
         if query.memory_types:
@@ -878,8 +902,8 @@ class SQLiteMemoryDatabase:
                         created_at=created_at,
                     )
                     relationships.append(relationship)
-                except (KeyError, ValueError, json.JSONDecodeError) as e:
-                    logger.warning(f"Failed to parse relationship row: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse relationship row {row.get('id', '?')}: {e}")
                     continue
 
             return relationships
