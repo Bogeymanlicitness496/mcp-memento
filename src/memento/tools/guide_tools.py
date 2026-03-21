@@ -68,7 +68,7 @@ def _generate_distinction_guide() -> str:
     """Generate guide focusing on the distinction between memento and session memory."""
     return """# MEMENTO vs SESSION MEMORY - CRITICAL DISTINCTION
 
-## MEMENTO (mcp-memento tools with '_persistent' suffix)
+## MEMENTO (mcp-memento tools)
 - Scope: Global - accessible from ANY project or session
 - Persistence: Long-term - survives across ALL sessions
 - Purpose: Store reusable knowledge, solutions, patterns
@@ -76,8 +76,9 @@ def _generate_distinction_guide() -> str:
   - store_memento - Store long-term solutions
   - get_memento - Retrieve cross-session knowledge
   - search_mementos - Search global patterns
+  - recall_mementos - Natural language search
 
-## SESSION MEMORY (Serena Context Server tools WITHOUT suffix)
+## SESSION MEMORY (Serena Context Server tools)
 - Scope: Project-specific - only accessible within current project
 - Persistence: Temporary - lasts only for current session
 - Purpose: Store ephemeral context, temporary variables
@@ -107,8 +108,9 @@ def _generate_distinction_guide() -> str:
    Use search_mementos instead
 
 ## KEY TAKEAWAY
-ALWAYS CHECK FOR '_persistent' SUFFIX when you need knowledge to survive across sessions.
-No suffix = session-only, temporary storage."""
+Memento tools are named store_memento, get_memento, search_mementos, etc.
+Session tools (Serena) are named store_memory, get_memory, search_memories, etc.
+The suffix '-o' (memento) vs no suffix (memory) is the quick differentiator."""
 
 
 def _generate_examples_guide() -> str:
@@ -151,10 +153,10 @@ PROBLEM: Pollutes memento storage with ephemeral data
 - Session: Store current method being refactored, temporary imports
 
 ## QUICK REFERENCE
-- Need it tomorrow? -> Use _persistent suffix
-- Only need it now? -> No suffix (session memory)
-- Sharing across projects? -> Use _persistent suffix
-- Project-specific only? -> No suffix (session memory)"""
+- Need it tomorrow? -> Use store_memento (long-term, cross-session)
+- Only need it now? -> Use store_memory / session context (temporary)
+- Sharing across projects? -> Use store_memento
+- Project-specific only? -> Use session memory"""
 
 
 def _generate_best_practices_guide() -> str:
@@ -162,9 +164,9 @@ def _generate_best_practices_guide() -> str:
     return """# BEST PRACTICES FOR MEMENTO USAGE
 
 ## 1. NAMING CONVENTION
-ALWAYS use '_persistent' suffix for long-term storage
-- store_memento - Correct for solutions
-- store_memory - Wrong for solutions (session-only)
+Use store_memento (not store_memory) for long-term knowledge
+- store_memento - Correct for solutions and persistent knowledge
+- store_memory (Serena) - Wrong for solutions (session-only, temporary)
 
 ## 2. TAGGING STRATEGY
 Always tag acronyms in mementos
@@ -190,7 +192,7 @@ Benefits:
 ## 5. MEMORY TYPE SELECTION
 Choose appropriate memory types
 - solution: For fixes and workarounds
-- pattern: For reusable code patterns
+- code_pattern: For reusable code patterns
 - technology: For framework/tool knowledge
 - error: For error patterns and solutions
 - general: For miscellaneous knowledge
@@ -206,7 +208,7 @@ Use these tools for database health:
 - analyze_memento_graph: Analyze relationship density
 
 ## 8. AVOID THESE COMMON MISTAKES
-1. Over-persisting: Don't use _persistent for temporary data
+1. Don't use store_memory (Serena) for long-term knowledge — use store_memento
 2. Under-tagging: Always tag acronyms and key terms
 3. Sparse relationships: Connect related memories
 4. Vague titles: Use descriptive, specific titles
@@ -214,8 +216,8 @@ Use these tools for database health:
 
 ## 9. INTEGRATION WITH SESSION MEMORY
 Use both systems together:
-1. Store current work in session memory
-2. Extract patterns and solutions to memento
+1. Store current work in session memory (Serena)
+2. Extract patterns and solutions to memento (store_memento)
 3. Reference memento knowledge during session work
 4. Clean up session memory at end of project
 

@@ -3,6 +3,16 @@
 Persistent memory for AI agents, integrated natively in [Zed](https://zed.dev/) via the
 Model Context Protocol (MCP).
 
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Configuration](#configuration)
+- [Manual configuration (without the extension)](#manual-configuration-without-the-extension)
+- [Troubleshooting](#troubleshooting)
+- [Links](#links)
+
 ---
 
 ## How it works

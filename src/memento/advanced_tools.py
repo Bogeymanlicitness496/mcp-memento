@@ -101,7 +101,17 @@ ADVANCED_RELATIONSHIP_TOOLS = [
     ),
     Tool(
         name="find_memento_patterns",
-        description="Find patterns in mementos and relationships",
+        description="""Find patterns in mementos and relationships
+
+Analyzes the relationship graph to detect recurring structural patterns:
+- Most frequent relationship types
+- Common memory-type pairs connected by relationships
+
+Note: patterns require multiple occurrences of the same relationship type.
+With small datasets (< 10 relationships), lower the thresholds:
+  min_pattern_size=1, min_support=0.0  → show all types, even singletons.
+When no patterns meet the thresholds the tool still reports all available
+relationship types with their counts so the result is always informative.""",
         inputSchema={
             "type": "object",
             "properties": {
@@ -144,56 +154,105 @@ class AdvancedRelationshipHandlers:
     async def handle_find_path_between_mementos(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Find shortest path between two mementos."""
+        """Find shortest path between two mementos using BFS."""
         try:
             from_id = arguments["from_memory_id"]
             to_id = arguments["to_memory_id"]
             max_depth = arguments.get("max_depth", 5)
             rel_types = arguments.get("relationship_types")
 
-            # Convert string types to enums if provided
             relationship_types = None
             if rel_types:
                 relationship_types = [RelationshipType(t) for t in rel_types]
 
-            # Get all memories and relationships
-            # (In production, this should be optimized to only fetch relevant subset)
-            all_memories = []
-            all_relationships = []
+            # BFS: predecessor map stores {node_id: (parent_id, relationship_type)}
+            visited = {from_id}
+            predecessor: dict = {from_id: None}
+            queue = [from_id]
+            found = False
 
-            # For now, we'll use the related memories query as an approximation
-            related = await self.memory_db.get_related_memories(
-                from_id, relationship_types=relationship_types, max_depth=max_depth
-            )
+            for _depth in range(max_depth):
+                if not queue:
+                    break
 
-            if not related:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text=f"No path found between {from_id} and {to_id}",
-                        )
-                    ]
-                )
+                next_queue = []
 
-            # Check if target is in related memories
-            found_target = any(m.id == to_id for m, _ in related)
+                for current_id in queue:
+                    neighbors = await self.memory_db.get_related_memories(
+                        current_id,
+                        relationship_types=relationship_types,
+                        max_depth=1,
+                    )
 
-            if found_target:
-                path_info = {
-                    "found": True,
-                    "from_memory_id": from_id,
-                    "to_memory_id": to_id,
-                    "hops": len([m for m, _ in related if m.id == to_id]),
-                    "related_memories": len(related),
-                }
-            else:
+                    for neighbor_memory, relationship in neighbors:
+                        nid = neighbor_memory.id
+
+                        if nid in visited:
+                            continue
+
+                        visited.add(nid)
+                        rel_label = relationship.type.value if relationship and hasattr(relationship, "type") else "RELATED_TO"
+                        predecessor[nid] = (current_id, rel_label, neighbor_memory.title)
+
+                        if nid == to_id:
+                            found = True
+                            break
+
+                        next_queue.append(nid)
+
+                    if found:
+                        break
+
+                if found:
+                    break
+
+                queue = next_queue
+
+            if not found:
                 path_info = {
                     "found": False,
                     "from_memory_id": from_id,
                     "to_memory_id": to_id,
                     "searched_depth": max_depth,
+                    "visited_count": len(visited),
                 }
+                return CallToolResult(
+                    content=[TextContent(type="text", text=json.dumps(path_info, indent=2))]
+                )
+
+            # Reconstruct path by walking back through predecessor map
+            path_nodes = []
+            current = to_id
+
+            while current is not None:
+                entry = predecessor[current]
+
+                if entry is None:
+                    path_nodes.append({"id": current, "via_relationship": None})
+                else:
+                    parent_id, rel_label, node_title = entry
+                    path_nodes.append(
+                        {"id": current, "title": node_title, "via_relationship": rel_label}
+                    )
+                    current = parent_id
+                    continue
+
+                break
+
+            path_nodes.reverse()
+
+            # Fetch start node title
+            start_memory = await self.memory_db.get_memory_by_id(from_id)
+            if path_nodes and path_nodes[0].get("id") == from_id:
+                path_nodes[0]["title"] = start_memory.title if start_memory else from_id
+
+            path_info = {
+                "found": True,
+                "from_memory_id": from_id,
+                "to_memory_id": to_id,
+                "hops": len(path_nodes) - 1,
+                "path": path_nodes,
+            }
 
             return CallToolResult(
                 content=[TextContent(type="text", text=json.dumps(path_info, indent=2))]
@@ -549,6 +608,18 @@ class AdvancedRelationshipHandlers:
                         }
                     )
 
+            # When nothing meets the thresholds, expose all available types
+            # so the caller always gets useful information.
+            all_rel_types = [
+                {
+                    "relationship_type": row["rel_type"],
+                    "count": row["count"],
+                    "frequency": round(row["count"] / max(total_relationships, 1), 3),
+                }
+                for row in rel_counts
+            ]
+            below_threshold = not rel_patterns and bool(all_rel_types)
+
             result = {
                 "total_memories": total_memories,
                 "total_relationships": total_relationships,
@@ -561,6 +632,14 @@ class AdvancedRelationshipHandlers:
                     "combinations that appear at least min_pattern_size times."
                 ),
             }
+
+            if below_threshold:
+                result["available_relationship_types"] = all_rel_types
+                result["threshold_note"] = (
+                    f"No patterns meet min_pattern_size={min_pattern_size} / "
+                    f"min_support={min_support}. "
+                    f"Use min_pattern_size=1, min_support=0.0 to see all types."
+                )
 
             return CallToolResult(
                 content=[TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -670,13 +749,58 @@ class AdvancedRelationshipHandlers:
     async def handle_get_memento_network(
         self, arguments: Dict[str, Any]
     ) -> CallToolResult:
-        """Get memento network structure."""
+        """Get the complete memento network: nodes, edges and system metadata."""
         try:
-            # Get database statistics
+            # Database statistics (same as get_memento_statistics)
             stats = await self.memory_db.get_memory_statistics()
 
-            # Enhance with relationship metadata
+            # Fetch all nodes (memories) — capped at 200
+            node_rows = await self.memory_db._execute_sql(
+                """
+                SELECT id,
+                       json_extract(properties, '$.title')      AS title,
+                       json_extract(properties, '$.type')       AS type,
+                       json_extract(properties, '$.importance') AS importance
+                FROM nodes
+                WHERE label = 'Memory'
+                LIMIT 200
+                """
+            )
+            nodes = [
+                {
+                    "id": r["id"],
+                    "title": r["title"],
+                    "type": r["type"],
+                    "importance": r["importance"],
+                }
+                for r in node_rows
+            ]
+
+            # Fetch all edges (relationships) — capped at 200
+            edge_rows = await self.memory_db._execute_sql(
+                """
+                SELECT id, from_id, to_id, rel_type, confidence
+                FROM relationships
+                LIMIT 200
+                """
+            )
+            edges = [
+                {
+                    "id": r["id"],
+                    "from": r["from_id"],
+                    "to": r["to_id"],
+                    "type": r["rel_type"],
+                    "confidence": r["confidence"],
+                }
+                for r in edge_rows
+            ]
+
             result = {
+                "nodes": nodes,
+                "edges": edges,
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+                "truncated": len(nodes) == 200 or len(edges) == 200,
                 "database_statistics": stats,
                 "relationship_system": {
                     "total_relationship_types": 35,
@@ -697,7 +821,7 @@ class AdvancedRelationshipHandlers:
             )
 
         except Exception as e:
-            logger.error(f"Error getting graph metrics: {e}")
+            logger.error(f"Error getting memento network: {e}")
             return CallToolResult(
                 content=[TextContent(type="text", text=f"Error: {str(e)}")],
                 isError=True,

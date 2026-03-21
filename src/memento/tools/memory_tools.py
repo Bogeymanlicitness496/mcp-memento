@@ -171,6 +171,27 @@ Tags: {", ".join(memory.tags) if memory.tags else "None"}
             )
             memory_text += "\n" + context_text
 
+    # Add relationships section if requested
+    if include_relationships:
+        related = await memory_db.get_related_memories(memory_id, max_depth=1)
+
+        if related:
+            memory_text += "\n\n**Relationships:**"
+
+            by_type: dict = {}
+            for rel_memory, relationship in related:
+                rel_type = relationship.type.value if relationship and hasattr(relationship, "type") else "RELATED_TO"
+                if rel_type not in by_type:
+                    by_type[rel_type] = []
+                by_type[rel_type].append(
+                    f"{rel_memory.title} (ID: {rel_memory.id})"
+                )
+
+            for rel_type, entries in sorted(by_type.items()):
+                memory_text += f"\n  {rel_type}:"
+                for entry in entries:
+                    memory_text += f"\n    - {entry}"
+
     return CallToolResult(content=[TextContent(type="text", text=memory_text)])
 
 

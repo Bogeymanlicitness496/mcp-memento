@@ -240,6 +240,63 @@ python scripts/deploy.py bump 0.3.0 --dev --yes
 # Then reload the extension in Zed via "Install Dev Extension"
 ```
 
+### Dev: test Python changes without publishing to PyPI
+
+#### Fast path — `rebuild` (recommended)
+
+The `rebuild` command combines all three steps (build stub + build wheel + invalidate
+Zed venv) into a single command with no git interaction:
+
+```bash
+python scripts/deploy.py rebuild
+```
+
+After it completes, **restart the MCP server** (not the full extension):
+
+```
+Ctrl+Shift+P → "agent: restart mcp server"
+```
+
+> **Note**: a full extension reload (`zed: extensions` → uninstall/reinstall) is **not**
+> required. Restarting the MCP server is enough and takes effect immediately.
+
+#### Manual path — `build` + `dev-install`
+
+For finer control (e.g. only rebuilding the wheel without touching the stub):
+
+```bash
+# 1. Build the local wheel
+python scripts/deploy.py build
+
+# 2. Invalidate the Zed venv and print the settings snippet
+python scripts/deploy.py dev-install
+#    → prints: "MEMENTO_LOCAL_WHEEL": "L:/Work/.../dist/mcp_memento-X.Y.Z-py3-none-any.whl"
+
+# 3. Paste the printed line into Zed settings
+#    (Ctrl+Shift+P → "zed: open settings", inside the memento block)
+
+# 4. Restart the MCP server: Ctrl+Shift+P → "agent: restart mcp server"
+```
+
+The stub installs from the local `.whl` instead of PyPI.
+The venv is rebuilt automatically whenever the wheel path or its content hash changes
+(the sentinel file stores the full `path|hash` fingerprint, not just the version string).
+To revert to PyPI, remove `MEMENTO_LOCAL_WHEEL` from your settings.
+
+#### How the sentinel works (Windows path parsing)
+
+The sentinel file `local_wheel.txt` stores the wheel path and its SHA-256 hash
+separated by `|`:
+
+```
+L:/Work/mcp-memento/dist/mcp_memento-0.2.28-py3-none-any.whl|<sha256>
+```
+
+The `|` separator was chosen because it is illegal in both Windows and Unix file
+paths, preventing collisions with Windows drive letters (a `:` separator would cause
+`splitn(2, ':')` in Rust to parse `L:` as the filename and discard the rest of the
+path, crashing pip install).
+
 ### Build wheel only (no git operations)
 
 ```bash

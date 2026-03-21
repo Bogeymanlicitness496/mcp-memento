@@ -481,12 +481,21 @@ class SQLiteMemoryDatabase:
         """Search using SQLite FTS5 full-text search."""
         search_terms = self._prepare_fts_query(query.query)
 
+        # Build optional extra WHERE clauses
+        extra_where = ""
+        extra_params_list = []
+
+        if getattr(query, "min_importance", None) is not None:
+            extra_where = "  AND CAST(json_extract(n.properties, '$.importance') AS REAL) >= ?"
+            extra_params_list = [query.min_importance]
+
         fts_query = f"""
-            SELECT n.id, n.properties
+            SELECT DISTINCT n.id, n.properties
             FROM nodes n
             JOIN nodes_fts fts ON n.id = fts.id
             WHERE n.label = 'Memory'
               AND fts.nodes_fts MATCH ?
+              {extra_where}
             ORDER BY
                 (json_extract(n.properties, '$.confidence') * json_extract(n.properties, '$.importance')) DESC,
                 rank
@@ -495,19 +504,24 @@ class SQLiteMemoryDatabase:
 
         # Get total count
         count_query = f"""
-            SELECT COUNT(*)
+            SELECT COUNT(DISTINCT n.id)
             FROM nodes n
             JOIN nodes_fts fts ON n.id = fts.id
             WHERE n.label = 'Memory'
               AND fts.nodes_fts MATCH ?
+              {extra_where}
         """
 
         limit = query.limit or 100
 
         # Execute queries
-        results = await self._execute_sql(fts_query, (search_terms, limit))
-        count_result = await self._execute_sql(count_query, (search_terms,))
-        total_count = count_result[0]["COUNT(*)"] if count_result else 0
+        results = await self._execute_sql(
+            fts_query, (search_terms, *extra_params_list, limit)
+        )
+        count_result = await self._execute_sql(
+            count_query, (search_terms, *extra_params_list)
+        )
+        total_count = count_result[0]["COUNT(DISTINCT n.id)"] if count_result else 0
 
         # Convert to Memory objects
         memories = []
@@ -544,10 +558,20 @@ class SQLiteMemoryDatabase:
         # Filter by tags if specified
         if query.tags:
             tag_conditions = []
+
             for tag in query.tags:
                 tag_conditions.append("json_extract(properties, '$.tags') LIKE ?")
                 params.append(f'%"{tag}"%')
-            where_clauses.append(f"({' OR '.join(tag_conditions)})")
+
+            join_op = " AND " if getattr(query, "match_mode", "any") == "all" else " OR "
+            where_clauses.append(f"({join_op.join(tag_conditions)})")
+
+        # Filter by min_importance if specified
+        if getattr(query, "min_importance", None) is not None:
+            where_clauses.append(
+                "CAST(json_extract(properties, '$.importance') AS REAL) >= ?"
+            )
+            params.append(query.min_importance)
 
         # Filter by memory type if specified
         if query.memory_types:
@@ -878,8 +902,8 @@ class SQLiteMemoryDatabase:
                         created_at=created_at,
                     )
                     relationships.append(relationship)
-                except (KeyError, ValueError, json.JSONDecodeError) as e:
-                    logger.warning(f"Failed to parse relationship row: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse relationship row {row.get('id', '?')}: {e}")
                     continue
 
             return relationships
@@ -1121,15 +1145,21 @@ class SQLiteMemoryDatabase:
         limit: int = 20,
     ) -> List[Relationship]:
         """
-        Search relationships by their structured context fields.
+        Search relationships by their context fields.
+
+        Matches against the serialized ``context`` string stored in each
+        relationship's ``properties`` JSON blob.  Both the structured JSON
+        produced by ``extract_context_structure`` *and* plain free-text
+        context strings are searched, so the tool works regardless of how
+        the relationship was created.
 
         Args:
-            scope: Filter by scope (partial/full/conditional)
-            conditions: Filter by conditions
-            has_evidence: Filter by presence/absence of evidence
-            evidence: Filter by specific evidence types
-            components: Filter by components mentioned
-            temporal: Filter by temporal information
+            scope: Filter by scope keyword (partial/full/conditional)
+            conditions: List of condition keywords — any must appear in context
+            has_evidence: True → context must mention evidence; False → must not
+            evidence: List of evidence keywords — any must appear in context
+            components: List of component keywords — any must appear in context
+            temporal: Temporal keyword that must appear in context
             limit: Maximum number of results
 
         Returns:
@@ -1139,65 +1169,64 @@ class SQLiteMemoryDatabase:
             BackendError: If database operation fails
         """
         try:
-            # Base query
-            query = """
-                SELECT id, from_id, to_id, rel_type, properties,
-                       created_at,
-                       confidence, last_accessed, access_count, decay_factor
-                FROM relationships
-                WHERE properties IS NOT NULL AND properties != ''
-            """
-            params = []
+            where_clauses = ["properties IS NOT NULL AND properties != ''"]
+            params: list = []
 
-            # Build WHERE clauses based on filters
-            where_clauses = []
+            # Helper: match a keyword anywhere in the serialised properties blob
+            # (covers both structured JSON and free-text context strings).
+            def _like(keyword: str) -> str:
+                return f"%{keyword}%"
 
             if scope:
+                # Match the scope keyword either as a JSON value or plain text
                 where_clauses.append("properties LIKE ?")
-                params.append(f'%"scope"%:"{scope}"%')
+                params.append(_like(scope))
 
             if conditions:
-                for condition in conditions:
+                for cond in conditions:
                     where_clauses.append("properties LIKE ?")
-                    params.append(f'%"conditions"%:"{condition}"%')
+                    params.append(_like(cond))
 
             if evidence:
                 for ev in evidence:
                     where_clauses.append("properties LIKE ?")
-                    params.append(f'%"evidence"%:"{ev}"%')
+                    params.append(_like(ev))
 
             if components:
-                for component in components:
+                for comp in components:
                     where_clauses.append("properties LIKE ?")
-                    params.append(f'%"components"%:"{component}"%')
+                    params.append(_like(comp))
 
             if temporal:
                 where_clauses.append("properties LIKE ?")
-                params.append(f'%"temporal"%:"{temporal}"%')
+                params.append(_like(temporal))
 
             if has_evidence is not None:
                 if has_evidence:
+                    # context must contain at least one evidence-related word
                     where_clauses.append(
-                        "(properties LIKE '%\"evidence\"%' OR properties LIKE '%\"evidence_count\"%')"
+                        "(properties LIKE '%evidence%' OR properties LIKE '%test%' OR properties LIKE '%verified%')"
                     )
                 else:
                     where_clauses.append(
-                        "(properties NOT LIKE '%\"evidence\"%' AND properties NOT LIKE '%\"evidence_count\"%')"
+                        "(properties NOT LIKE '%evidence%' AND properties NOT LIKE '%test%' AND properties NOT LIKE '%verified%')"
                     )
 
-            # Add WHERE clauses if any
-            if where_clauses:
-                query += " AND " + " AND ".join(where_clauses)
-
-            # Add limit
-            query += " LIMIT ?"
+            where_sql = " AND ".join(where_clauses)
+            query = f"""
+                SELECT id, from_id, to_id, rel_type, properties,
+                       created_at,
+                       confidence, last_accessed, access_count, decay_factor
+                FROM relationships
+                WHERE {where_sql}
+                LIMIT ?
+            """
             params.append(limit)
 
-            # Execute query
             results = await self._execute_sql(query, tuple(params))
 
-            # Parse results into Relationship objects
             relationships = []
+
             for row in results:
                 try:
                     properties = json.loads(row["properties"])
@@ -1206,6 +1235,7 @@ class SQLiteMemoryDatabase:
                     def parse_date(date_str):
                         if not date_str:
                             return None
+
                         try:
                             return datetime.fromisoformat(date_str)
                         except (ValueError, TypeError):
@@ -1215,7 +1245,6 @@ class SQLiteMemoryDatabase:
                         timezone.utc
                     )
 
-                    # Parse confidence system fields
                     confidence = (
                         float(row["confidence"])
                         if row["confidence"] is not None
@@ -1225,9 +1254,7 @@ class SQLiteMemoryDatabase:
                         timezone.utc
                     )
                     access_count = (
-                        int(row["access_count"])
-                        if row["access_count"] is not None
-                        else 0
+                        int(row["access_count"]) if row["access_count"] is not None else 0
                     )
                     decay_factor = (
                         float(row["decay_factor"])
@@ -1235,7 +1262,6 @@ class SQLiteMemoryDatabase:
                         else 0.95
                     )
 
-                    # Update properties with confidence system fields
                     properties.update(
                         {
                             "confidence": confidence,
@@ -1254,18 +1280,14 @@ class SQLiteMemoryDatabase:
                         created_at=created_at,
                     )
                     relationships.append(relationship)
-                except (KeyError, ValueError, json.JSONDecodeError) as e:
-                    logger.warning(f"Failed to parse relationship row: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse relationship row {row.get('id', '?')}: {e}")
                     continue
 
             return relationships
 
         except Exception as e:
             raise BackendError(f"Failed to search relationships by context: {str(e)}")
-        except aiosqlite.Error as e:
-            raise BackendError(f"Failed to get relationship history: {e}")
-        except Exception as e:
-            raise BackendError(f"Failed to get relationship history: {str(e)}")
 
     async def get_recent_activity(
         self, days: int = 7, project: Optional[str] = None

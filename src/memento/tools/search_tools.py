@@ -191,16 +191,16 @@ async def handle_recall_mementos(
 
     # Add helpful tip at the end
     results_text += "\n💡 **Next steps:**\n"
-    results_text += '- Use `get_memory(memory_id="...")` to see full details\n'
+    results_text += '- Use `get_memento(memory_id="...")` to see full details\n'
     results_text += (
-        '- Use `get_related_memories(memory_id="...")` to explore connections\n'
+        '- Use `get_related_mementos(memory_id="...")` to explore connections\n'
     )
 
     # Add confidence system tips
     results_text += "\n🔍 **Confidence System:**\n"
     results_text += "- Memories are sorted by (confidence × importance)\n"
     results_text += "- Low confidence (<0.3) may indicate obsolete knowledge\n"
-    results_text += "- Use `boost_confidence` when you verify a memory is still valid\n"
+    results_text += "- Use `boost_memento_confidence` when you verify a memory is still valid\n"
     results_text += "- Critical info (security, API keys) has no automatic decay\n"
 
     return CallToolResult(content=[TextContent(type="text", text=results_text)])
@@ -325,6 +325,6 @@ async def handle_contextual_memento_search(
 
         results_text += "\n"
 
-    results_text += f'\n💡 Use `get_memory(memory_id="...")` to see full details\n'
+    results_text += f'\n💡 Use `get_memento(memory_id="...")` to see full details\n'
 
     return CallToolResult(content=[TextContent(type="text", text=results_text)])

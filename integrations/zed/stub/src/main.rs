@@ -48,7 +48,7 @@ use std::os::unix::process::CommandExt;
 // Version — must match STUB_EXT_RELEASE in lib.rs
 // ---------------------------------------------------------------------------
 
-const STUB_VERSION: &str = "v0.2.25";
+const STUB_VERSION: &str = "v0.2.29";
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -182,8 +182,53 @@ fn marker_path(venv: &Path) -> PathBuf {
     venv.join("memento_version.txt")
 }
 
+/// Dev-mode sentinel data read from `local_wheel.txt`.
+/// Written by `scripts/deploy.py rebuild` as "<path>:<sha256[:12]>".
+/// The full raw string (path+hash) is used as the venv marker fingerprint,
+/// so any rebuild that changes the wheel content invalidates the venv.
+struct LocalWheel {
+    /// Absolute path to the .whl file — passed to pip install.
+    path: String,
+    /// Raw sentinel string (path:hash or just path) — used as marker key.
+    fingerprint: String,
+}
+
+fn local_wheel_path(venv: &Path) -> Option<LocalWheel> {
+    let sentinel = venv.parent().unwrap_or(venv).join("local_wheel.txt");
+    match fs::read_to_string(&sentinel) {
+        Ok(s) => {
+            let trimmed = s.trim().to_string();
+            if trimmed.is_empty() {
+                return None;
+            }
+            // Format: "<path>|<hash>"  (pipe separator — safe on all platforms).
+            // Legacy format "<path>" (no separator) is also accepted.
+            // NOTE: we do NOT split on ':' because Windows drive letters
+            // (e.g. "C:/foo") contain a colon and would be mis-parsed.
+            let path = if let Some((p, _)) = trimmed.split_once('|') {
+                p.to_string()
+            } else {
+                trimmed.clone()
+            };
+            Some(LocalWheel {
+                path,
+                fingerprint: trimmed,
+            })
+        }
+        Err(_) => None,
+    }
+}
+
 fn lock_path(venv: &Path) -> PathBuf {
     venv.parent().unwrap_or(venv).join("memento_setup.lock")
+}
+
+fn expected_marker() -> String {
+    let venv = venv_dir();
+    match local_wheel_path(&venv) {
+        Some(w) => format!("{}+local:{}", STUB_VERSION, w.fingerprint),
+        None => STUB_VERSION.to_string(),
+    }
 }
 
 fn venv_is_valid(venv: &Path) -> bool {
@@ -191,13 +236,14 @@ fn venv_is_valid(venv: &Path) -> bool {
         return false;
     }
 
+    let expected = expected_marker();
     match fs::read_to_string(marker_path(venv)) {
-        Ok(c) if c.trim() == STUB_VERSION => true,
+        Ok(c) if c.trim() == expected => true,
         Ok(c) => {
             log!(
                 "Venv version mismatch: marker='{}' expected='{}'.",
                 c.trim(),
-                STUB_VERSION
+                expected
             );
             false
         }
@@ -292,13 +338,57 @@ fn setup_venv(system_python: &Path, venv: &Path) -> Result<(), String> {
 
     install_memento(&venv_python(venv))?;
 
-    fs::write(marker_path(venv), STUB_VERSION).map_err(|e| format!("write marker: {e}"))?;
+    let marker = expected_marker();
+    fs::write(marker_path(venv), &marker).map_err(|e| format!("write marker: {e}"))?;
 
-    log!("Venv ready. Marker written: {}", STUB_VERSION);
+    log!("Venv ready. Marker written: {}", marker);
     Ok(())
 }
 
 fn install_memento(python: &Path) -> Result<(), String> {
+    // Dev-mode: if a local wheel sentinel file exists, install from it directly.
+    let venv = venv_dir();
+    if let Some(wheel) = local_wheel_path(&venv) {
+        log!("local_wheel.txt found — installing from local wheel: {} (fingerprint: {})", wheel.path, wheel.fingerprint);
+
+        // Step 1: install dependencies from PyPI (use the published package
+        //         just to pull its deps; the code itself is overwritten in step 2).
+        let s_deps = Command::new(python)
+            .args([
+                "-m", "pip", "install", "--upgrade", "--timeout", "120",
+                "mcp-memento",
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|e| format!("pip (deps from PyPI): {e}"))?;
+
+        if !s_deps.success() {
+            log!("Warning: could not pre-install deps from PyPI ({s_deps}). Continuing anyway.");
+        }
+
+        // Step 2: overwrite with the local wheel (--no-deps: deps already present).
+        let s = Command::new(python)
+            .args([
+                "-m", "pip", "install",
+                "--force-reinstall", "--no-deps",
+                &wheel.path,
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|e| format!("pip (local wheel): {e}"))?;
+
+        if s.success() {
+            log!("mcp-memento installed from local wheel.");
+            return Ok(());
+        }
+
+        return Err(format!(
+            "pip install from local wheel failed ({s}). Check local_wheel.txt path: {}", wheel.path
+        ));
+    }
+
     log!("pip install --upgrade mcp-memento (standard)");
 
     let s = Command::new(python)
@@ -358,7 +448,7 @@ fn exec_python(venv_py: &Path) -> ! {
     cmd.args(["-u", "-m", "memento"])
         .env("PYTHONUNBUFFERED", "1");
 
-    for var in &["MEMENTO_DB_PATH", "MEMENTO_PROFILE", "PYTHON_COMMAND"] {
+    for var in &["MEMENTO_DB_PATH", "MEMENTO_PROFILE", "PYTHON_COMMAND", "MEMENTO_LOCAL_WHEEL"] {
         if let Ok(val) = env::var(var) {
             cmd.env(var, val);
         }

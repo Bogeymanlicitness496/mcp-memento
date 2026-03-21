@@ -17,12 +17,12 @@ use zed_extension_api::{
 // ---------------------------------------------------------------------------
 
 /// GitHub release tag for the current stub binaries (matches Python version tag).
-const STUB_EXT_RELEASE: &str = "v0.2.25";
+const STUB_EXT_RELEASE: &str = "v0.2.29";
 
 /// Distribution channel: "prod" downloads from the vX.Y.Z GitHub Release;
 /// "dev" downloads from the rolling pre-release tag "dev-latest".
 /// Set automatically by scripts/deploy.py during a version bump.
-const STUB_CHANNEL: &str = "prod";
+const STUB_CHANNEL: &str = "dev";
 
 /// GitHub repository (owner/name) hosting the releases.
 const REPO: &str = "annibale-x/mcp-memento";
@@ -368,7 +368,8 @@ impl zed::Extension for MementoExtension {
                     "type": "string",
                     "description": "Python executable. Use 'default' for automatic discovery, or set an absolute path (e.g. C:/Users/you/AppData/Local/Programs/Python/Python312/python.exe).",
                     "default": "default"
-                }
+                },
+
             }
         });
 
@@ -382,11 +383,11 @@ impl zed::Extension for MementoExtension {
 
         let installation_instructions = format!(
             r#"
-> **First install / update note:** On the very first install (and sometimes after an
-> update), Memento may initially report only **1 tool available** — this is expected.
-> The launcher is downloading and installing the Python package in the background.
-> Once installation completes (usually a few seconds), Zed will automatically refresh
-> and expose all tools for the selected profile.
+**First install / update:** On the very first install (and sometimes after an
+update), Memento may initially report only **1 tool available** — this is expected.
+The launcher is downloading and installing the Python package in the background.
+Once installation completes (usually a few seconds), Zed will automatically refresh
+and expose all tools for the selected profile.
 
 ---
 
@@ -412,6 +413,7 @@ __**Configuration parameters:**__
   - **default** : tries **py**, **python3**, **python** and common install paths.
 
   (_Set an absolute path if your Python is not on the system **PATH**._)
+
 	        "#,
             db_path_default_hint
         );

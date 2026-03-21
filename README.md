@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.25-purple.svg)](https://github.com/annibale-x/mcp-memento/releases/tag/v0.2.25)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.29-purple.svg)](https://github.com/annibale-x/mcp-memento/releases/tag/v0.2.29)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
@@ -18,13 +18,19 @@ Build a personal or team knowledge base that grows smarter over time, accessible
 ## Table of Contents
 
 - [🌱 A Gentle Introduction](#a-gentle-introduction)
+- [✨ Key Features](#key-features)
 - [🚀 Quick Start](#quick-start)
 - [⚙️ Configuration](#configuration)
-- [💬 Natural Language Interaction](#basic-usage-examples)
-- [🔗 Integrations](#integrations)
 - [📖 Core Concepts](#core-concepts)
+- [🔗 Integrations](#integrations)
+- [🛠️ Basic Usage Examples](#basic-usage-examples)
+- [📚 Documentation Structure](#documentation-structure)
+- [🏗️ Architecture Overview](#architecture-overview)
 - [📜 Background](#background)
 - [🙏 Acknowledgments](#acknowledgments)
+- [🤝 Contributing](#contributing)
+- [📄 License](#license)
+- [🔗 Links](#links)
 
 <a name="a-gentle-introduction"></a>
 ## 🌱 A Gentle Introduction

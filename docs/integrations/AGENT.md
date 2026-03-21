@@ -284,8 +284,8 @@ async def main():
                 "recall_mementos",
                 arguments={"query": "API timeout", "limit": 5},
             )
-            for m in json.loads(result.content[0].text):
-                print(f"- {m['title']}: {m.get('content', '')[:80]}")
+            # Note: recall_mementos returns formatted text, not JSON
+            print(result.content[0].text)
 
 
 if __name__ == "__main__":

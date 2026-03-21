@@ -2,9 +2,7 @@
 
 This directory contains the unified release and deployment tooling for MCP Memento.
 
-## 📦 deploy.py — Primary Release Script
-
-Single entry point for all release and deployment operations.
+## deploy.py — Primary Release Script
 
 ```bash
 python scripts/deploy.py <command> [options]
@@ -12,89 +10,188 @@ python scripts/deploy.py <command> [options]
 
 ---
 
-## Commands
+## Development Workflow
 
-### `bump X.Y.Z`
-Full release cycle: run tests, bump versions across all manifests, update
-`CHANGELOG.md` and `README.md` badges, build wheel, commit, tag, push,
-merge `dev → main`, and upload stub binaries to the GitHub release.
+```
+rebuild  →  fix / test  →  rebuild  →  ...  →  bump [X.Y.Z]  →  promote  →  publish
+```
 
-With `--dev`, the merge and GitHub Release upload are skipped, and the stub
-binary for the **current platform** is automatically rebuilt and bundled into
-`stub/bin/` so that "Install Dev Extension" in Zed always uses an up-to-date binary.
+### Inner loop (fast, no git)
 
 ```bash
-# Preview without side effects
-python scripts/deploy.py bump 0.3.0 --dry-run
+python scripts/deploy.py rebuild
+```
 
-# Full release (merges dev → main)
-python scripts/deploy.py bump 0.3.0 --yes
+Rebuilds everything needed to test the current code in Zed — no git interaction:
 
-# Dev-only release (no merge into main, rebuilds stub for current platform)
-python scripts/deploy.py bump 0.3.0 --dev --yes
+1. Compiles the Rust stub binary for the current platform and copies it into the Zed extension work dir
+2. Builds the Python wheel (`dist/mcp_memento-*.whl`)
+3. Deletes the Zed venv marker so the stub reinstalls from the local wheel on next startup
+4. Prints next steps (Zed reload command + pip install command for local testing)
+
+After `rebuild`, reload the extension in Zed:
+
+```
+Ctrl+Shift+P → "zed: extensions" → Reload mcp-memento
+```
+
+### Dev snapshot (commit + local tag)
+
+```bash
+# Auto-increment patch version (X.Y.Z → X.Y.Z+1)
+python scripts/deploy.py bump
+
+# Explicit version
+python scripts/deploy.py bump 0.3.0
+```
+
+Freezes the current state as a numbered dev version:
+
+1. Bumps version in all manifests
+2. Scaffolds a `CHANGELOG.md` placeholder entry
+3. Builds the wheel
+4. Commits to `dev` and pushes
+5. Creates a local-only tag `vX.Y.Z` (CI is **not** triggered)
+6. Builds stub + uploads to the rolling `dev-latest` pre-release on GitHub
+7. Installs the wheel into the Zed extension venv (same as `rebuild` step 3–4)
+
+Use `bump` when you want a named checkpoint before moving on.
+
+### Promote to official release
+
+```bash
+python scripts/deploy.py promote
+```
+
+Promotes the current `pyproject.toml` version to an official release (interactive):
+
+1. Verifies `CHANGELOG.md` has a filled-in entry for the current version
+2. Runs the test suite
+3. Pushes tag `vX.Y.Z` to origin (triggers CI stub cross-compile for all 5 platforms)
+4. Merges `dev → main`
+5. Uploads local stub binaries to the GitHub Release
+
+> **Before running promote**, write the release notes manually in `CHANGELOG.md`:
+> ```
+> * YYYY-MM-DD: vX.Y.Z - <title> (Hannibal)
+>   * change one
+>   * change two
+> ```
+> `promote` will abort if the entry is missing or still contains placeholder text.
+
+### Publish to PyPI
+
+```bash
+python scripts/deploy.py publish
+
+# TestPyPI first (recommended)
+python scripts/deploy.py publish -t
+python scripts/deploy.py publish
+```
+
+Uploads `dist/*` to PyPI. If the release tag was not yet on the remote,
+it is pushed first (triggering CI).
+
+---
+
+## All Commands
+
+### `rebuild`
+
+Fast dev rebuild: stub + wheel + Zed venv. **No git interaction.**
+
+```bash
+python scripts/deploy.py rebuild
+python scripts/deploy.py rebuild --dry-run
+```
+
+### `bump [X.Y.Z]`
+
+Dev snapshot: bump versions, commit, local tag, build stub + upload to
+`dev-latest`, build wheel, install into Zed venv.
+
+```bash
+python scripts/deploy.py bump              # auto-increment patch (Z+1)
+python scripts/deploy.py bump 0.3.0        # explicit version
+python scripts/deploy.py bump --skip-tests
+python scripts/deploy.py bump --dry-run
+```
+
+### `promote`
+
+Promote to official release: verify CHANGELOG, run tests, push tag,
+merge dev→main, upload stubs. Always interactive.
+
+```bash
+python scripts/deploy.py promote
+python scripts/deploy.py promote --skip-tests
+python scripts/deploy.py promote --dry-run
+```
+
+### `publish`
+
+Upload `dist/*` to PyPI or TestPyPI.
+
+```bash
+python scripts/deploy.py publish
+python scripts/deploy.py publish -t        # TestPyPI
+python scripts/deploy.py publish --dry-run
 ```
 
 ### `build`
-Build wheel only, no version bump or git operations.
 
-Temporarily patches `README.md` for PyPI compatibility before building:
-- Converts relative markdown links to absolute GitHub URLs.
-- Injects a compact "📋 Recent Changes" table (last 4 releases from `CHANGELOG.md`)
-  before the License section.
-
-The original `README.md` is restored immediately after the build.
+Build sdist + wheel only. No version bump, no git operations.
 
 ```bash
 python scripts/deploy.py build
 ```
 
-### `publish`
-Upload `dist/*` to TestPyPI or PyPI using `twine`.
-
-If the current branch is `dev` and `main` is behind, **automatically merges
-`dev → main`** before uploading — so the published release is always reflected
-on the main branch.
-
-```bash
-python scripts/deploy.py publish --target testpypi
-python scripts/deploy.py publish --target pypi
-```
-
 ### `build-zed-stub`
-Build the Rust stub binary for the **current platform** using `cargo build --release`,
-copy it into `integrations/zed/stub/bin/`, and commit.
 
-Use this during active Zed extension development when you modify `stub/src/main.rs`
-and want the bundled binary updated without doing a full `bump`.
+Build the Rust stub binary for the current platform, copy it into
+`integrations/zed/stub/bin/` and into the Zed work dir, then commit and push.
+
+Use this when you modify `stub/src/main.rs` without doing a full `bump`.
 
 ```bash
 python scripts/deploy.py build-zed-stub
-python scripts/deploy.py build-zed-stub --dry-run   # preview only
 ```
 
-> **Note**: this only updates the binary for your current OS/arch.
-> The other 4 platform binaries are produced by CI on a full release.
+### `ext-binaries [--version X.Y.Z]`
 
----
-
-### `ext-binaries`
-Download the CI-built stub binaries from the GitHub release `vX.Y.Z` and
-commit them into `integrations/zed/stub/bin/`.
-
-**When to use**: after `bump` has pushed the tag and the GitHub Actions CI
-workflow (`.github/workflows/zed-stub-release.yml`) has finished building all
-5 platform binaries. The CI produces fresh cross-compiled binaries (e.g. Linux
-ARM64 via `cross`, macOS Intel cross-compiled on Apple Silicon) that may differ
-from whatever was previously bundled in the repository.
+Download CI-built stub binaries from the GitHub Release `vX.Y.Z` and commit
+them into `integrations/zed/stub/bin/`. Run after CI finishes following a
+`promote`.
 
 ```bash
-# Wait for CI to finish, then:
 python scripts/deploy.py ext-binaries
-python scripts/deploy.py ext-binaries --version 0.3.0   # explicit version
+python scripts/deploy.py ext-binaries --version 0.3.0
+```
+
+### `upload-stubs [--version X.Y.Z]`
+
+Create the GitHub Release (if missing) and upload local stub binaries from
+`stub/bin/`. Manual fallback if the CI upload step failed during `promote`.
+
+```bash
+python scripts/deploy.py upload-stubs
+```
+
+### `dev-install`
+
+Invalidate the Zed venv marker so the stub reinstalls from
+`MEMENTO_LOCAL_WHEEL` on next Zed startup. Prints the Zed settings snippet
+and the pip install command.
+
+Called automatically by `rebuild` — only run manually if needed.
+
+```bash
+python scripts/deploy.py dev-install
 ```
 
 ### `status`
-Print the current version string from every manifest file.
+
+Print the current version from every manifest file.
 
 ```bash
 python scripts/deploy.py status
@@ -102,112 +199,83 @@ python scripts/deploy.py status
 
 ---
 
-## Options
+## Options Reference
 
-| Option | Applies to | Description |
-|---|---|---|
-| `--dry-run` | all | Preview all actions without executing |
-| `--skip-tests` | `bump` | Skip pytest before release |
-| `--dev` | `bump` | Do not merge `dev → main`; rebuild stub for current platform |
-| `--yes` / `-y` | `bump`, `ext-binaries` | Auto-confirm all prompts |
-| `--version X.Y.Z` | `ext-binaries` | Override Python version |
-
----
-
-## Typical Release Flow
-
-```bash
-# 1. Dry run — verify everything looks correct
-python scripts/deploy.py bump 0.3.0 --dry-run
-
-# 2. Full release (bumps, builds, tags, pushes, uploads stub binaries, merges to main)
-python scripts/deploy.py bump 0.3.0 --yes
-
-# 3. Publish to PyPI (merge already done by bump)
-python scripts/deploy.py publish --target pypi
-
-# --- Optional: refresh stub binaries from CI ---
-# Monitor CI (cross-compiles stub for all 5 platforms)
-gh run list --repo annibale-x/mcp-memento --limit 5
-
-# Pull fresh CI-built binaries into repo and commit
-python scripts/deploy.py ext-binaries
-```
-
-### Dev-only release (publish to PyPI later)
-
-```bash
-# 1. Release to GitHub only, stay on dev (also rebuilds stub for current platform)
-python scripts/deploy.py bump 0.3.0 --dev --yes
-
-# 2. When ready to publish — publish automatically merges dev → main first
-python scripts/deploy.py publish --target pypi
-```
-
-### Zed extension development loop
-
-```bash
-# After modifying stub/src/main.rs only (no version bump needed):
-python scripts/deploy.py build-zed-stub
-
-# After any change (Python server, lib.rs, stub) — full dev cycle:
-python scripts/deploy.py bump 0.3.0 --dev --yes
-# Then reload the extension in Zed via "Install Dev Extension"
-```
+| Option            | Applies to                        | Description                           |
+|-------------------|-----------------------------------|---------------------------------------|
+| `--dry-run`       | all                               | Preview all actions without executing |
+| `--skip-tests`    | `bump`, `promote`                 | Skip pytest                           |
+| `--version X.Y.Z` | `ext-binaries`, `upload-stubs`   | Override version                      |
+| `--test` / `-t`   | `publish`                         | Upload to TestPyPI instead of PyPI    |
+| `--yes` / `-y`    | `ext-binaries`                    | Auto-confirm prompts                  |
 
 ---
 
-## Files Modified by `bump`
+## What `bump` Modifies
 
-| File | What changes |
-|---|---|
+| File | Change |
+|------|--------|
 | `pyproject.toml` | `version` field |
 | `src/memento/__init__.py` | `__version__` |
 | `integrations/zed/Cargo.toml` | `[package] version` |
 | `integrations/zed/extension.toml` | `version` |
 | `integrations/zed/src/lib.rs` | `STUB_EXT_RELEASE` constant |
 | `README.md` | Version badge |
-| `CHANGELOG.md` | New entry prepended |
+| `CHANGELOG.md` | Placeholder entry scaffolded (if not present) |
 
 ---
 
-## Zed Extension Stub Binaries
+## Zed Extension: How the Stub and Wheel Are Resolved
 
-The stub binaries in `integrations/zed/stub/bin/` are pre-compiled native
-launchers for each platform. They are:
+### Stub binary (`memento-stub`)
 
-1. Bundled in the repository for zero-download installs (dev extensions).
-2. Uploaded as assets to the GitHub release `vX.Y.Z` by `deploy.py bump`.
-3. Re-built by GitHub Actions CI (`.github/workflows/zed-stub-release.yml`)
-   on every push of a `vX.Y.Z` tag, for all 5 targets:
+The Zed WASM extension resolves the stub binary with a bundle-first strategy:
 
-| Platform | Asset |
-|---|---|
+1. `stub/bin/<asset>` relative to the Zed extension work dir (placed by `rebuild` or `bump`)
+2. A previously downloaded binary cached in the work dir
+3. Download from the GitHub Release (`dev-latest` on dev channel, `vX.Y.Z` on prod)
+
+`rebuild` always copies the freshly built binary to the work dir, so reinstalling
+the extension always picks up the latest local build via path 1.
+
+### Python package (`mcp-memento`)
+
+The stub creates a `venv/` in the work dir and installs the package:
+
+- If `<work_dir>/local_wheel.txt` exists → installs from the `.whl` path it contains
+- Otherwise → `pip install --upgrade mcp-memento` from PyPI
+
+`rebuild` writes `local_wheel.txt` automatically. The file is never present in
+production installs (marketplace or PyPI users are unaffected).
+
+The venv is rebuilt whenever the marker file (`venv/memento_version.txt`) is
+missing or stale. `rebuild` deletes this marker on every run, forcing a reinstall
+from the local wheel on next Zed startup. No Zed settings changes required.
+
+---
+
+## Stub Platforms (CI cross-compile)
+
+| Platform | Asset filename |
+|----------|---------------|
 | Windows x86-64 | `memento-stub-x86_64-pc-windows-msvc.exe` |
 | macOS Intel | `memento-stub-x86_64-apple-darwin` |
 | macOS Apple Silicon | `memento-stub-aarch64-apple-darwin` |
 | Linux x86-64 | `memento-stub-x86_64-unknown-linux-gnu` |
 | Linux ARM64 | `memento-stub-aarch64-unknown-linux-gnu` |
 
----
-
-## Directory Structure
-
-```
-scripts/
-├── README.md    ← This file
-└── deploy.py    ← Unified release & deploy script
-```
+Cross-compilation is triggered automatically by pushing the tag `vX.Y.Z` (done
+by `promote`). The CI workflow is `.github/workflows/zed-stub-release.yml`.
 
 ---
 
 ## Prerequisites
 
 ```bash
-# Python build tools
+# Python build + publish tools
 pip install build twine
 
-# GitHub CLI (for stub binary upload / download)
+# GitHub CLI (for stub upload/download and dev-latest pre-release management)
 gh auth login
 ```
 
@@ -217,4 +285,4 @@ gh auth login
 
 - **[docs/dev/README.md](../docs/dev/README.md)** — Full developer guide
 - **[CHANGELOG.md](../CHANGELOG.md)** — Release history
-- **[Main README](../README.md)** — Project overview and quick start
+- **[README.md](../README.md)** — Project overview and quick start

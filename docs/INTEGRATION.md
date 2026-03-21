@@ -227,10 +227,9 @@ memento
 Memento uses SQLite with Write-Ahead Logging (WAL) mode enabled by default to support concurrent read and write operations from multiple clients. This allows multiple IDE instances or AI agents to access the same memory database simultaneously.
 
 ### Key Features:
-- **WAL Mode**: Enables concurrent reads and writes without locking conflicts
+- **WAL Mode**: Enables concurrent reads and writes without locking conflicts (single connection per server instance; no internal connection pool)
 - **Optimistic Locking**: A `version` field is stored in each memory's JSON properties and incremented on every update, allowing the database layer to detect and reject stale writes
 - **Busy Timeout**: SQLite is configured with a 5-second busy timeout before reporting a lock error, reducing transient failures under concurrent load
-- **WAL Mode**: Enables concurrent reads and writes without locking conflicts (single connection per server instance; no internal connection pool)
 
 ### Best Practices for Team Usage:
 1. **Shared Network Storage**: When using a shared database on network storage, ensure filesystem supports locking

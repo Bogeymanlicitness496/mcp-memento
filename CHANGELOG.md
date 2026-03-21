@@ -1,5 +1,45 @@
 # Changelog
 
+* 2026-03-21: v0.2.29 - Documentation audit: fixes, consistency, completeness (Hannibal)
+  * docs: expand README TOC from 8 to 14 entries — all sections now listed
+  * docs: compile CHANGELOG placeholder entries for v0.2.26-0.2.28
+  * docs(dev): document rebuild command, | sentinel separator, fingerprint venv marker, MCP server restart workflow
+  * docs(zed): add missing Table of Contents to ZED.md
+  * docs(tools): fix apply_memento_confidence_decay params — add memory_id optional; add async/await consistency note in Integration Patterns
+  * docs(decay): clarify boost_memento_confidence boosts relationships not memory node; add no-op note
+  * docs(integration): remove duplicate WAL Mode bullet point
+  * docs(api): remove deprecated docker-compose version key; fix recall_mementos example (returns text not JSON)
+  * docs(python): fix recall_mementos example (returns text not JSON)
+  * docs(agent): fix recall_mementos example (returns text not JSON)
+  * docker-compose.yml: remove deprecated version key
+  * docs(contributing): update test count 169→206; fix API.md description
+
+* 2026-03-21: v0.2.28 - Windows path parsing fix + venv fingerprint + deploy rebuild command (Hannibal)
+  * fix(stub): changed sentinel separator in local_wheel.txt from `:` to `|` — colon collided with Windows drive letters causing splitn(2, ':') to parse the drive letter as filename, crashing pip install
+  * fix(stub): venv marker now stores full sentinel fingerprint (path|hash) instead of STUB_VERSION — wheel content change forces venv rebuild, eliminating stale-server bug
+  * fix(deploy): dev-install now verifies pip exists before install, detects broken venvs, deletes them entirely so stub performs a clean rebuild on next boot
+  * fix(deploy): success marker written only if direct pip install actually succeeds
+  * feat(deploy): add `rebuild` command — fast dev cycle: build stub + wheel + invalidate Zed venv in one step, no git interaction required
+  * docs(dev): document `rebuild` workflow, `|` separator, fingerprint sentinel logic in dev/README.md
+
+
+* 2026-03-21: v0.2.27 - Regression test suite: 25/25 tools verified on live MCP server (Hannibal)
+  * test: executed 25-tool regression suite on live Zed MCP server
+  * fix(tools): get_memento — missing "Relationships" section in output added
+  * fix(tools): find_path_between_mementos — missing path array and incorrect hop count fixed
+  * fix(tools): recall_mementos — duplicate results eliminated
+  * fix(tools): search_mementos — match_mode=all and min_importance filters now work correctly
+  * fix(tools): apply_memento_confidence_decay — output formatting corrected
+  * fix(tools): get_memento_network — now returns nodes/edges topology instead of raw statistics
+
+
+* 2026-03-21: v0.2.26 - Zed extension: stale server version root cause fix (Hannibal)
+  * fix(stub): resolved stale server version issue where Zed extension launched old Python server after rebuild
+  * fix(stub): venv marker logic updated to detect PyPI vs local wheel reinstalls correctly
+  * fix(deploy): dev-install enhanced with pip verification and broken venv detection
+  * chore: updated release_workflow memory with new deploy workflow
+
+
 * 2026-03-20: v0.2.25 - Bug fixes: 8 critical tool regressions + 37 new regression tests (Hannibal)
   * fix(tools): find_memento_patterns — handler was using wrong arguments (from_memory_id); replaced with real SQL-based pattern detection
   * fix(tools): analyze_memento_graph — handler was using wrong argument (category); replaced with real graph analytics (density, degree, category coverage)

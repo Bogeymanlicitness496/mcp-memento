@@ -54,7 +54,7 @@ mcp-memento/
 │       ├── config.py          # TOOL_PROFILES, Config, DB path defaults
 │       ├── backend.py         # SQLiteBackend
 │       └── ...
-├── tests/                     # pytest test suite (169+ tests)
+├── tests/                     # pytest test suite (206+ tests)
 ├── docs/
 │   ├── TOOLS.md               # MCP tools reference
 │   ├── DECAY_SYSTEM.md        # Confidence & decay system
@@ -66,7 +66,7 @@ mcp-memento/
 │   │   ├── IDE.md             # Zed, Cursor, Windsurf, VSCode
 │   │   ├── PYTHON.md          # Python MCP client
 │   │   ├── AGENT.md           # CLI agents (Gemini, Claude, etc.)
-│   │   └── API.md             # HTTP REST, Node.js SDK, Docker
+│   │   └── API.md             # MCP client (Python), Docker, CLI export/import
 │   ├── extensions/
 │   │   └── ZED.md             # Zed extension specifics
 │   └── dev/
