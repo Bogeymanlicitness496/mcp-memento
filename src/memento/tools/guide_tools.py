@@ -153,10 +153,10 @@ PROBLEM: Pollutes memento storage with ephemeral data
 - Session: Store current method being refactored, temporary imports
 
 ## QUICK REFERENCE
-- Need it tomorrow? -> Use _persistent suffix
-- Only need it now? -> No suffix (session memory)
-- Sharing across projects? -> Use _persistent suffix
-- Project-specific only? -> No suffix (session memory)"""
+- Need it tomorrow? -> Use store_memento (long-term, cross-session)
+- Only need it now? -> Use store_memory / session context (temporary)
+- Sharing across projects? -> Use store_memento
+- Project-specific only? -> Use session memory"""
 
 
 def _generate_best_practices_guide() -> str:
