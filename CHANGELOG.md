@@ -1,5 +1,14 @@
 # Changelog
 
+* 2026-03-24: v0.2.34 - Promote to stable, Python 3.10 support, remove MCP Registry CI workflow (Hannibal)
+  * chore: promote classifier from Beta to Production/Stable in pyproject.toml
+  * chore: lower minimum Python requirement from 3.11 to 3.10; add Python 3.10 classifier
+  * docs: remove beta status badge from README
+  * ci: remove publish-mcp-registry.yml workflow
+  * chore(zed): update Windows stub binary (x86_64-pc-windows-msvc)
+
+---
+
 * 2026-03-24: v0.2.33 - Beta badge, server.json auto-bump, CI publisher fix (Hannibal)
   * docs: add beta status badge and "Beta Status" section in README with feedback CTA
   * ci: fix mcp-publisher install — dynamically resolve latest release tag via GitHub API instead of hardcoded /releases/download/latest/ (404 fix)
