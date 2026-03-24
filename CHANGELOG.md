@@ -1,7 +1,11 @@
 # Changelog
 
-* 2026-03-24: v0.2.35 - <TITLE> (Hannibal)
-  * <release notes here>
+* 2026-03-24: v0.2.35 - Promote to stable, Python 3.10 support, remove MCP Registry CI workflow (Hannibal)
+  * chore: promote classifier from Beta to Production/Stable in pyproject.toml
+  * chore: lower minimum Python requirement from 3.11 to 3.10; add Python 3.10 classifier
+  * docs: remove beta status badge from README
+  * ci: remove publish-mcp-registry.yml workflow
+  * chore(zed): update Windows stub binary (x86_64-pc-windows-msvc)
 
 
 * 2026-03-24: v0.2.34 - Promote to stable, Python 3.10 support, remove MCP Registry CI workflow (Hannibal)
