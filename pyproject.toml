@@ -4,24 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-memento"
-version = "0.2.32"
+version = "0.2.33"
 description = "Intelligent persistent memory for AI agents and IDEs via Model Context Protocol (MCP)."
 readme = "README.md"
 authors = [
     {name = "Hannibal", email = "annibale.x@gmail.com"}
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license-files = ["LICENSE"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 keywords = ["mcp", "memory", "ai", "context", "knowledge-base", "ide", "cli"]
 dependencies = [
@@ -48,7 +50,9 @@ dev = [
 memento = "memento.cli:main"
 [project.urls]
 Homepage = "https://github.com/annibale-x/mcp-memento"
+Repository = "https://github.com/annibale-x/mcp-memento"
 Issues = "https://github.com/annibale-x/mcp-memento/issues"
+Changelog = "https://github.com/annibale-x/mcp-memento/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

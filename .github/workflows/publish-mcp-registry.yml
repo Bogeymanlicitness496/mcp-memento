@@ -1,4 +1,3 @@
-# .github/workflows/publish-mcp-registry.yml
 name: Publish to MCP Registry
 
 on:
@@ -9,7 +8,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # required for OIDC
+      id-token: write # required for OIDC
       contents: read
 
     steps:
@@ -17,7 +16,8 @@ jobs:
 
       - name: Install mcp-publisher
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/latest/mcp-publisher_linux_amd64.tar.gz" | tar xz
+          LATEST=$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${LATEST}/mcp-publisher_linux_amd64.tar.gz" | tar xz
           sudo mv mcp-publisher /usr/local/bin/
 
       - name: Update version in server.json

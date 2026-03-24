@@ -1,5 +1,13 @@
 # Changelog
 
+* 2026-03-24: v0.2.33 - Beta badge, server.json auto-bump, CI publisher fix (Hannibal)
+  * docs: add beta status badge and "Beta Status" section in README with feedback CTA
+  * ci: fix mcp-publisher install — dynamically resolve latest release tag via GitHub API instead of hardcoded /releases/download/latest/ (404 fix)
+  * feat(deploy): add bump_server_json() — updates both version fields in server.json during cmd_bump
+  * chore(deploy): integrate server.json into bump pipeline so version stays in sync across all manifests
+
+---
+
 * 2026-03-21: v0.2.32 - Add MCP Registry publish workflow and server.json (Hannibal)
   * ci: add publish-mcp-registry.yml workflow — triggers on tag push, updates server.json version via jq, publishes via OIDC
   * chore: add server.json for MCP Registry (schema 2025-12-11, pypi package, stdio transport)
