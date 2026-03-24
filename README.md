@@ -3,7 +3,8 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.32-purple.svg)](https://github.com/annibale-x/mcp-memento/releases/tag/v0.2.32)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.33-purple.svg)](https://github.com/annibale-x/mcp-memento/releases/tag/v0.2.33)
+[![Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/annibale-x/mcp-memento/issues)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
@@ -409,6 +410,18 @@ For true multi-tenancy, use the original MemoryGraph project.
 Memento is built upon the solid foundation of Gregory Dickson's [MemoryGraph](https://github.com/memory-graph/memory-graph) project. We're grateful for his pioneering work in memory management systems.
 
 This fork maintains compatibility with MemoryGraph's core concepts while adapting them for the specific needs of MCP integration and modern development tooling. For users requiring the full power of MemoryGraph's advanced features, we recommend exploring the original project.
+
+## 🧪 Beta Status
+
+mcp-webgate is in **beta**. Core functionality is stable and the server is used in production,
+but the configuration API may still change before 1.0.
+
+**Feedback is very welcome.** If something doesn't work as expected, behaves oddly,
+or you have a use case that isn't covered:
+
+→ [Open an issue on GitHub](https://github.com/annibale-x/mcp-memento/issues)
+
+Bug reports, configuration questions, and feature requests all help shape the roadmap.
 
 <a name="contributing"></a>
 ## 🤝 Contributing

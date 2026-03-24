@@ -142,6 +142,8 @@ ZED_STUB_CARGO = ZED_DIR / "stub" / "Cargo.toml"
 ZED_STUB_MAIN_RS = ZED_DIR / "stub" / "src" / "main.rs"
 ZED_STUB_BIN = ZED_DIR / "stub" / "bin"
 
+SERVER_JSON = ROOT / "server.json"
+
 GITHUB_REPO = "annibale-x/mcp-memento"
 GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_REPO}"
 
@@ -375,6 +377,28 @@ def bump_lib_rs_stub_release(new_ver: str, dev_only: bool, dry: bool) -> None:
         rf'\g<1>"{tag}"',
         dry,
     )
+
+
+def bump_server_json(new_ver: str, dry: bool) -> None:
+    """Update both version fields in server.json."""
+
+    import json
+
+    if dry:
+        info(f"[dry-run] Would update {SERVER_JSON} → {new_ver}")
+        return
+
+    data = json.loads(SERVER_JSON.read_text(encoding="utf-8"))
+    data["version"] = new_ver
+
+    for pkg in data.get("packages", []):
+        pkg["version"] = new_ver
+
+    SERVER_JSON.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    ok(f"server.json → {new_ver}")
 
 
 def bump_readme_badge(new_ver: str, dry: bool) -> None:
@@ -1036,10 +1060,7 @@ def cmd_dev_install(dry: bool) -> None:
     wheels = sorted(DIST_DIR.glob("mcp_memento-*.whl"))
 
     if not wheels:
-        die(
-            "No wheel found in dist/. Run:\n"
-            "  python scripts/deploy.py build"
-        )
+        die("No wheel found in dist/. Run:\n  python scripts/deploy.py build")
 
     wheel = wheels[-1]
     wheel_posix = wheel.as_posix()
@@ -1076,8 +1097,8 @@ def cmd_dev_install(dry: bool) -> None:
         # available as soon as the user reloads the extension in Zed.
         # ------------------------------------------------------------------
         step("Installing wheel directly into Zed venv (if present)")
-        import sys as _sys
         import subprocess as _sp
+        import sys as _sys
 
         venv_dir = zed_work / "venv"
 
@@ -1106,14 +1127,20 @@ def cmd_dev_install(dry: bool) -> None:
                 # Remove the entire venv so the stub's venv_is_valid() is false
                 # and it rebuilds from scratch via setup_venv().
                 import shutil as _sh
+
                 if not dry:
                     _sh.rmtree(venv_dir, ignore_errors=True)
                     info(f"Removed: {venv_dir}")
             elif not dry:
                 result = _sp.run(
                     [
-                        str(venv_python), "-m", "pip", "install",
-                        "--force-reinstall", "--no-deps", "--quiet",
+                        str(venv_python),
+                        "-m",
+                        "pip",
+                        "install",
+                        "--force-reinstall",
+                        "--no-deps",
+                        "--quiet",
                         wheel_posix,
                     ],
                     capture_output=True,
@@ -1325,6 +1352,7 @@ def cmd_bump(
     bump_zed_cargo(new_ver, dry)
     bump_extension_toml(new_ver, dry)
     bump_lib_rs_stub_release(new_ver, dev_only=True, dry=dry)
+    bump_server_json(new_ver, dry)
     bump_readme_badge(new_ver, dry)
 
     # 3. Scaffold CHANGELOG placeholder (skipped silently if entry already exists)
