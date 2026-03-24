@@ -6,13 +6,13 @@
     "url": "https://github.com/annibale-x/mcp-memento",
     "source": "github"
   },
-  "version": "0.2.34",
+  "version": "0.2.35",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "mcp-memento",
-      "version": "0.2.34",
+      "version": "0.2.35",
       "transport": {
         "type": "stdio"
       }
