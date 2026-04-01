@@ -6,13 +6,13 @@
     "url": "https://github.com/x-monk/mcp-memento",
     "source": "github"
   },
-  "version": "0.2.35",
+  "version": "0.2.36",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "mcp-memento",
-      "version": "0.2.35",
+      "version": "0.2.36",
       "transport": {
         "type": "stdio"
       }
