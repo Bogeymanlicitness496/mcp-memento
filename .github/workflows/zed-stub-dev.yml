@@ -18,6 +18,7 @@ on:
       - dev
     paths:
       - "integrations/zed/stub/Cargo.toml"
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -170,7 +170,7 @@ extension.
 
 ```rust
 const STUB_EXT_RELEASE: &str = "v0.2.9";   // GitHub Release tag for fallback download
-const REPO: &str = "annibale-x/mcp-memento";
+const REPO: &str = "x-monk/mcp-memento";
 const BUNDLED_BIN_DIR: &str = "stub/bin";   // Relative to WASM CWD
 ```
 
