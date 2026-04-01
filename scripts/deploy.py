@@ -144,7 +144,7 @@ ZED_STUB_BIN = ZED_DIR / "stub" / "bin"
 
 SERVER_JSON = ROOT / "server.json"
 
-GITHUB_REPO = "annibale-x/mcp-memento"
+GITHUB_REPO = "x-monk/mcp-memento"
 GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_REPO}"
 
 # uv is the project's package manager. Use "uv run" for tests and builds so
