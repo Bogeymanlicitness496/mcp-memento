@@ -40,7 +40,7 @@ This means **zero manual setup**: install the extension, open Zed, done.
 
 ### Dev / manual install (current method)
 
-1. Clone the repository: `git clone https://github.com/annibale-x/mcp-memento.git`
+1. Clone the repository: `git clone https://github.com/x-monk/mcp-memento.git`
 2. Command Palette → `zed: extensions` → **Install Dev Extension**
 3. Select the `integrations/zed/` folder
 
@@ -211,7 +211,7 @@ The stub writes a debug log to:
 
 ## Links
 
-- [GitHub Repository](https://github.com/annibale-x/mcp-memento)
+- [GitHub Repository](https://github.com/x-monk/mcp-memento)
 - [PyPI Package](https://pypi.org/project/mcp-memento/)
 - [Full IDE Integration Guide](../integrations/IDE.md)
 - [Developer Guide](../../integrations/zed/README.md) *(path works from the repo root `docs/extensions/` tree)*

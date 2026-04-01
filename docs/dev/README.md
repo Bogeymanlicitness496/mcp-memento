@@ -129,7 +129,7 @@ mcp-memento/
 
 ```bash
 # Clone
-git clone https://github.com/annibale-x/mcp-memento.git
+git clone https://github.com/x-monk/mcp-memento.git
 cd mcp-memento
 
 # Create virtual environment
@@ -206,8 +206,8 @@ python scripts/deploy.py bump 0.3.0 --yes
 #   i) git merge dev → main, git push origin main, checkout dev
 
 # 3. Monitor CI (cross-compiles stub for all 5 platforms)
-gh run list --repo annibale-x/mcp-memento --limit 5
-gh run watch <run-id> --repo annibale-x/mcp-memento
+gh run list --repo x-monk/mcp-memento --limit 5
+gh run watch <run-id> --repo x-monk/mcp-memento
 
 # 4. When CI succeeds — pull fresh binaries into repo and commit
 python scripts/deploy.py ext-binaries
@@ -524,7 +524,7 @@ installs require zero network access:
 ```bash
 python scripts/deploy.py ext-binaries
 # Equivalent manual command:
-gh release download v0.3.0 --repo annibale-x/mcp-memento \
+gh release download v0.3.0 --repo x-monk/mcp-memento \
   --dir integrations/zed/stub/bin/ --clobber
 git add integrations/zed/stub/bin/
 git commit -m "chore(ext): bundle stub binaries from v0.3.0"
@@ -554,8 +554,8 @@ cargo build --target wasm32-wasip1 --release
 
 **Monitor**:
 ```bash
-gh run list --repo annibale-x/mcp-memento --limit 5
-gh run watch <run-id> --repo annibale-x/mcp-memento
+gh run list --repo x-monk/mcp-memento --limit 5
+gh run watch <run-id> --repo x-monk/mcp-memento
 ```
 
 ---
@@ -670,7 +670,7 @@ attempting to connect, the process was never launched.
 When ready to publish publicly:
 
 1. Fork `zed-industries/extensions`
-2. Add as Git submodule: `git submodule add https://github.com/annibale-x/mcp-memento.git extensions/mcp-memento`
+2. Add as Git submodule: `git submodule add https://github.com/x-monk/mcp-memento.git extensions/mcp-memento`
 3. Add entry to `extensions.toml`:
    ```toml
    [mcp-memento]

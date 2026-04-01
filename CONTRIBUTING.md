@@ -18,7 +18,7 @@
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/annibale-x/mcp-memento.git
+   git clone https://github.com/x-monk/mcp-memento.git
    cd mcp-memento
    ```
 
@@ -295,7 +295,7 @@ before running a production bump. Write the entry manually before invoking the s
 
 ## Getting Help
 
-- **Bug reports / feature requests**: [GitHub Issues](https://github.com/annibale-x/mcp-memento/issues)
+- **Bug reports / feature requests**: [GitHub Issues](https://github.com/x-monk/mcp-memento/issues)
 - **Documentation**: `docs/` directory
 - **Development docs**: `docs/dev/README.md`
 

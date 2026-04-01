@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.annibale-x/mcp-memento",
+  "name": "io.github.x-monk/mcp-memento",
   "description": "An MCP server that provides persistent memory and context management across sessions",
   "repository": {
-    "url": "https://github.com/annibale-x/mcp-memento",
+    "url": "https://github.com/x-monk/mcp-memento",
     "source": "github"
   },
   "version": "0.2.35",
