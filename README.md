@@ -3,8 +3,8 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.36-purple.svg)](https://github.com/x-monk/mcp-memento/releases/tag/v0.2.36)
-[![Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/x-monk/mcp-memento/issues)
+[![Latest Release](https://img.shields.io/badge/release-v0.2.37-purple.svg)](https://github.com/x-hannibal/mcp-memento/releases/tag/v0.2.37)
+[![Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/x-hannibal/mcp-memento/issues)
 
 Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
 
@@ -419,7 +419,7 @@ but the configuration API may still change before 1.0.
 **Feedback is very welcome.** If something doesn't work as expected, behaves oddly,
 or you have a use case that isn't covered:
 
-→ [Open an issue on GitHub](https://github.com/x-monk/mcp-memento/issues)
+→ [Open an issue on GitHub](https://github.com/x-hannibal/mcp-memento/issues)
 
 Bug reports, configuration questions, and feature requests all help shape the roadmap.
 
@@ -441,13 +441,13 @@ MIT License - see [LICENSE](LICENSE) for details.
 <a name="links"></a>
 ## 🔗 Links
 
-- **[GitHub Repository](https://github.com/x-monk/mcp-memento)** - Source code and issues
+- **[GitHub Repository](https://github.com/x-hannibal/mcp-memento)** - Source code and issues
 - **[MCP Protocol](https://spec.modelcontextprotocol.io/)** - Model Context Protocol specification
 - **[PyPI Package](https://pypi.org/project/mcp-memento/)** - Python Package Index
 - **[MCP Registry](https://registry.modelcontextprotocol.io/?q=mcp-memento&all=1)** - Model Context Protocol Registry
 
 ---
 
-**Need help?** Check the [documentation](docs/) or open an [issue](https://github.com/x-monk/mcp-memento/issues) on GitHub.
+**Need help?** Check the [documentation](docs/) or open an [issue](https://github.com/x-hannibal/mcp-memento/issues) on GitHub.
 
-<!-- mcp-name: io.github.x-monk/mcp-memento -->
+<!-- mcp-name: io.github.x-hannibal/mcp-memento -->

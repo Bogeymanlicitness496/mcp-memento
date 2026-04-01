@@ -38,7 +38,7 @@ a `Command` to Zed. It uses a **download-first with local cache** strategy:
 
 | Priority | Location | When present |
 |----------|----------|--------------|
-| 1 | `stub/bin/<asset>` relative to WASM CWD | Placed there by `deploy.py build-zed-stub` (dev) or by Zed from the extension package (marketplace) |
+| 1 | `stub/bin/<asset>` relative to WASM CWD | Placed there by `robot.py build-zed-stub` (dev) or by Zed from the extension package (marketplace) |
 | 2 | `<download-name>` in WASM CWD | Cached from a previous download |
 | 3 | GitHub Release `vX.Y.Z` | Downloaded on first run, cached for future runs |
 
@@ -114,7 +114,7 @@ They are used by the marketplace install path (Zed copies them into the work dir
 After cloning, run:
 
 ```
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 ```
 
 This command:
@@ -149,7 +149,7 @@ Zed compiles the WASM and loads the extension. No rebuild needed after editing
 ### After modifying `stub/src/main.rs`
 
 ```
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 ```
 
 Rebuild, copy to both locations, commit, push.
@@ -170,50 +170,50 @@ extension.
 
 ```rust
 const STUB_EXT_RELEASE: &str = "v0.2.9";   // GitHub Release tag for fallback download
-const REPO: &str = "x-monk/mcp-memento";
+const REPO: &str = "x-hannibal/mcp-memento";
 const BUNDLED_BIN_DIR: &str = "stub/bin";   // Relative to WASM CWD
 ```
 
-`STUB_EXT_RELEASE` is updated automatically by `scripts/deploy.py` on every version bump.
+`STUB_EXT_RELEASE` is updated automatically by `scripts/robot.py` on every version bump.
 
 ---
 
 ## 7. Release Workflow
 
-The full release is handled by `scripts/deploy.py`. See [`scripts/README.md`](../../scripts/README.md)
+The full release is handled by `scripts/robot.py`. See [`scripts/README.md`](../../scripts/README.md)
 for the authoritative command reference.
 
 ### Typical flow
 
 ```
 # 1. Dry run — verify everything looks correct
-python scripts/deploy.py bump X.Y.Z --dry-run
+python scripts/robot.py bump X.Y.Z --dry-run
 
 # 2. Full release (bumps versions, builds, tags, pushes, uploads stub binaries, merges dev → main)
-python scripts/deploy.py bump X.Y.Z --yes
+python scripts/robot.py bump X.Y.Z --yes
 
 # 3. Publish to PyPI (merge dev → main is done automatically if not already merged)
-python scripts/deploy.py publish --target pypi
+python scripts/robot.py publish --target pypi
 ```
 
 ### Dev-only release (publish to PyPI later)
 
 ```
 # Release to GitHub only, stay on dev (also rebuilds stub for current platform):
-python scripts/deploy.py bump X.Y.Z --dev --yes
+python scripts/robot.py bump X.Y.Z --dev --yes
 
 # When ready to publish — publish automatically merges dev → main first:
-python scripts/deploy.py publish --target pypi
+python scripts/robot.py publish --target pypi
 ```
 
 ### Zed extension development loop
 
 ```
 # After modifying stub/src/main.rs only (no version bump needed):
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 
 # After any change (Python server, lib.rs, stub) — full dev cycle:
-python scripts/deploy.py bump X.Y.Z --dev --yes
+python scripts/robot.py bump X.Y.Z --dev --yes
 # Then reload the extension in Zed via "Install Dev Extension"
 ```
 
@@ -228,7 +228,7 @@ On a full `bump` (without `--dev`):
 After CI finishes, optionally pull fresh CI-built binaries into the repo:
 
 ```
-python scripts/deploy.py ext-binaries
+python scripts/robot.py ext-binaries
 ```
 
 ---

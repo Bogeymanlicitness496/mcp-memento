@@ -264,7 +264,7 @@ If you encounter "database is locked" errors:
 - **Agent Issues**: Check [AGENT.md](./integrations/AGENT.md#troubleshooting)
 
 ### Community Support
-- **GitHub Issues**: [Report bugs or request features](https://github.com/x-monk/mcp-memento/issues)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/x-hannibal/mcp-memento/issues)
 - **Documentation**: Check the `docs/` directory for complete guides
 
 ## Next Steps

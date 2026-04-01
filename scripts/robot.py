@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-deploy.py — MCP Memento unified release & deploy script.
+robot.py — MCP Memento unified release & deploy script.
 
 Workflow
 --------
   rebuild  →  fix / test  →  rebuild  →  ...  →  bump [X.Y.Z]  →  promote  →  publish
 
 Usage:
-    python scripts/deploy.py rebuild
-    python scripts/deploy.py bump [X.Y.Z]
-    python scripts/deploy.py promote
-    python scripts/deploy.py publish [-t]
-    python scripts/deploy.py build
-    python scripts/deploy.py build-zed-stub
-    python scripts/deploy.py dev-install
-    python scripts/deploy.py ext-binaries [--version X.Y.Z]
-    python scripts/deploy.py upload-stubs [--version X.Y.Z]
-    python scripts/deploy.py status
+    python scripts/robot.py rebuild
+    python scripts/robot.py bump [X.Y.Z]
+    python scripts/robot.py promote
+    python scripts/robot.py publish [-t]
+    python scripts/robot.py build
+    python scripts/robot.py build-zed-stub
+    python scripts/robot.py dev-install
+    python scripts/robot.py ext-binaries [--version X.Y.Z]
+    python scripts/robot.py upload-stubs [--version X.Y.Z]
+    python scripts/robot.py status
 
 Commands
 --------
@@ -74,28 +74,28 @@ Options
 Examples
 --------
   # Inner dev loop: rebuild after every code change
-  python scripts/deploy.py rebuild
+  python scripts/robot.py rebuild
 
   # Snapshot current state as a new patch version (auto-increments Z)
-  python scripts/deploy.py bump
+  python scripts/robot.py bump
 
   # Snapshot as a specific version
-  python scripts/deploy.py bump 0.3.0
+  python scripts/robot.py bump 0.3.0
 
   # Preview without executing
-  python scripts/deploy.py rebuild --dry-run
+  python scripts/robot.py rebuild --dry-run
 
   # Promote to official release (interactive)
-  python scripts/deploy.py promote
+  python scripts/robot.py promote
 
   # Publish to PyPI
-  python scripts/deploy.py publish
+  python scripts/robot.py publish
 
   # Publish to TestPyPI
-  python scripts/deploy.py publish --test
+  python scripts/robot.py publish --test
 
   # Show current version state
-  python scripts/deploy.py status
+  python scripts/robot.py status
 
 """
 
@@ -144,7 +144,7 @@ ZED_STUB_BIN = ZED_DIR / "stub" / "bin"
 
 SERVER_JSON = ROOT / "server.json"
 
-GITHUB_REPO = "annibale-x/mcp-memento"
+GITHUB_REPO = "x-hannibal/mcp-memento"
 GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_REPO}"
 
 # uv is the project's package manager. Use "uv run" for tests and builds so
@@ -804,7 +804,7 @@ def upload_stub_binaries_to_release(python_ver: str, dry: bool) -> None:
         check=False,
     )
 
-    # Upload local binaries (at minimum the Windows stub built by deploy.py).
+    # Upload local binaries (at minimum the Windows stub built by robot.py).
     for f in files:
         cmd = f"gh release upload {tag} {f} --repo {GITHUB_REPO} --clobber"
         run(cmd, dry=dry)
@@ -979,7 +979,7 @@ def build_stub_local(dry: bool) -> None:
     if zed_work_dir is None:
         warn("Could not locate Zed data directory; skipping work-dir copy.")
         warn(
-            "Run 'python scripts/deploy.py build-zed-stub' again after installing Zed."
+            "Run 'python scripts/robot.py build-zed-stub' again after installing Zed."
         )
         return
 
@@ -1060,7 +1060,7 @@ def cmd_dev_install(dry: bool) -> None:
     wheels = sorted(DIST_DIR.glob("mcp_memento-*.whl"))
 
     if not wheels:
-        die("No wheel found in dist/. Run:\n  python scripts/deploy.py build")
+        die("No wheel found in dist/. Run:\n  python scripts/robot.py build")
 
     wheel = wheels[-1]
     wheel_posix = wheel.as_posix()
@@ -1393,8 +1393,8 @@ def cmd_bump(
     print()
     ok(f"Dev snapshot v{new_ver} complete. Tag is local only — CI was NOT triggered.")
     info("When ready for the official release:")
-    info("  python scripts/deploy.py promote")
-    info("  python scripts/deploy.py publish")
+    info("  python scripts/robot.py promote")
+    info("  python scripts/robot.py publish")
 
 
 # ---------------------------------------------------------------------------
@@ -1473,7 +1473,7 @@ def cmd_promote(new_ver: str, skip_tests: bool, dry: bool) -> None:
         if not dry:
             die(
                 f"Tag {py_tag} not found locally. "
-                "Run 'python scripts/deploy.py bump' first to create the snapshot."
+                "Run 'python scripts/robot.py bump' first to create the snapshot."
             )
         git_push_tag(py_tag, dry)
 
@@ -1485,7 +1485,7 @@ def cmd_promote(new_ver: str, skip_tests: bool, dry: bool) -> None:
 
     print()
     ok(f"v{new_ver} promoted to official release!")
-    info("Publish to PyPI with:  python scripts/deploy.py publish")
+    info("Publish to PyPI with:  python scripts/robot.py publish")
 
 
 # ---------------------------------------------------------------------------
@@ -1495,7 +1495,7 @@ def cmd_promote(new_ver: str, skip_tests: bool, dry: bool) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="deploy.py",
+        prog="robot.py",
         description="MCP Memento unified release & deploy script.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,

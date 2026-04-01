@@ -17,15 +17,15 @@ use zed_extension_api::{
 // ---------------------------------------------------------------------------
 
 /// GitHub release tag for the current stub binaries (matches Python version tag).
-const STUB_EXT_RELEASE: &str = "v0.2.36";
+const STUB_EXT_RELEASE: &str = "v0.2.37";
 
 /// Distribution channel: "prod" downloads from the vX.Y.Z GitHub Release;
 /// "dev" downloads from the rolling pre-release tag "dev-latest".
-/// Set automatically by scripts/deploy.py during a version bump.
+/// Set automatically by scripts/robot.py during a version bump.
 const STUB_CHANNEL: &str = "dev";
 
 /// GitHub repository (owner/name) hosting the releases.
-const REPO: &str = "annibale-x/mcp-memento";
+const REPO: &str = "x-hannibal/mcp-memento";
 
 /// Subdirectory inside the extension working directory where bundled stub
 /// binaries are stored (committed to the repository under integrations/zed/).
@@ -130,7 +130,7 @@ impl MementoExtension {
         //
         // Zed uses  <data>/extensions/work/<ext-id>/  as the WASM sandbox CWD.
         // It does NOT copy repo source files there.  The binary is placed here
-        // by running:  python scripts/deploy.py build-zed-stub
+        // by running:  python scripts/robot.py build-zed-stub
         // ------------------------------------------------------------------
         let bundled_path = format!("{}/{}", BUNDLED_BIN_DIR, asset_name);
         log(&format!("Step 1: checking bundled path: {}", bundled_path));

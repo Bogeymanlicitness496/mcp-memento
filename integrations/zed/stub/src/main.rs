@@ -48,7 +48,7 @@ use std::os::unix::process::CommandExt;
 // Version — must match STUB_EXT_RELEASE in lib.rs
 // ---------------------------------------------------------------------------
 
-const STUB_VERSION: &str = "v0.2.36";
+const STUB_VERSION: &str = "v0.2.37";
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -183,7 +183,7 @@ fn marker_path(venv: &Path) -> PathBuf {
 }
 
 /// Dev-mode sentinel data read from `local_wheel.txt`.
-/// Written by `scripts/deploy.py rebuild` as "<path>:<sha256[:12]>".
+/// Written by `scripts/robot.py rebuild` as "<path>:<sha256[:12]>".
 /// The full raw string (path+hash) is used as the venv marker fingerprint,
 /// so any rebuild that changes the wheel content invalidates the venv.
 struct LocalWheel {
