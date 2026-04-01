@@ -94,7 +94,7 @@ mcp-memento/
 │   └── RULES.md                 ← Agent rules and prompts
 │
 ├── scripts/
-│   ├── deploy.py                ← Unified release & deploy script (PRIMARY)
+│   ├── robot.py                ← Unified release & deploy script (PRIMARY)
 │   └── README.md                ← Scripts documentation
 │
 ├── .github/
@@ -129,7 +129,7 @@ mcp-memento/
 
 ```bash
 # Clone
-git clone https://github.com/x-monk/mcp-memento.git
+git clone https://github.com/x-hannibal/mcp-memento.git
 cd mcp-memento
 
 # Create virtual environment
@@ -179,7 +179,7 @@ are required. All async tests use `pytest-asyncio` in auto mode.
 
 ## 5. Release Workflow
 
-The canonical release workflow is driven by `scripts/deploy.py`.
+The canonical release workflow is driven by `scripts/robot.py`.
 Every step below is automated by the script — manual steps are documented
 here for reference only.
 
@@ -187,10 +187,10 @@ here for reference only.
 
 ```bash
 # 1. Dry run — preview everything without side effects
-python scripts/deploy.py bump 0.3.0 --dry-run
+python scripts/robot.py bump 0.3.0 --dry-run
 
 # 2. Execute the full bump
-python scripts/deploy.py bump 0.3.0 --yes
+python scripts/robot.py bump 0.3.0 --yes
 
 # What 'bump' does, in order:
 #   a) Runs pytest
@@ -206,37 +206,37 @@ python scripts/deploy.py bump 0.3.0 --yes
 #   i) git merge dev → main, git push origin main, checkout dev
 
 # 3. Monitor CI (cross-compiles stub for all 5 platforms)
-gh run list --repo x-monk/mcp-memento --limit 5
-gh run watch <run-id> --repo x-monk/mcp-memento
+gh run list --repo x-hannibal/mcp-memento --limit 5
+gh run watch <run-id> --repo x-hannibal/mcp-memento
 
 # 4. When CI succeeds — pull fresh binaries into repo and commit
-python scripts/deploy.py ext-binaries
+python scripts/robot.py ext-binaries
 
 # 5. Publish to TestPyPI first (optional but recommended)
-python scripts/deploy.py publish --target testpypi
+python scripts/robot.py publish --target testpypi
 
 # 6. Publish to PyPI
-python scripts/deploy.py publish --target pypi
+python scripts/robot.py publish --target pypi
 ```
 
 ### Dev-only release (publish to PyPI later)
 
 ```bash
 # 1. Release to GitHub only, stay on dev (also rebuilds stub for current platform)
-python scripts/deploy.py bump 0.3.0 --dev --yes
+python scripts/robot.py bump 0.3.0 --dev --yes
 
 # 2. When ready to publish — automatically merges dev → main before upload
-python scripts/deploy.py publish
+python scripts/robot.py publish
 ```
 
 ### Zed extension development loop
 
 ```bash
 # After modifying stub/src/main.rs only (no version bump needed):
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 
 # After any change (Python server, lib.rs, stub) — full dev cycle:
-python scripts/deploy.py bump 0.3.0 --dev --yes
+python scripts/robot.py bump 0.3.0 --dev --yes
 # Then reload the extension in Zed via "Install Dev Extension"
 ```
 
@@ -248,7 +248,7 @@ The `rebuild` command combines all three steps (build stub + build wheel + inval
 Zed venv) into a single command with no git interaction:
 
 ```bash
-python scripts/deploy.py rebuild
+python scripts/robot.py rebuild
 ```
 
 After it completes, **restart the MCP server** (not the full extension):
@@ -266,10 +266,10 @@ For finer control (e.g. only rebuilding the wheel without touching the stub):
 
 ```bash
 # 1. Build the local wheel
-python scripts/deploy.py build
+python scripts/robot.py build
 
 # 2. Invalidate the Zed venv and print the settings snippet
-python scripts/deploy.py dev-install
+python scripts/robot.py dev-install
 #    → prints: "MEMENTO_LOCAL_WHEEL": "L:/Work/.../dist/mcp_memento-X.Y.Z-py3-none-any.whl"
 
 # 3. Paste the printed line into Zed settings
@@ -300,13 +300,13 @@ path, crashing pip install).
 ### Build wheel only (no git operations)
 
 ```bash
-python scripts/deploy.py build
+python scripts/robot.py build
 ```
 
 ### Check current version state
 
 ```bash
-python scripts/deploy.py status
+python scripts/robot.py status
 ```
 
 ---
@@ -365,7 +365,7 @@ del Config.PROFILE
 
 ## 7. Deploy Script Reference
 
-**File**: `scripts/deploy.py`
+**File**: `scripts/robot.py`
 
 ### Commands
 
@@ -474,7 +474,7 @@ buffered it indefinitely. The native stub solves this by:
 
 ```bash
 # Recommended: use the deploy script (builds + copies to stub/bin/ + copies to Zed work dir)
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 
 # Or manually (replace target with your platform):
 cd integrations/zed/stub
@@ -494,7 +494,7 @@ Push a release tag — GitHub Actions handles everything:
 
 ```bash
 # Via deploy script (recommended):
-python scripts/deploy.py promote --yes
+python scripts/robot.py promote --yes
 
 # Or manually:
 git tag v0.3.0
@@ -522,9 +522,9 @@ After CI completes, download and commit the binaries so future extension
 installs require zero network access:
 
 ```bash
-python scripts/deploy.py ext-binaries
+python scripts/robot.py ext-binaries
 # Equivalent manual command:
-gh release download v0.3.0 --repo x-monk/mcp-memento \
+gh release download v0.3.0 --repo x-hannibal/mcp-memento \
   --dir integrations/zed/stub/bin/ --clobber
 git add integrations/zed/stub/bin/
 git commit -m "chore(ext): bundle stub binaries from v0.3.0"
@@ -554,8 +554,8 @@ cargo build --target wasm32-wasip1 --release
 
 **Monitor**:
 ```bash
-gh run list --repo x-monk/mcp-memento --limit 5
-gh run watch <run-id> --repo x-monk/mcp-memento
+gh run list --repo x-hannibal/mcp-memento --limit 5
+gh run watch <run-id> --repo x-hannibal/mcp-memento
 ```
 
 ---
@@ -592,9 +592,9 @@ v0.2.24   ← Python + Zed stub release
 v0.3.0    ← Next release
 ```
 
-The tag is created by `deploy.py bump` (or `promote`) and pushed to origin.
+The tag is created by `robot.py bump` (or `promote`) and pushed to origin.
 Pushing the tag triggers `zed-stub-release.yml`, which cross-compiles stub binaries
-for all 5 platforms and uploads them to the GitHub Release (already created by `deploy.py`).
+for all 5 platforms and uploads them to the GitHub Release (already created by `robot.py`).
 
 > **Note**: An older `vX.Y.Z-ext.N` format was considered for extension-only hotfixes
 > but was never adopted. Only the `vX.Y.Z` format is used. Do not create `-ext.N` tags.
@@ -615,12 +615,12 @@ only in that case.
   * Change description two
 ```
 
-The `deploy.py bump` command prepends a skeleton entry. **Edit it manually**
+The `robot.py bump` command prepends a skeleton entry. **Edit it manually**
 to add meaningful release notes before pushing.
 
 ### README.md badges
 
-The version badge is updated automatically by `deploy.py bump`:
+The version badge is updated automatically by `robot.py bump`:
 
 ```markdown
 [![Latest Release](https://img.shields.io/badge/release-v0.2.6-purple.svg)](...)
@@ -670,7 +670,7 @@ attempting to connect, the process was never launched.
 When ready to publish publicly:
 
 1. Fork `zed-industries/extensions`
-2. Add as Git submodule: `git submodule add https://github.com/x-monk/mcp-memento.git extensions/mcp-memento`
+2. Add as Git submodule: `git submodule add https://github.com/x-hannibal/mcp-memento.git extensions/mcp-memento`
 3. Add entry to `extensions.toml`:
    ```toml
    [mcp-memento]

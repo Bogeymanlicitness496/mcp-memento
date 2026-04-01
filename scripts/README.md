@@ -2,10 +2,10 @@
 
 This directory contains the unified release and deployment tooling for MCP Memento.
 
-## deploy.py — Primary Release Script
+## robot.py — Primary Release Script
 
 ```bash
-python scripts/deploy.py <command> [options]
+python scripts/robot.py <command> [options]
 ```
 
 ---
@@ -19,7 +19,7 @@ rebuild  →  fix / test  →  rebuild  →  ...  →  bump [X.Y.Z]  →  promot
 ### Inner loop (fast, no git)
 
 ```bash
-python scripts/deploy.py rebuild
+python scripts/robot.py rebuild
 ```
 
 Rebuilds everything needed to test the current code in Zed — no git interaction:
@@ -39,10 +39,10 @@ Ctrl+Shift+P → "zed: extensions" → Reload mcp-memento
 
 ```bash
 # Auto-increment patch version (X.Y.Z → X.Y.Z+1)
-python scripts/deploy.py bump
+python scripts/robot.py bump
 
 # Explicit version
-python scripts/deploy.py bump 0.3.0
+python scripts/robot.py bump 0.3.0
 ```
 
 Freezes the current state as a numbered dev version:
@@ -60,7 +60,7 @@ Use `bump` when you want a named checkpoint before moving on.
 ### Promote to official release
 
 ```bash
-python scripts/deploy.py promote
+python scripts/robot.py promote
 ```
 
 Promotes the current `pyproject.toml` version to an official release (interactive):
@@ -82,11 +82,11 @@ Promotes the current `pyproject.toml` version to an official release (interactiv
 ### Publish to PyPI
 
 ```bash
-python scripts/deploy.py publish
+python scripts/robot.py publish
 
 # TestPyPI first (recommended)
-python scripts/deploy.py publish -t
-python scripts/deploy.py publish
+python scripts/robot.py publish -t
+python scripts/robot.py publish
 ```
 
 Uploads `dist/*` to PyPI. If the release tag was not yet on the remote,
@@ -101,8 +101,8 @@ it is pushed first (triggering CI).
 Fast dev rebuild: stub + wheel + Zed venv. **No git interaction.**
 
 ```bash
-python scripts/deploy.py rebuild
-python scripts/deploy.py rebuild --dry-run
+python scripts/robot.py rebuild
+python scripts/robot.py rebuild --dry-run
 ```
 
 ### `bump [X.Y.Z]`
@@ -111,10 +111,10 @@ Dev snapshot: bump versions, commit, local tag, build stub + upload to
 `dev-latest`, build wheel, install into Zed venv.
 
 ```bash
-python scripts/deploy.py bump              # auto-increment patch (Z+1)
-python scripts/deploy.py bump 0.3.0        # explicit version
-python scripts/deploy.py bump --skip-tests
-python scripts/deploy.py bump --dry-run
+python scripts/robot.py bump              # auto-increment patch (Z+1)
+python scripts/robot.py bump 0.3.0        # explicit version
+python scripts/robot.py bump --skip-tests
+python scripts/robot.py bump --dry-run
 ```
 
 ### `promote`
@@ -123,9 +123,9 @@ Promote to official release: verify CHANGELOG, run tests, push tag,
 merge dev→main, upload stubs. Always interactive.
 
 ```bash
-python scripts/deploy.py promote
-python scripts/deploy.py promote --skip-tests
-python scripts/deploy.py promote --dry-run
+python scripts/robot.py promote
+python scripts/robot.py promote --skip-tests
+python scripts/robot.py promote --dry-run
 ```
 
 ### `publish`
@@ -133,9 +133,9 @@ python scripts/deploy.py promote --dry-run
 Upload `dist/*` to PyPI or TestPyPI.
 
 ```bash
-python scripts/deploy.py publish
-python scripts/deploy.py publish -t        # TestPyPI
-python scripts/deploy.py publish --dry-run
+python scripts/robot.py publish
+python scripts/robot.py publish -t        # TestPyPI
+python scripts/robot.py publish --dry-run
 ```
 
 ### `build`
@@ -143,7 +143,7 @@ python scripts/deploy.py publish --dry-run
 Build sdist + wheel only. No version bump, no git operations.
 
 ```bash
-python scripts/deploy.py build
+python scripts/robot.py build
 ```
 
 ### `build-zed-stub`
@@ -154,7 +154,7 @@ Build the Rust stub binary for the current platform, copy it into
 Use this when you modify `stub/src/main.rs` without doing a full `bump`.
 
 ```bash
-python scripts/deploy.py build-zed-stub
+python scripts/robot.py build-zed-stub
 ```
 
 ### `ext-binaries [--version X.Y.Z]`
@@ -164,8 +164,8 @@ them into `integrations/zed/stub/bin/`. Run after CI finishes following a
 `promote`.
 
 ```bash
-python scripts/deploy.py ext-binaries
-python scripts/deploy.py ext-binaries --version 0.3.0
+python scripts/robot.py ext-binaries
+python scripts/robot.py ext-binaries --version 0.3.0
 ```
 
 ### `upload-stubs [--version X.Y.Z]`
@@ -174,7 +174,7 @@ Create the GitHub Release (if missing) and upload local stub binaries from
 `stub/bin/`. Manual fallback if the CI upload step failed during `promote`.
 
 ```bash
-python scripts/deploy.py upload-stubs
+python scripts/robot.py upload-stubs
 ```
 
 ### `dev-install`
@@ -186,7 +186,7 @@ and the pip install command.
 Called automatically by `rebuild` — only run manually if needed.
 
 ```bash
-python scripts/deploy.py dev-install
+python scripts/robot.py dev-install
 ```
 
 ### `status`
@@ -194,7 +194,7 @@ python scripts/deploy.py dev-install
 Print the current version from every manifest file.
 
 ```bash
-python scripts/deploy.py status
+python scripts/robot.py status
 ```
 
 ---

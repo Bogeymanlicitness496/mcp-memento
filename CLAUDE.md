@@ -5,11 +5,11 @@ description: How to bump the version in mcp-memento
 type: feedback
 ---
 
-Always edit dthe CHANGELOG and use `python deploy.py bump` to bump the version in mcp-memento. Never manually edit version numbers in pyproject.toml, server.json, README.md, or CHANGELOG.md.
+Always edit dthe CHANGELOG and use `python robot.py bump` to bump the version in mcp-memento. Never manually edit version numbers in pyproject.toml, server.json, README.md, or CHANGELOG.md.
 
-**Why:** The deploy.py script handles all version bumps atomically and correctly (pyproject.toml, server.json, README badge, CHANGELOG). Manual bumps are error-prone and may miss files or steps.
+**Why:** The robot.py script handles all version bumps atomically and correctly (pyproject.toml, server.json, README badge, CHANGELOG). Manual bumps are error-prone and may miss files or steps.
 
-**How to apply:** Whenever the user asks for a version bump / "fai bump" in mcp-memento, run `python deploy.py bump` instead of editing files manually.
+**How to apply:** Whenever the user asks for a version bump / "fai bump" in mcp-memento, run `python robot.py bump` instead of editing files manually.
 
 
 ---

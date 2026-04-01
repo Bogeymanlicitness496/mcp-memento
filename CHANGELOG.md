@@ -1,7 +1,11 @@
 # Changelog
 
-* 2026-04-01: v0.2.36 - Update GitHub username from annibale-x to x-monk (Hannibal)
-  * chore(repo): update all GitHub URLs, manifest links, and documentation references to new username x-monk
+* 2026-04-02: v0.2.37 - Rename deploy.py to robot.py, update GitHub username to x-hannibal (Hannibal)
+  * chore(repo): rename scripts/deploy.py to scripts/robot.py and update all references
+  * chore(repo): update remaining GitHub username references from x-monk to x-hannibal
+
+* 2026-04-01: v0.2.36 - Update GitHub username from annibale-x to x-hannibal (Hannibal)
+  * chore(repo): update all GitHub URLs, manifest links, and documentation references to new username x-hannibal
 
 * 2026-03-24: v0.2.35 - Promote to stable, Python 3.10 support, remove MCP Registry CI workflow (Hannibal)
   * chore: promote classifier from Beta to Production/Stable in pyproject.toml
@@ -164,13 +168,13 @@
 
 ---
 
-* 2026-03-19: v0.2.18 - Debug logging opt-in and deploy.py CLI redesign (Hannibal)
+* 2026-03-19: v0.2.18 - Debug logging opt-in and robot.py CLI redesign (Hannibal)
   * Zed extension and stub logging disabled by default; both enabled via debug.enable marker file in Zed work directory
   * Stub debug_enabled() checks MEMENTO_WORK_DIR first, then falls back to stub binary directory
   * Fixed WASM log path: replaced hardcoded /tmp/memento-zed.log with cross-platform std::env::temp_dir()
-  * deploy.py: bump X.Y.Z always dev (non-interactive); promote replaces prod bump; publish defaults to PyPI; publish -t for TestPyPI
+  * robot.py: bump X.Y.Z always dev (non-interactive); promote replaces prod bump; publish defaults to PyPI; publish -t for TestPyPI
   * Updated integrations/zed/README.md: unified debug logging section, updated release workflow
-  * Updated scripts/deploy.py docstring and help to reflect new CLI
+  * Updated scripts/robot.py docstring and help to reflect new CLI
 
 ---
 
@@ -180,7 +184,7 @@
   * Venv is validated at every startup via a version marker file; rebuilt automatically on extension update
   * WASM extension passes MEMENTO_WORK_DIR env var to stub so venv location is always inside Zed's sandbox
   * Removed pipx fallback strategy (superseded by venv isolation)
-  * deploy.py bump now keeps STUB_VERSION in main.rs in sync with STUB_EXT_RELEASE in lib.rs
+  * robot.py bump now keeps STUB_VERSION in main.rs in sync with STUB_EXT_RELEASE in lib.rs
 
 ---
 
@@ -203,12 +207,12 @@
 
 ---
 
-* 2026-03-19: v0.2.13 - deploy.py release workflow hardening (Hannibal)
+* 2026-03-19: v0.2.13 - robot.py release workflow hardening (Hannibal)
   * Fixed bump prod after --dev on same version: tag local-only no longer causes fatal error, retag + push offered automatically
 
 ---
 
-* 2026-03-19: v0.2.12 - deploy.py release workflow hardening (Hannibal)
+* 2026-03-19: v0.2.12 - robot.py release workflow hardening (Hannibal)
   * Fixed "release not found": upload_stub_binaries_to_release now creates the GitHub Release object before uploading assets
   * Fixed bump resume: tag already on remote treated as mid-flight resume, tagging step skipped gracefully
   * Added git_tag_exists_remote() using git ls-remote for reliable local-vs-remote tag distinction
@@ -221,7 +225,7 @@
 
 ---
 
-* 2026-03-19: v0.2.11 - deploy.py robustness fixes for release workflow (Hannibal)
+* 2026-03-19: v0.2.11 - robot.py robustness fixes for release workflow (Hannibal)
   * Fixed bump command crashing when prod release attempted after a --dev bump on the same version (tag exists only locally)
   * Fixed "release not found" error: upload_stub_binaries_to_release now creates the GitHub Release before uploading assets
   * Fixed bump resume: tag already on remote is now treated as a mid-flight resume, not a fatal error
@@ -233,7 +237,7 @@
 * 2026-03-18: v0.2.10 - Zed extension dual-channel stub workflow (Hannibal)
   * Added dev-latest pre-release channel for iterative Zed extension testing without full releases
   * Added zed-stub-dev.yml CI workflow: triggers on dev branch push with stub/Cargo.toml changes
-  * Updated deploy.py: bump --dev builds stub locally and uploads to dev-latest pre-release
+  * Updated robot.py: bump --dev builds stub locally and uploads to dev-latest pre-release
   * Updated lib.rs: STUB_CHANNEL constant switches download URL between dev and prod channels
   * Fixed configuration defaults from "auto" to "default" placeholder for WASM sandbox compatibility
   * Removed failed %USERPROFILE% resolution attempts in WASM; replaced with static placeholders
@@ -246,14 +250,14 @@
   * Added zed-stub-release.yml CI workflow: cross-compiles 5 targets and uploads to GitHub Release
   * Added stub/main.rs: lightweight native binary bridging WASM sandbox to Python MCP server
   * Fixed 404 error in development mode caused by WASM sandbox isolation from source tree
-  * Added ext-binaries deploy.py subcommand to download CI-built stubs into stub/bin/
+  * Added ext-binaries robot.py subcommand to download CI-built stubs into stub/bin/
 
 ---
 
 * 2026-03-18: v0.2.8 - Zed MCP extension scaffold (Hannibal)
   * Added initial Zed editor extension integrating mcp-memento as an MCP server
   * Added extension.toml, lib.rs and Cargo.toml for the Zed WASM extension
-  * Added deploy.py support for bumping Zed extension version alongside Python package
+  * Added robot.py support for bumping Zed extension version alongside Python package
 
 ---
 
@@ -266,7 +270,7 @@
   * Fixed non-existent CLI commands (memento --maintenance, memento --export without --format)
   * Added MCP tool call disambiguation notes throughout (pseudocode vs importable library)
   * Fixed PyPI build: relative links now correctly converted to absolute GitHub URLs; changelog section injected dynamically into PyPI long description
-  * Fixed deploy.py: git_is_clean now ignores untracked files (Windows NUL phantom entry)
+  * Fixed robot.py: git_is_clean now ignores untracked files (Windows NUL phantom entry)
 
 ---
 

@@ -145,7 +145,7 @@ jobs:
 
       # ── Upload assets to the existing release ────────────────────────────
       # The Python release (same tag) must already exist before this runs.
-      # deploy.py creates it via `git tag vX.Y.Z && git push origin vX.Y.Z`
+      # robot.py creates it via `git tag vX.Y.Z && git push origin vX.Y.Z`
       # followed by the GitHub release created in the bump workflow.
       - name: Upload assets to existing release
         env:

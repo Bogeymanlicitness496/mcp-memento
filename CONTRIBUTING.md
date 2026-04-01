@@ -18,7 +18,7 @@
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/x-monk/mcp-memento.git
+   git clone https://github.com/x-hannibal/mcp-memento.git
    cd mcp-memento
    ```
 
@@ -73,7 +73,7 @@ mcp-memento/
 │       ├── README.md          # Development workflow & release process
 │       └── SCHEMA.md          # Database schema
 ├── scripts/
-│   ├── deploy.py              # Automated release script
+│   ├── robot.py              # Automated release script
 │   └── README.md              # Deploy commands reference
 ├── integrations/
 │   └── zed/                   # Zed WASM extension
@@ -262,7 +262,7 @@ chore(deps): bump mcp to 1.3.0
 
 ## Release Process
 
-All releases are managed by `scripts/deploy.py`. The full workflow is documented in:
+All releases are managed by `scripts/robot.py`. The full workflow is documented in:
 
 - [`docs/dev/README.md`](docs/dev/README.md) — process overview, branching strategy, CI/CD
 - [`scripts/README.md`](scripts/README.md) — deploy command reference
@@ -295,7 +295,7 @@ before running a production bump. Write the entry manually before invoking the s
 
 ## Getting Help
 
-- **Bug reports / feature requests**: [GitHub Issues](https://github.com/x-monk/mcp-memento/issues)
+- **Bug reports / feature requests**: [GitHub Issues](https://github.com/x-hannibal/mcp-memento/issues)
 - **Documentation**: `docs/` directory
 - **Development docs**: `docs/dev/README.md`
 
