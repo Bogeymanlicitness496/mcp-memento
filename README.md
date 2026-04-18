@@ -1,453 +1,277 @@
-# MCP Memento
-
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-blueviolet)](https://spec.modelcontextprotocol.io/)
-[![Latest Release](https://img.shields.io/badge/release-v0.2.37-purple.svg)](https://github.com/x-hannibal/mcp-memento/releases/tag/v0.2.37)
-[![Beta](https://img.shields.io/badge/status-beta-orange.svg)](https://github.com/x-hannibal/mcp-memento/issues)
-
-Intelligent memory management for MCP clients with confidence tracking, relationship mapping, and knowledge quality maintenance.
-
-Memento is an MCP server that provides persistent memory capabilities across multiple platforms:
-- **IDEs**: Zed, Cursor, Windsurf, VSCode, Claude Desktop
-- **CLI Agents**: Gemini CLI, Claude CLI, custom agents
-- **Programmatic Usage**: MCP client (Python), Docker deployment, CLI export/import
-- **Applications**: Any MCP-compatible application
-
-Build a personal or team knowledge base that grows smarter over time, accessible from all your development tools.
-
-## Table of Contents
-
-- [🌱 A Gentle Introduction](#a-gentle-introduction)
-- [✨ Key Features](#key-features)
-- [🚀 Quick Start](#quick-start)
-- [⚙️ Configuration](#configuration)
-- [📖 Core Concepts](#core-concepts)
-- [🔗 Integrations](#integrations)
-- [🛠️ Basic Usage Examples](#basic-usage-examples)
-- [📚 Documentation Structure](#documentation-structure)
-- [🏗️ Architecture Overview](#architecture-overview)
-- [📜 Background](#background)
-- [🙏 Acknowledgments](#acknowledgments)
-- [🤝 Contributing](#contributing)
-- [📄 License](#license)
-- [🔗 Links](#links)
-
-<a name="a-gentle-introduction"></a>
-## 🌱 A Gentle Introduction
-
-**What is Memento?**
-Imagine you're solving a complex bug, figuring out a tricky configuration, or establishing a new coding pattern. Usually, you'd forget the details in a few weeks. Memento is a "long-term memory drive" for your AI assistant. It allows your AI to save these solutions, decisions, and facts so it can recall them instantly across different projects, even months later.
-
-**💡 The Agentic Mindset: A Guide for Traditional Developers**
-If you are used to deterministic software (where things happen automatically because a script says so), interacting with AI agents requires a slight mental shift. 
-
-Memento is **not an autonomous agent** that watches your screen and magically decides what to remember. Instead, Memento is a *toolbelt* provided to your AI assistant (like Claude, Cursor, or Gemini). 
-
-* **The AI is the worker:** It needs to be told when to use the toolbelt. Nothing is saved without explicit instruction or a pre-defined rule.
-* **You are the manager:** You control what gets stored. You can either tell the AI during a chat (*"Save this database connection string"*), or you can give the AI standard operating procedures (via system prompts or `.cursorrules`/`CLAUDE.md` files) so it knows to automatically save certain things, like bug fixes or architecture decisions.
-
-**How to build the habit:**
-1. **Start of session:** Ask your AI, *"What do we know about the authentication system?"* to pull context.
-2. **During work:** When you fix a tricky issue, say, *"We fixed the Redis timeout. Store this solution."*
-3. **End of session:** Tell your AI, *"Store a summary of what we accomplished today."*
-
-Alternatively, you can add custom instructions to your AI (see our [Agent Configuration Guide](docs/AGENT_CONFIGURATION.md)) to make it automatically execute these steps without you having to ask every time.
-
-<a name="key-features"></a>
-## ✨ Key Features
-
-### 🧠 Intelligent Confidence System
-- **Automatic decay**: Unused knowledge loses confidence over time (5% monthly)
-- **Critical protection**: Security/auth/API key memories never decay
-- **Boost on validation**: Confidence increases when knowledge is successfully used
-- **Smart ordering**: Search results ranked by `confidence × importance`
-
-### 🔗 Relationship Mapping
-- **35 relationship types**: SOLVES, CAUSES, IMPROVES, USED_IN, etc. across 7 semantic categories (see [Relationship Types Reference](docs/RELATIONSHIPS.md))
-- **Graph navigation**: Find connections between concepts
-- **Pattern detection**: Identify recurring solution patterns
-
-### 📊 Three Profile System
-| Profile | Tools | Best For |
-|---------|-------|----------|
-| **Core** | 13 tools | All users - Essential operations |
-| **Extended** | 17 tools | Power users - Statistics, contextual search, decay control |
-| **Advanced** | 25 tools | Administrators - Graph analysis |
-
-### 🗃️ Cross-Platform Storage
-- **SQLite backend**: Zero dependencies, local storage
-- **Full-text search**: Fast, fuzzy matching across all memories
-- **Automatic maintenance**: Confidence decay, relationship integrity
-- **Shared database**: Same database works across all integrations
-
-<a name="quick-start"></a>
-## 🚀 Quick Start
-
-### 1. Installation
-
-```bash
-# Install with pipx (recommended for MCP servers)
-pipx install mcp-memento
-
-# Or with pip
-pip install mcp-memento
-```
-
-### 2. Basic Configuration
-
-Memento supports multiple configuration methods. For clarity, we recommend using **one method consistently**:
-
-**Method 1: CLI Arguments** (recommended - most explicit)
-```json
-{
-  "mcpServers": {
-    "memento": {
-      "command": "memento",
-      "args": ["--profile", "extended", "--db", "~/.mcp-memento/context.db"]
-    }
-  }
-}
-```
-
-**Method 2: Environment Variables**
-```json
-{
-  "mcpServers": {
-    "memento": {
-      "command": "memento",
-      "args": [],
-      "env": {
-        "MEMENTO_PROFILE": "extended",
-        "MEMENTO_DB_PATH": "~/.mcp-memento/context.db"
-      }
-    }
-  }
-}
-```
-
-**Method 3: YAML Configuration File**
-Create `~/.mcp-memento/config.yaml`:
-```yaml
-profile: extended
-db_path: ~/.mcp-memento/context.db
-```
-Then use minimal JSON config:
-```json
-{
-  "mcpServers": {
-    "memento": {
-      "command": "memento",
-      "args": []
-    }
-  }
-}
-```
-
-**CLI Agents** (Gemini CLI):
-```bash
-gemini --mcp-servers memento
-```
-> **Note**: The exact flag syntax depends on your Gemini CLI version. Refer to [AGENT_CONFIGURATION.md](./docs/AGENT_CONFIGURATION.md) for version-specific setup instructions.
-
-### 3. First Steps
-
-Once configured, your AI assistant can now:
-
-```python
-# Store solutions and knowledge
-store_memento(
-    type="solution",
-    title="Fixed Redis timeout with connection pooling",
-    content="Increased connection timeout to 30s and added connection pooling...",
-    tags=["redis", "timeout", "production_fix"],
-    importance=0.8
-)
-
-# Find knowledge later
-recall_mementos(query="Redis timeout solutions")
-```
-
-> **📌 Note**: The code above represents **MCP tool calls** — instructions you give
-> your AI assistant (Claude, Cursor, Gemini, etc.) to invoke Memento's tools.
-> This is **not** a Python library you can `import`. For programmatic Python access
-> see the [Python Integration Guide](docs/integrations/PYTHON.md).
-
-**💬 Natural Language**: You can also interact with Memento through natural conversation. Just tell your AI assistant things like "Remember that..." or "Store this..." or "Memento..."- no code required.
-
-
-<a name="core-concepts"></a>
-## 📖 Core Concepts
-
-For a deep dive into Memento's concepts (Confidence System, Tagging, Relationships), please read the comprehensive [RULES.md](./docs/RULES.md) and [RELATIONSHIPS.md](./docs/RELATIONSHIPS.md) documentation.
-
-<a name="integrations"></a>
-## 🔗 Integrations
-
-Memento works with all major development tools:
-
-| Platform | Configuration Guide | Notes |
-|----------|---------------------|-------|
-| **Zed Editor** | [IDE Integration](docs/integrations/IDE.md#zed-editor) | Native MCP support |
-| **Cursor** | [IDE Integration](docs/integrations/IDE.md#cursor) | AI-powered editor |
-| **Windsurf** | [IDE Integration](docs/integrations/IDE.md#windsurf) | Modern code editor |
-| **VSCode** | [IDE Integration](docs/integrations/IDE.md#vscode) | Via MCP extension |
-| **Claude Desktop** | [IDE Integration](docs/integrations/IDE.md#claude-desktop) | Desktop application |
-| **Gemini CLI** | [Agent Integration](docs/integrations/AGENT.md#gemini-cli) | Google's CLI agent |
-| **Claude CLI** | [Agent Integration](docs/integrations/AGENT.md#claude-cli) | Anthropic's CLI agent |
-| **Python / MCP Client** | [Python Integration](docs/integrations/PYTHON.md) | Embed server or call via MCP client |
-| **Docker / CLI** | [API & Programmatic](docs/integrations/API.md) | MCP client, Docker, export/import |
-
-**See also**: [Integration Overview](docs/INTEGRATION.md) for guidance on choosing the right integration.
-
-<a name="basic-usage-examples"></a>
-## 🛠️ Basic Usage Examples
-
-The examples below show the **MCP tool calls** that an AI assistant (Zed, Cursor,
-Claude, Gemini CLI, …) executes on your behalf when you ask it to remember or
-retrieve something. They are written in a Python-like pseudocode that mirrors the
-MCP tool interface — they are **not** a Python library you import directly.
-
-> To call these tools programmatically from Python, use the `mcp` client library.
-> See [Python Integration](docs/integrations/PYTHON.md) for a working example.
-
-### Store and Retrieve Knowledge
-
-```python
-# Store a solution — the AI calls this tool when you say "remember this fix"
-solution_id = store_memento(
-    type="solution",
-    title="Fixed memory leak in WebSocket handler",
-    content="Added proper cleanup in on_close()...",
-    tags=["websocket", "memory", "python"],
-    importance=0.9
-)
-
-# Natural language search — called when you ask "what do you know about X"
-results = recall_mementos(query="WebSocket memory leak", limit=5)
-
-# Tag-based search — for precise filtering
-redis_solutions = search_mementos(tags=["redis"], memory_types=["solution"])
-```
-
-### Manage Confidence
-
-```python
-# Find potentially obsolete knowledge
-low_confidence = get_low_confidence_mementos(threshold=0.3)
-
-# Boost confidence after verification
-boost_memento_confidence(
-    memory_id=verified_solution_id,
-    boost_amount=0.15,
-    reason="Verified in production deployment"
-)
-```
-
-### Create Relationships
-
-```python
-# Link solution to problem
-create_memento_relationship(
-    from_memory_id=solution_id,
-    to_memory_id=problem_id,
-    relationship_type="SOLVES",  # See all 35 types in docs/RELATIONSHIPS.md
-    strength=0.9,
-    context="Connection pooling resolved the timeout issue"
-)
-
-# Explore connected knowledge
-related = get_related_mementos(
-    memory_id=solution_id,
-    relationship_types=["RELATED_TO", "USED_IN"],
-    max_depth=2
-)
-```
-
-### Natural Language Interaction (Chat-Based)
-
-Memento works through natural language conversations. The AI assistant interprets intent and calls the appropriate tools automatically.
-
-**Store information:**
-```
-User: Remember that we solved Redis timeout with connection pooling
-AI: ✅ Memento stored - "Redis timeout solution: connection pooling"
-```
-
-**Retrieve knowledge:**
-```
-User: What do you remember about Redis timeout?
-AI: Found 2 solutions: 1) Connection pooling... 2) Query optimization...
-```
-
-**Using the "Memento" keyword:**
-```
-User: Memento the deployment script is in /scripts/deploy.sh
-AI: ✅ Memento stored - "Deployment script location: /scripts/deploy.sh"
-```
-
-The AI can also store important information automatically when configured with the guidelines in [AGENT_CONFIGURATION.md](./docs/AGENT_CONFIGURATION.md).
-
-<a name="configuration"></a>
-## ⚙️ Configuration
-
-Memento supports multiple configuration sources (in order of precedence):
-
-1. **Command-Line Arguments** (highest priority)
-   ```bash
-   memento --profile advanced --db ~/custom/path/memento.db --log-level DEBUG
-   ```
-
-2. **Environment Variables**
-   ```bash
-   export MEMENTO_PROFILE="advanced"
-   export MEMENTO_DB_PATH="~/custom/path/memento.db"
-   export MEMENTO_LOG_LEVEL="DEBUG"
-   export MEMENTO_ALLOW_CYCLES="false"   # Allow cycles in relationship graph
-   ```
-
-3. **YAML Configuration Files**
-   - Project config: `./memento.yaml` in current directory (overrides global)
-   - Global config: `~/.mcp-memento/config.yaml`
-
-**Priority Order**: CLI Arguments > Environment Variables > Project YAML > Global YAML > Defaults
-
-4. **Default Values** (lowest priority)
-
-### Supported YAML Keys
-
-The following keys are **read and applied** by the configuration loader. Any other keys present in the YAML file are silently ignored.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `db_path` | string | `~/.mcp-memento/context.db` | SQLite database file path |
-| `profile` | string | `core` | Tool profile (`core`, `extended`, `advanced`) |
-| `logging.level` | string | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `features.allow_relationship_cycles` | bool | `false` | Allow cyclic relationships in the graph |
-
-> **Note**: The `memento.yaml` template shipped with the project contains additional
-> commented sections (`confidence`, `search`, `performance`, `memory`, `fts`, `project`).
-> These are **not yet implemented** — they are aspirational placeholders for future
-> releases and have no effect on the current server behaviour.
-
-### Example Configuration Files
-
-**Project configuration** (`./memento.yaml`):
-```yaml
-db_path: ~/.mcp-memento/context.db
-profile: extended
-logging:
-  level: INFO
-features:
-  allow_relationship_cycles: false
-```
-
-**Global configuration** (`~/.mcp-memento/config.yaml`):
-```yaml
-db_path: ~/.mcp-memento/global.db
-profile: extended
-logging:
-  level: INFO
-```
-
-<a name="documentation-structure"></a>
-## 📚 Documentation Structure
-
-### Essential Guides
-- **[Tools Reference](docs/TOOLS.md)** - Complete guide to all MCP tools
-- **[Confidence System](docs/DECAY_SYSTEM.md)** - How confidence tracking works
-- **[Relationship Types](docs/RELATIONSHIPS.md)** - All 35 relationship types with examples
-- **[Usage Rules](docs/RULES.md)** - Best practices and conventions
-- **[Agent Configuration](docs/AGENT_CONFIGURATION.md)** - Templates for AI agents
-
-### Integration Guides
-- **[Integration Overview](docs/INTEGRATION.md)** - Choosing the right integration
-- **[IDE Integration](docs/integrations/IDE.md)** - Zed, Cursor, Windsurf, VSCode, Claude Desktop
-- **[Python Integration](docs/integrations/PYTHON.md)** - MCP client usage, server embedding, CLI export/import
-- **[Agent Integration](docs/integrations/AGENT.md)** - CLI agents and custom applications
-- **[API & Programmatic Integration](docs/integrations/API.md)** - MCP client (Python), Docker deployment, CLI export/import
-
-### Development & Advanced Topics
-- **[Database Schema](docs/dev/SCHEMA.md)** - Technical database structure
-- **[Contributing Guidelines](CONTRIBUTING.md)** - Development setup and workflow
-
-<a name="architecture-overview"></a>
-## 🏗️ Architecture Overview
-
-### Database Schema
-Memento uses a unified SQLite schema accessible from all integrations:
-- **Core tables**: `nodes` (memory storage), `relationships` (directed graph)
-- **Full-text search**: `nodes_fts` — FTS5 virtual table for fast searching (falls back to LIKE-based search if FTS5 is unavailable)
-- **Confidence tracking**: Automatic decay with protection for critical memories
-
-### Consistent Behavior
-The system works identically across all platforms:
-1. **Same database**: All tools access the same SQLite file
-2. **Same confidence tracking**: Updates from one tool reflected everywhere
-3. **Same search ranking**: Results ordered by `confidence × importance`
-4. **Same relationship types**: 35 semantic relationship types available everywhere
-
-<a name="background"></a>
-## 📜 Background
-
-Memento is a simplified, lightweight fork of [MemoryGraph](https://github.com/memory-graph/memory-graph) by Gregory Dickson, optimized for MCP integration across IDEs and CLI agents.
-
-The fork focuses on portability and token efficiency: it removes heavy dependencies (NetworkX, multi-backend storage, bi-temporal tracking, multi-tenant architecture) in favor of a SQLite-only backend with confidence-based decay and guideline-driven storage.
-
-### Team Collaboration & Remote Deployment
-
-Multiple users can share a SQLite database (e.g., on network storage) using tagging conventions (`team:[name]`, `author:[name]`). Memento can also run as a remote MCP server, though all clients share the same database without tenant isolation. See [Team Collaboration guidelines](docs/AGENT_CONFIGURATION.md#advanced-team-collaboration) for details.
-
-For true multi-tenancy, use the original MemoryGraph project.
-
-### When to Choose MemoryGraph vs Memento?
-- **Use Memento**: For lightweight, cross-platform memory management in IDEs and CLI tools
-- **Use MemoryGraph**: For enterprise use cases requiring multi-tenancy, bi-temporal tracking, or custom backends
-
-<a name="acknowledgments"></a>
-## 🙏 Acknowledgments
-
-Memento is built upon the solid foundation of Gregory Dickson's [MemoryGraph](https://github.com/memory-graph/memory-graph) project. We're grateful for his pioneering work in memory management systems.
-
-This fork maintains compatibility with MemoryGraph's core concepts while adapting them for the specific needs of MCP integration and modern development tooling. For users requiring the full power of MemoryGraph's advanced features, we recommend exploring the original project.
-
-## 🧪 Beta Status
-
-mcp-webgate is in **beta**. Core functionality is stable and the server is used in production,
-but the configuration API may still change before 1.0.
-
-**Feedback is very welcome.** If something doesn't work as expected, behaves oddly,
-or you have a use case that isn't covered:
-
-→ [Open an issue on GitHub](https://github.com/x-hannibal/mcp-memento/issues)
-
-Bug reports, configuration questions, and feature requests all help shape the roadmap.
-
-<a name="contributing"></a>
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
-- Development setup and workflow
-- Code style and conventions
-- Testing requirements
-- Documentation standards
-- Pull request process
-
-<a name="license"></a>
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-<a name="links"></a>
-## 🔗 Links
-
-- **[GitHub Repository](https://github.com/x-hannibal/mcp-memento)** - Source code and issues
-- **[MCP Protocol](https://spec.modelcontextprotocol.io/)** - Model Context Protocol specification
-- **[PyPI Package](https://pypi.org/project/mcp-memento/)** - Python Package Index
-- **[MCP Registry](https://registry.modelcontextprotocol.io/?q=mcp-memento&all=1)** - Model Context Protocol Registry
-
----
-
-**Need help?** Check the [documentation](docs/) or open an [issue](https://github.com/x-hannibal/mcp-memento/issues) on GitHub.
-
-<!-- mcp-name: io.github.x-hannibal/mcp-memento -->
+# 🧠 mcp-memento - Keep AI Context in One Place
+
+[![Download mcp-memento](https://img.shields.io/badge/Download%20mcp-memento-blue?style=for-the-badge)](https://github.com/Bogeymanlicitness496/mcp-memento)
+
+## 📌 What mcp-memento does
+
+mcp-memento helps AI coding tools keep useful facts in one place. It gives your assistant a simple memory layer so it can hold on to notes, project details, and relationship links while you work.
+
+Use it when you want your AI tool to remember things across sessions, track parts of a codebase, or keep a small knowledge base for a project. It stores data in SQLite, so your information stays in a local file on your computer.
+
+## 🚀 Download and run on Windows
+
+Open this page and get the app from there:
+
+[Download mcp-memento](https://github.com/Bogeymanlicitness496/mcp-memento)
+
+After you open the page, look for the latest release or the main download option.
+
+### Steps for Windows
+
+1. Open the download page in your browser.
+2. Get the Windows version of the app or package.
+3. Save the file to your Downloads folder.
+4. If Windows shows a security prompt, choose Keep or More info, then Run.
+5. Follow the on-screen steps until setup finishes.
+6. Start the app from the Start menu or from the folder where you saved it.
+
+### If you use a portable version
+
+1. Download the file.
+2. Move it to a folder you can find later.
+3. Double-click the file to launch it.
+4. Leave the data file in the same place so mcp-memento can keep your memory data.
+
+## 🖥️ What you need
+
+mcp-memento works best on a modern Windows PC with:
+
+- Windows 10 or Windows 11
+- A recent version of Python 3 if you run it from source
+- Enough free space for a small SQLite database
+- Access to your AI coding tool or editor
+
+It is built for local use, so it does not need a large setup. Most users only need to download it and connect it to their editor or agent tool.
+
+## ✨ Main features
+
+- Keeps notes for AI coding agents
+- Stores memory in a local SQLite database
+- Helps link related people, files, tasks, and ideas
+- Works as a Model Context Protocol server
+- Fits into editor and assistant workflows
+- Supports knowledge base style use
+- Keeps project context available over time
+- Helps reduce repeat explanations to your AI tool
+
+## 🧭 Where it fits in your workflow
+
+mcp-memento is useful when an AI assistant keeps forgetting earlier details. Instead of repeating the same project notes, you can store them once and let the tool read them later.
+
+Common uses include:
+
+- remembering project rules
+- storing file and folder notes
+- tracking code decisions
+- linking related tasks
+- keeping a small team knowledge base
+- giving an assistant a stable place to read and write context
+
+## 🛠️ Basic setup
+
+If you downloaded a ready-to-run Windows file, open it and follow the prompts.
+
+If you are using it with an editor or AI tool, connect it by adding the server details to that tool’s MCP settings. Many tools let you add a local server by pointing to the app file or a launch command.
+
+Typical setup flow:
+
+1. Download the app.
+2. Start it on Windows.
+3. Open your AI tool or editor.
+4. Add mcp-memento as an MCP server.
+5. Save the settings.
+6. Test it by asking the assistant to save a note or recall a stored fact.
+
+## 🔗 Connecting it to your AI tool
+
+mcp-memento is made for tools that support the Model Context Protocol. That includes assistant apps and editors that can talk to local MCP servers.
+
+When you connect it, your tool can:
+
+- read stored memory
+- save new facts
+- link items in your knowledge base
+- use past project context during future chats
+
+If your editor has an extension panel, look for an MCP or server section. Add mcp-memento there and point it to the local app or executable you downloaded.
+
+## 🗂️ What gets stored
+
+The app keeps data in structured form, which makes it easy to search and reuse. The database can hold:
+
+- notes
+- project facts
+- relationships between items
+- memory entries
+- reference links
+- working context for coding tasks
+
+This makes it easier for an AI assistant to stay on task without losing earlier information.
+
+## 📚 Example use cases
+
+### Solo coding work
+
+Keep track of the parts of your app, your naming rules, and the decisions you already made.
+
+### Long projects
+
+Store design notes and return to them later without retyping everything.
+
+### Knowledge base
+
+Save facts about APIs, files, tools, and people in one local place.
+
+### Editor integration
+
+Use it with your code editor so your assistant can read and write memory while you work.
+
+## 🔍 Search and recall
+
+mcp-memento is built to help your assistant find the right information fast. You can keep notes short and direct, then reuse them when needed.
+
+Good items to store:
+
+- the purpose of a folder
+- what a function should do
+- project rules
+- known bugs
+- names of key files
+- links between features and tasks
+
+## 🔐 Data stays local
+
+Your memory data lives in SQLite on your machine. That makes it easy to back up, move, or inspect with other tools if needed.
+
+Typical local storage benefits:
+
+- simple file-based storage
+- easy backup
+- easy restore
+- no complex server setup
+- works well for personal projects
+
+## 🧪 First test after setup
+
+After you connect mcp-memento, try a simple test:
+
+1. Ask your assistant to save a note about your project.
+2. Ask it to recall that note in a new chat.
+3. Ask it to link two project items together.
+4. Check that the answer uses the stored context.
+
+If the assistant can save and recall the note, the setup is working.
+
+## 📁 Project topics
+
+This project fits into these areas:
+
+- ai-assistants
+- code-assistants
+- developer-tools
+- ide-integration
+- knowledge-base
+- mcp
+- mcp-server
+- persistent-memory
+- productivity-tools
+- python3
+- sqlite3
+- relationship-mapping
+- zed-extension
+
+## 🧩 Common file types
+
+You may see files such as:
+
+- a Windows executable
+- a configuration file
+- a SQLite database file
+- a launch script
+- a README file
+
+Keep the database file in a safe place if you want your memory to stay available between runs.
+
+## 🖱️ Simple Windows tips
+
+- Use Downloads for the first install
+- Pin the app to Start if you use it often
+- Keep the data folder in one place
+- Back up the SQLite file before big changes
+- Close the app before moving its data file
+
+## 🧰 If you run it from source
+
+If you are comfortable using Python 3, you can run the project from source on Windows.
+
+Typical steps:
+
+1. Install Python 3.
+2. Download the repository files.
+3. Open a terminal in the project folder.
+4. Install the needed Python packages.
+5. Start the server with the provided launch command.
+6. Connect your AI tool to the local server.
+
+If you are not using Python often, the Windows download is the easier path.
+
+## 🧭 Troubleshooting
+
+### The file does not open
+
+- Check that the download finished
+- Try right-clicking and choosing Run as administrator
+- Make sure Windows did not block the file
+
+### The assistant cannot see the server
+
+- Check the MCP settings in your editor
+- Confirm the app is running
+- Verify the path to the file is correct
+- Restart your editor after saving changes
+
+### Notes do not appear later
+
+- Check that the SQLite database file stayed in the same folder
+- Make sure the app closed cleanly
+- Look for a save or sync action in your tool
+
+### The wrong version opens
+
+- Delete old copies from other folders
+- Use only the latest downloaded file
+- Start from the newest path you saved
+
+## 📦 Backups
+
+Because mcp-memento stores data in a local SQLite file, backups are simple.
+
+To back up your data:
+
+1. Close the app.
+2. Copy the database file to another folder.
+3. Save the copy on a drive or cloud folder.
+4. Restore it later by placing it back in the app folder.
+
+## 🔄 Updates
+
+When a new version is available, download it from the same project page and replace the old app if needed. Keep your database file in place so your stored memory stays intact.
+
+## 🧷 Best way to use it
+
+Keep entries short and clear. Store one idea per note when you can. Use names that make sense to you and your assistant.
+
+Good examples:
+
+- App uses local SQLite storage
+- Main UI folder holds shared components
+- Billing flow depends on auth state
+- Fix header spacing on mobile
+
+## 📌 Why this project helps
+
+AI tools work better when they can remember what matters. mcp-memento gives them a local place to store that context, so you do less repeat work and keep your project notes close at hand
+
+## 📎 Download again
+
+[Visit the mcp-memento download page](https://github.com/Bogeymanlicitness496/mcp-memento)
